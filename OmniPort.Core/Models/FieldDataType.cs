@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace OmniPort.Core.Models
 {
-    public enum FieldType
+    public enum FieldDataType
     {
         String,
         Integer,

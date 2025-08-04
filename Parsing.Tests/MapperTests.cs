@@ -18,8 +18,8 @@ namespace Parsing.Tests
                 Template = new ImportTemplate { Columns = ["Name", "Age"] },
                 Mappings = new List<FieldMapping>
             {
-                new() { SourceField = "full_name", TargetField = "Name", TargetType = FieldType.String },
-                new() { SourceField = "years", TargetField = "Age", TargetType = FieldType.Integer }
+                new() { SourceField = "full_name", TargetField = "Name", TargetType = FieldDataType.String },
+                new() { SourceField = "years", TargetField = "Age", TargetType = FieldDataType.Integer }
             }
             };
 

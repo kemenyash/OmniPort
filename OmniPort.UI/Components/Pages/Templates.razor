@@ -1,6 +1,8 @@
 ﻿@page "/templates"
+@using OmniPort.Core.Interfaces
 @using OmniPort.Core.Models
 @inject NavigationManager Navigation
+@inject ITemplateService TemplateService
 
 <h1 class="text-2xl font-bold mb-6">Templates</h1>
 
@@ -14,11 +16,23 @@
         </tr>
     </thead>
     <tbody>
-        <tr>
-            <td class="p-3">Example Template</td>
-            <td class="p-3">@DateTime.Today.ToShortDateString()</td>
-            <td class="p-3">CSV</td>
-        </tr>
+        @if (ExistingTemplates.Any())
+        {
+            @foreach (var tpl in ExistingTemplates)
+            {
+                <tr>
+                    <td class="p-3">@tpl.Name</td>
+                    <td class="p-3">@tpl.CreatedAt.ToShortDateString()</td>
+                    <td class="p-3">@tpl.SourceType</td>
+                </tr>
+            }
+        }
+        else
+        {
+            <tr>
+                <td colspan="3" class="p-3 text-gray-500 italic">No templates found.</td>
+            </tr>
+        }
     </tbody>
 </table>
 
@@ -35,7 +49,7 @@
         <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl" @onclick:stopPropagation>
             <h2 class="text-xl font-semibold mb-4">Create Template</h2>
 
-            <EditForm Model="@NewTemplate" OnValidSubmit="SaveTemplate">
+            <EditForm Model="@NewTemplate" OnValidSubmit="SaveTemplateAsync">
                 <div class="mb-4">
                     <label class="block font-medium mb-1">Template Name</label>
                     <InputText class="w-full border rounded px-3 py-2" @bind-Value="NewTemplate.TemplateName" />
@@ -47,7 +61,7 @@
                         <InputText class="border rounded px-2 py-1 col-span-2" @bind-Value="field.SourceField" placeholder="Field name" />
                         <InputSelect class="border rounded px-2 py-1" @bind-Value="field.TargetType">
                             <option value="">Select type</option>
-                            @foreach (FieldType type in Enum.GetValues(typeof(FieldType)))
+                            @foreach (FieldDataType type in Enum.GetValues(typeof(FieldDataType)))
                             {
                                 <option value="@type">@type</option>
                             }
@@ -74,13 +88,24 @@
 
     private ImportTemplate NewTemplate = new();
     private List<FieldMapping> NewFields = new();
+    private List<TemplateSummary> ExistingTemplates = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTemplatesAsync();
+    }
+
+    private async Task LoadTemplatesAsync()
+    {
+        ExistingTemplates = await TemplateService.GetTemplatesSummaryAsync();
+    }
 
     private void ShowCreateTemplateModal()
     {
         NewTemplate = new ImportTemplate();
         NewFields = new List<FieldMapping>
         {
-            new FieldMapping { SourceField = "", TargetType = FieldType.String }
+            new FieldMapping { SourceField = "", TargetType = FieldDataType.String }
         };
         ShowModal = true;
     }
@@ -92,7 +117,7 @@
 
     private void AddField()
     {
-        NewFields.Add(new FieldMapping { SourceField = "", TargetType = FieldType.String });
+        NewFields.Add(new FieldMapping { SourceField = "", TargetType = FieldDataType.String });
     }
 
     private void RemoveField(FieldMapping field)
@@ -100,12 +125,15 @@
         NewFields.Remove(field);
     }
 
-    private void SaveTemplate()
+    private async Task SaveTemplateAsync()
     {
+        if (string.IsNullOrWhiteSpace(NewTemplate.TemplateName) || !NewFields.Any())
+            return;
+
         NewTemplate.Columns = NewFields.Select(f => f.SourceField).ToList();
 
-        // TODO: Save to DB or state store
-        Console.WriteLine($"Saved template: {NewTemplate.TemplateName}");
+        await TemplateService.SaveTemplateAsync(NewTemplate, "CSV", NewFields);
+        await LoadTemplatesAsync();
 
         ShowModal = false;
     }
