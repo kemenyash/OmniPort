@@ -3,65 +3,143 @@
 @layout MainLayout
 @rendermode InteractiveServer
 
-<h1 class="text-2xl font-bold mb-4">Join Templates</h1>
+<h1 class="text-2xl font-bold mb-6">Join Templates</h1>
 
 <div class="grid grid-cols-2 gap-6">
-    <div class="border rounded p-4">
-        <h2 class="font-semibold text-lg mb-2">Source Template</h2>
-        <ul class="space-y-2">
+    <!-- Source Template -->
+    <div class="border rounded p-4 shadow bg-white">
+        <div class="flex items-center justify-between mb-2">
+            <h2 class="text-xl font-semibold text-blue-700">Source Template:</h2>
+            <select class="border rounded px-2 py-1" @onchange="OnSourceTemplateChanged">
+                <option disabled selected value="">Select Template</option>
+                @foreach (var template in AvailableTemplates)
+                {
+                    <option value="@template">@template</option>
+                }
+            </select>
+        </div>
+        <p class="text-sm text-gray-500 mb-3 italic">Fields from original data</p>
+        <ul class="list-disc pl-5 space-y-1">
             @foreach (var field in SourceFields)
             {
-                <li draggable="true"
-                    @ondragstart="e => OnDragStart(e, field)"
-                    class="px-3 py-2 border rounded bg-gray-100 hover:bg-gray-200 cursor-move">
-                    @field
+                <li>
+                    <span class="font-medium">@field.Name</span>
+                    <span class="text-gray-500 text-sm">(@field.Type)</span>
                 </li>
             }
         </ul>
     </div>
 
-    <div class="border rounded p-4">
-        <h2 class="font-semibold text-lg mb-2">Target Template</h2>
-        <ul class="space-y-2">
-            @foreach (var field in TargetFields)
+    <!-- Target Template -->
+    <div class="border rounded p-4 shadow bg-white">
+        <div class="flex items-center justify-between mb-2">
+            <h2 class="text-xl font-semibold text-green-700">Internal CRM Schema:</h2>
+            <select class="border rounded px-2 py-1" @onchange="OnTargetTemplateChanged">
+                <option disabled selected value="">Select Schema</option>
+                @foreach (var template in AvailableTemplates)
+                {
+                    <option value="@template">@template</option>
+                }
+            </select>
+        </div>
+        <p class="text-sm text-gray-500 mb-3 italic">Match source fields to target structure</p>
+        <div class="space-y-4">
+            @foreach (var target in TargetFields)
             {
-                <li class="px-3 py-2 border rounded bg-white"
-                    @ondrop="e => OnDrop(e, field)"
-                    @ondragover:preventDefault
-                    @ondrop:preventDefault>
-                    <strong>@field</strong>
-                    <div class="text-sm text-gray-500">
-                        Mapped: @(Mappings.ContainsKey(field) ? Mappings[field] : "(not mapped)")
-                    </div>
-                </li>
+                <div>
+                    <label class="block font-medium text-gray-800">
+                        @target.Name <span class="text-gray-500 text-sm">(@target.Type)</span>
+                    </label>
+                    <select class="w-full mt-1 px-3 py-2 border rounded bg-gray-50"
+                            @onchange="e => MapField(target.Name, e.Value?.ToString())">
+                        <option value="">-- Not Mapped --</option>
+                        @foreach (var source in SourceFields)
+                        {
+                            <option value="@source.Name" selected="@IsSelected(target.Name, source.Name)">
+                                @source.Name (@source.Type)
+                            </option>
+                        }
+                    </select>
+                </div>
             }
-        </ul>
+        </div>
     </div>
 </div>
 
-<button @onclick="SaveMapping" class="mt-6 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+<button @onclick="SaveMapping"
+        class="mt-6 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
     Save Mapping
 </button>
 
 @code {
-    private List<string> SourceFields = new() { "Name", "Email", "Age", "Country" };
-    private List<string> TargetFields = new() { "FullName", "Contact", "Years", "Location" };
-    private Dictionary<string, string> Mappings = new();
-
-    private string? DraggedField;
-
-    private void OnDragStart(DragEventArgs e, string field)
+    public class FieldDefinition
     {
-        DraggedField = field;
+        public string Name { get; set; } = default!;
+        public string Type { get; set; } = default!;
     }
 
-    private void OnDrop(DragEventArgs e, string targetField)
+    private List<string> AvailableTemplates = new() { "Template A", "Template B", "Template C" };
+
+    private string? SelectedSourceTemplate;
+    private string? SelectedTargetTemplate;
+
+    private List<FieldDefinition> SourceFields = new();
+    private List<FieldDefinition> TargetFields = new();
+
+    private Dictionary<string, string> Mappings = new();
+
+    private void OnSourceTemplateChanged(ChangeEventArgs e)
     {
-        if (!string.IsNullOrEmpty(DraggedField))
+        SelectedSourceTemplate = e.Value?.ToString();
+        SourceFields = SelectedSourceTemplate switch
         {
-            Mappings[targetField] = DraggedField;
-            StateHasChanged();
-        }
+            "Template A" => new() {
+                new() { Name = "Name", Type = "string" },
+                new() { Name = "Email", Type = "string" },
+                new() { Name = "Age", Type = "int" },
+            },
+            "Template B" => new() {
+                new() { Name = "Full Name", Type = "string" },
+                new() { Name = "E-mail", Type = "string" },
+            },
+            _ => new()
+        };
+
+        Mappings.Clear();
+    }
+
+    private void OnTargetTemplateChanged(ChangeEventArgs e)
+    {
+        SelectedTargetTemplate = e.Value?.ToString();
+        // Replace with real schema loading logic
+        TargetFields = SelectedTargetTemplate switch
+        {
+            "Template B" => new() {
+                new() { Name = "FullName", Type = "string" },
+                new() { Name = "Contact", Type = "string" },
+                new() { Name = "Location", Type = "string" },
+            },
+            "Template C" => new() {
+                new() { Name = "User", Type = "string" },
+                new() { Name = "EmailAddress", Type = "string" },
+            },
+            _ => new()
+        };
+
+        Mappings.Clear();
+    }
+
+    private void MapField(string target, string? source)
+    {
+        if (string.IsNullOrWhiteSpace(source))
+            Mappings.Remove(target);
+        else
+            Mappings[target] = source;
+    }
+
+    private bool IsSelected(string target, string source)
+    {
+        return Mappings.TryGetValue(target, out var mapped) && mapped == source;
     }
 
     private void SaveMapping()
