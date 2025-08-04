@@ -1,0 +1,75 @@
+﻿@page "/join-templates"
+@using OmniPort.UI.Components.Layout
+@layout MainLayout
+@rendermode InteractiveServer
+
+<h1 class="text-2xl font-bold mb-4">Join Templates</h1>
+
+<div class="grid grid-cols-2 gap-6">
+    <div class="border rounded p-4">
+        <h2 class="font-semibold text-lg mb-2">Source Template</h2>
+        <ul class="space-y-2">
+            @foreach (var field in SourceFields)
+            {
+                <li draggable="true"
+                    @ondragstart="e => OnDragStart(e, field)"
+                    class="px-3 py-2 border rounded bg-gray-100 hover:bg-gray-200 cursor-move">
+                    @field
+                </li>
+            }
+        </ul>
+    </div>
+
+    <div class="border rounded p-4">
+        <h2 class="font-semibold text-lg mb-2">Target Template</h2>
+        <ul class="space-y-2">
+            @foreach (var field in TargetFields)
+            {
+                <li class="px-3 py-2 border rounded bg-white"
+                    @ondrop="e => OnDrop(e, field)"
+                    @ondragover:preventDefault
+                    @ondrop:preventDefault>
+                    <strong>@field</strong>
+                    <div class="text-sm text-gray-500">
+                        Mapped: @(Mappings.ContainsKey(field) ? Mappings[field] : "(not mapped)")
+                    </div>
+                </li>
+            }
+        </ul>
+    </div>
+</div>
+
+<button @onclick="SaveMapping" class="mt-6 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+    Save Mapping
+</button>
+
+@code {
+    private List<string> SourceFields = new() { "Name", "Email", "Age", "Country" };
+    private List<string> TargetFields = new() { "FullName", "Contact", "Years", "Location" };
+    private Dictionary<string, string> Mappings = new();
+
+    private string? DraggedField;
+
+    private void OnDragStart(DragEventArgs e, string field)
+    {
+        DraggedField = field;
+    }
+
+    private void OnDrop(DragEventArgs e, string targetField)
+    {
+        if (!string.IsNullOrEmpty(DraggedField))
+        {
+            Mappings[targetField] = DraggedField;
+            StateHasChanged();
+        }
+    }
+
+    private void SaveMapping()
+    {
+        Console.WriteLine("Mappings:");
+        foreach (var kv in Mappings)
+        {
+            Console.WriteLine($"{kv.Key} ← {kv.Value}");
+        }
+    }
+}

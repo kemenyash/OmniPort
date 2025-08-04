@@ -1,0 +1,149 @@
+﻿@page "/transform"
+@using OmniPort.UI.Components.Layout
+@layout MainLayout
+@rendermode InteractiveServer
+
+<h1 class="text-2xl font-bold mb-4">Transform File</h1>
+
+<EditForm Model="@Model" OnValidSubmit="RunTransformation">
+    <div class="space-y-6">
+
+        <!-- Template Selection -->
+        <div>
+            <label class="block font-medium mb-1">Joined Template</label>
+            <InputSelect @bind-Value="Model.SelectedTemplate" class="w-full border rounded px-3 py-2">
+                <option disabled selected value="">Select a template</option>
+                @foreach (var template in Templates)
+                {
+                    <option>@template</option>
+                }
+            </InputSelect>
+        </div>
+
+        <!-- Toggle upload vs URL -->
+        <div class="flex gap-4">
+            <button type="button" @onclick="() => InputMode = UploadMode.Upload"
+                    class="@GetButtonClass(UploadMode.Upload)">
+                Upload File
+            </button>
+            <button type="button" @onclick="() => InputMode = UploadMode.Url"
+                    class="@GetButtonClass(UploadMode.Url)">
+                Provide URL
+            </button>
+        </div>
+
+        <!-- Conditional Upload -->
+        @if (InputMode == UploadMode.Upload)
+        {
+            <div>
+                <label class="block font-medium mb-1">Upload File</label>
+                <InputFile OnChange="HandleFile" class="w-full border rounded px-3 py-2" />
+            </div>
+        }
+
+        <!-- Conditional URL -->
+        @if (InputMode == UploadMode.Url)
+        {
+            <div>
+                <label class="block font-medium mb-1">File URL</label>
+                <InputText @bind-Value="Model.FileUrl" class="w-full border px-3 py-2 rounded" placeholder="https://example.com/data.csv" />
+            </div>
+
+            <div>
+                <label class="block font-medium mb-1">Check Interval (minutes)</label>
+                <InputNumber @bind-Value="Model.IntervalMinutes" class="w-32 border px-3 py-2 rounded" min="1" />
+            </div>
+        }
+
+        <!-- Run -->
+        <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+            Run Transformation
+        </button>
+    </div>
+</EditForm>
+
+<!-- Output Format Dialog -->
+@if (ShowFormatDialog)
+{
+    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+            <h2 class="text-xl font-semibold mb-4">Select Output Format</h2>
+
+            <div class="space-y-2">
+                <label><input type="radio" name="format" value="Csv" @onchange="() => Format = OutputFormat.Csv" checked="@IsChecked(OutputFormat.Csv)" class="mr-2" /> CSV</label>
+                <label><input type="radio" name="format" value="Json" @onchange="() => Format = OutputFormat.Json" checked="@IsChecked(OutputFormat.Json)" class="mr-2" /> JSON</label>
+                <label><input type="radio" name="format" value="Xml" @onchange="() => Format = OutputFormat.Xml" checked="@IsChecked(OutputFormat.Xml)" class="mr-2" /> XML</label>
+            </div>
+
+            <div class="flex justify-end gap-2 mt-6">
+                <button @onclick="() => ShowFormatDialog = false" class="bg-gray-200 px-4 py-2 rounded hover:bg-gray-300">Cancel</button>
+                <button @onclick="ConfirmFormat" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Confirm</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    enum UploadMode { Upload, Url }
+    enum OutputFormat { Csv, Json, Xml }
+
+    private UploadMode InputMode = UploadMode.Upload;
+    private OutputFormat Format = OutputFormat.Json;
+
+    private IBrowserFile? UploadedFile;
+    private bool ShowFormatDialog = false;
+
+    private TransformModel Model = new();
+
+    private List<string> Templates = new() { "Joined Template A-B" };
+
+    private void HandleFile(InputFileChangeEventArgs e)
+    {
+        UploadedFile = e.File;
+    }
+
+    private void RunTransformation()
+    {
+        if (string.IsNullOrWhiteSpace(Model.SelectedTemplate))
+        {
+            Console.WriteLine("No template selected.");
+            return;
+        }
+
+        ShowFormatDialog = true;
+    }
+
+    private void ConfirmFormat()
+    {
+        ShowFormatDialog = false;
+
+        Console.WriteLine($"Running transformation using template: {Model.SelectedTemplate}");
+        Console.WriteLine($"Format: {Format}");
+
+        if (InputMode == UploadMode.Upload && UploadedFile != null)
+        {
+            Console.WriteLine($"Using uploaded file: {UploadedFile.Name}");
+        }
+        else if (InputMode == UploadMode.Url)
+        {
+            Console.WriteLine($"Using remote file: {Model.FileUrl} (check every {Model.IntervalMinutes} min)");
+        }
+
+    }
+
+    private string GetButtonClass(UploadMode mode)
+    {
+        return InputMode == mode
+            ? "bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition"
+            : "bg-gray-200 text-gray-700 px-3 py-1 rounded hover:bg-gray-300 transition";
+    }
+
+    private bool IsChecked(OutputFormat f) => Format == f;
+
+    public class TransformModel
+    {
+        public string? SelectedTemplate { get; set; }
+        public string? FileUrl { get; set; }
+        public int IntervalMinutes { get; set; } = 15;
+    }
+}
