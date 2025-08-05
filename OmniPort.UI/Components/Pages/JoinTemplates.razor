@@ -2,7 +2,6 @@
 @using OmniPort.Core.Interfaces
 @using OmniPort.Core.Models
 @using OmniPort.UI.Components.Layout
-@using OmniPort.UI.Services
 @inject ITemplateService TemplateService
 @layout MainLayout
 @rendermode InteractiveServer
@@ -20,23 +19,23 @@ else
         <div class="border rounded p-4 shadow bg-white">
             <div class="flex items-center justify-between mb-2">
                 <h2 class="text-xl font-semibold text-blue-700">Source Template:</h2>
-                <select class="border rounded px-2 py-1" @onchange="OnSourceTemplateChanged">
-                    <option disabled selected value="">Select Template</option>
+                <select class="border rounded px-2 py-1"
+                        value="@SourceId"
+                        @onchange="OnSourceTemplateChanged">
+                    <option disabled value="">Select Template</option>
                     @foreach (var t in Templates)
                     {
-                        <option value="@t.Id" selected="@(SourceId == t.Id)">
-                            @t.TemplateName
-                        </option>
+                        <option value="@t.Id">@t.TemplateName</option>
                     }
                 </select>
             </div>
             <p class="text-sm text-gray-500 mb-3 italic">Fields from original data</p>
             <ul class="list-disc pl-5 space-y-1">
-                @foreach (var field in SourceTemplate?.Columns ?? [])
+                @foreach (var field in SourceTemplate?.Fields ?? [])
                 {
                     <li>
-                        <span class="font-medium">@field</span>
-                        <span class="text-gray-500 text-sm">(string)</span>
+                        <span class="font-medium">@field.Name</span>
+                        <span class="text-gray-500 text-sm">(@field.Type)</span>
                     </li>
                 }
             </ul>
@@ -46,30 +45,31 @@ else
         <div class="border rounded p-4 shadow bg-white">
             <div class="flex items-center justify-between mb-2">
                 <h2 class="text-xl font-semibold text-green-700">Internal CRM Schema:</h2>
-                <select class="border rounded px-2 py-1" @onchange="OnTargetTemplateChanged">
-                    <option disabled selected value="">Select Schema</option>
+                <select class="border rounded px-2 py-1"
+                        value="@TargetId"
+                        @onchange="OnTargetTemplateChanged">
+                    <option disabled value="">Select Schema</option>
                     @foreach (var t in Templates)
                     {
-                        <option value="@t.Id" selected="@(TargetId == t.Id)">
-                            @t.TemplateName
-                        </option>
+                        <option value="@t.Id">@t.TemplateName</option>
                     }
                 </select>
             </div>
             <p class="text-sm text-gray-500 mb-3 italic">Match source fields to target structure</p>
             <div class="space-y-4">
-                @foreach (var field in TargetTemplate?.Columns ?? [])
+                @foreach (var field in TargetTemplate?.Fields ?? [])
                 {
                     <div>
-                        <label class="block font-medium text-gray-800">@field</label>
+                        <label class="block font-medium text-gray-800">
+                            @field.Name <span class="text-gray-500 text-sm">(@field.Type)</span>
+                        </label>
                         <select class="w-full mt-1 px-3 py-2 border rounded bg-gray-50"
-                                @onchange="e => MapField(field, e.Value?.ToString())">
+                                value="@GetMappedValue(field.Name)"
+                                @onchange="e => MapField(field.Name, e.Value?.ToString())">
                             <option value="">-- Not Mapped --</option>
-                            @foreach (var source in SourceTemplate?.Columns ?? [])
+                            @foreach (var source in SourceTemplate?.Fields ?? [])
                             {
-                                <option value="@source" selected="@IsSelected(field, source)">
-                                    @source
-                                </option>
+                                <option value="@source.Name">@source.Name (@source.Type)</option>
                             }
                         </select>
                     </div>
@@ -83,12 +83,49 @@ else
             disabled="@(!CanSave)">
         Save Mapping
     </button>
+
+    <hr class="my-10" />
+
+    <h2 class="text-xl font-semibold mb-4">Saved Join Templates</h2>
+
+    @if (JoinTemplatesSummary.Any())
+    {
+        <table class="min-w-full bg-white border border-gray-300 rounded shadow">
+            <thead class="bg-gray-100 text-left">
+                <tr>
+                    <th class="px-4 py-2 border-b">Source Template</th>
+                    <th class="px-4 py-2 border-b">Target Template</th>
+                    <th class="px-4 py-2 border-b text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var join in JoinTemplatesSummary)
+                {
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="px-4 py-2">@join.SourceTemplate</td>
+                        <td class="px-4 py-2">@join.TargetTemplate</td>
+                        <td class="px-4 py-2 text-right">
+                            <button @onclick="() => DeleteJoinTemplate(join.Id)"
+                                    class="text-red-600 hover:underline">
+                                Delete
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <p class="text-gray-500">No saved join templates found.</p>
+    }
 }
 
 @code {
     private List<ImportTemplate>? Templates;
     private ImportTemplate? SourceTemplate;
     private ImportTemplate? TargetTemplate;
+    private List<JoinedTemplateSummary> JoinTemplatesSummary = new();
 
     private int? SourceId;
     private int? TargetId;
@@ -100,7 +137,23 @@ else
     protected override async Task OnInitializedAsync()
     {
         Templates = await TemplateService.GetTemplatesAsync();
+        JoinTemplatesSummary = await TemplateService.GetJoinedTemplatesAsync();
+
+        if (Templates != null && Templates.Count >= 2)
+        {
+            SourceId = Templates[0].Id;
+            TargetId = Templates[1].Id;
+
+            SourceTemplate = await TemplateService.GetTemplateByIdAsync(SourceId.Value);
+            TargetTemplate = await TemplateService.GetTemplateByIdAsync(TargetId.Value);
+        }
+        else if (Templates != null && Templates.Count == 1)
+        {
+            SourceId = Templates[0].Id;
+            SourceTemplate = await TemplateService.GetTemplateByIdAsync(SourceId.Value);
+        }
     }
+
 
     private async Task OnSourceTemplateChanged(ChangeEventArgs e)
     {
@@ -130,9 +183,9 @@ else
             Mappings[targetField] = sourceField;
     }
 
-    private bool IsSelected(string target, string source)
+    private string? GetMappedValue(string targetField)
     {
-        return Mappings.TryGetValue(target, out var mapped) && mapped == source;
+        return Mappings.TryGetValue(targetField, out var value) ? value : null;
     }
 
     private async Task SaveMapping()
@@ -142,6 +195,7 @@ else
 
         var profile = new ImportProfile
         {
+            ProfileName = $"{SourceTemplate.TemplateName} -> {TargetTemplate.TemplateName}",
             Template = TargetTemplate,
             Mappings = Mappings.Select(kv =>
             {
@@ -151,15 +205,18 @@ else
                 {
                     SourceField = kv.Value,
                     TargetField = kv.Key,
-                    TargetType = field?.Type ?? FieldDataType.String,
-                    DateFormat = null,
-                    CustomTransform = null
+                    TargetType = field?.Type ?? FieldDataType.String
                 };
             }).ToList()
         };
 
         await TemplateService.SaveMappingAsync(profile, SourceTemplate.Id);
+        JoinTemplatesSummary = await TemplateService.GetJoinedTemplatesAsync();
     }
 
-
+    private async Task DeleteJoinTemplate(int id)
+    {
+        await TemplateService.DeleteJoinTemplateAsync(id);
+        JoinTemplatesSummary = await TemplateService.GetJoinedTemplatesAsync();
+    }
 }

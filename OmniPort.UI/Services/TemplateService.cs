@@ -44,6 +44,7 @@ namespace OmniPort.UI.Services
                 .ToListAsync();
         }
 
+
         public async Task<List<ImportProfile>> GetImportProfilesByTemplateIdAsync(int templateId)
         {
             var mappings = await dataContext.TemplateMappings
@@ -245,6 +246,18 @@ namespace OmniPort.UI.Services
             await dataContext.SaveChangesAsync();
         }
 
+        public async Task DeleteJoinTemplateAsync(int joinTemplateId)
+        {
+            var mapping = await dataContext.TemplateMappings
+                .FirstOrDefaultAsync(m => m.Id == joinTemplateId);
+
+            if (mapping is null)
+                return;
+
+            dataContext.TemplateMappings.Remove(mapping);
+            await dataContext.SaveChangesAsync();
+        }
+
 
         public async Task<Dictionary<string, string?>> GetFieldMappingLabelsAsync(int mappingId)
         {
@@ -259,5 +272,6 @@ namespace OmniPort.UI.Services
                 f => f.SourceField?.Name
             );
         }
+
     }
 }
