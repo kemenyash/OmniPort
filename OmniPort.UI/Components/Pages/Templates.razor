@@ -44,7 +44,7 @@
 <!-- Buttons -->
 <div class="flex gap-4 mb-8">
     <button class="bg-blue-600 text-white px-4 py-2 rounded" @onclick="ShowCreateTemplateModal">Create Template</button>
-    <button class="bg-gray-200 px-4 py-2 rounded">Upload File to Generate</button>
+    <button class="bg-gray-200 px-4 py-2 rounded" @onclick="@(() => Navigation.NavigateTo("/join-templates"))">Join Templates</button>
 </div>
 
 <!-- Modal -->
@@ -75,7 +75,6 @@
                     <div class="grid grid-cols-4 gap-2 items-center mb-2">
                         <InputText class="border rounded px-2 py-1 col-span-2" @bind-Value="field.SourceField" placeholder="Field name" />
                         <InputSelect class="border rounded px-2 py-1" @bind-Value="field.TargetType">
-                            <option value="">Select type</option>
                             @foreach (FieldDataType type in Enum.GetValues(typeof(FieldDataType)))
                             {
                                 <option value="@type">@type</option>
@@ -204,7 +203,12 @@
         if (string.IsNullOrWhiteSpace(NewTemplate.TemplateName) || !NewFields.Any())
             return;
 
-        NewTemplate.Columns = NewFields.Select(f => f.SourceField).ToList();
+        NewTemplate.Fields = NewFields.Select(f => new TemplateField
+        {
+            Name = f.SourceField,
+            Type = f.TargetType
+        }).ToList();
+
         NewTemplate.SourceType = SelectedSourceType;
 
         if (EditingTemplateId.HasValue)

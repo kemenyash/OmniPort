@@ -1,5 +1,6 @@
 ﻿using AutoMapper;
 using AutoMapper.QueryableExtensions;
+using DocumentFormat.OpenXml.InkML;
 using Microsoft.EntityFrameworkCore;
 using OmniPort.Core.Interfaces;
 using OmniPort.Core.Models;
@@ -24,6 +25,43 @@ namespace OmniPort.UI.Services
                 .Select(t => t.Name)
                 .ToListAsync();
         }
+
+        public async Task<List<ImportTemplate>> GetTemplatesAsync()
+        {
+            var entities = await dataContext.Templates
+                .Include(t => t.Fields)
+                .ToListAsync();
+
+            return mapper.Map<List<ImportTemplate>>(entities);
+        }
+
+        public async Task<List<ImportProfile>> GetImportProfilesByTemplateIdAsync(int templateId)
+        {
+            var mappings = await dataContext.TemplateMappings
+                .Include(m => m.SourceTemplate)
+                .Include(m => m.TargetTemplate)
+                .Where(m => m.SourceTemplateId == templateId || m.TargetTemplateId == templateId)
+                .ToListAsync();
+
+            var profiles = new List<ImportProfile>();
+
+            foreach (var mapping in mappings)
+            {
+                var profile = mapper.Map<ImportProfile>(mapping);
+
+                var fields = await dataContext.TemplateMappingFields
+                    .Include(f => f.SourceField)
+                    .Include(f => f.TargetField)
+                    .Where(f => f.MappingId == mapping.Id)
+                    .ToListAsync();
+
+                profile.Mappings = mapper.Map<List<FieldMapping>>(fields);
+                profiles.Add(profile);
+            }
+
+            return profiles;
+        }
+
 
         public async Task<ImportTemplate?> GetTemplateAsync(int templateId)
         {
@@ -56,6 +94,16 @@ namespace OmniPort.UI.Services
             return entity.Id;
         }
 
+        public async Task<ImportTemplate> GetTemplateByIdAsync(int templateId)
+        {
+            var entity = await dataContext.Templates
+                .Include(t => t.Fields)
+                .FirstOrDefaultAsync(t => t.Id == templateId);
+
+            if (entity is null) throw new InvalidOperationException($"Template with ID {templateId} not found");
+
+            return mapper.Map<ImportTemplate>(entity);
+        }
         public async Task<bool> UpdateTemplateByIdAsync(int templateId, ImportTemplate updatedTemplate, List<FieldMapping> fields)
         {
             var existing = await dataContext.Templates
@@ -141,6 +189,53 @@ namespace OmniPort.UI.Services
             dataContext.TemplateMappingFields.AddRange(mappingFields);
             await dataContext.SaveChangesAsync();
         }
+
+        public async Task SaveMappingAsync(ImportProfile profile, int sourceTemplateId)
+        {
+            var target = await dataContext.Templates
+                .Include(t => t.Fields)
+                .FirstOrDefaultAsync(t => t.Id == profile.Template.Id);
+
+            if (target == null)
+                throw new InvalidOperationException("Target template not found.");
+
+            var source = await dataContext.Templates
+                .Include(t => t.Fields)
+                .FirstOrDefaultAsync(t => t.Id == sourceTemplateId);
+
+            if (source == null)
+                throw new InvalidOperationException("Source template not found.");
+
+            var mapping = new TemplateMappingData
+            {
+                SourceTemplateId = sourceTemplateId,
+                TargetTemplateId = profile.Template.Id,
+            };
+
+            await dataContext.TemplateMappings.AddAsync(mapping);
+            await dataContext.SaveChangesAsync();
+
+            var fields = new List<TemplateMappingFieldData>();
+
+            foreach (var field in profile.Mappings)
+            {
+                var targetField = target.Fields.FirstOrDefault(f => f.Name == field.TargetField);
+                if (targetField == null) continue;
+
+                var sourceField = source.Fields.FirstOrDefault(f => f.Name == field.SourceField);
+
+                fields.Add(new TemplateMappingFieldData
+                {
+                    MappingId = mapping.Id,
+                    TargetFieldId = targetField.Id,
+                    SourceFieldId = sourceField?.Id
+                });
+            }
+
+            dataContext.TemplateMappingFields.AddRange(fields);
+            await dataContext.SaveChangesAsync();
+        }
+
 
         public async Task<Dictionary<string, string?>> GetFieldMappingLabelsAsync(int mappingId)
         {
