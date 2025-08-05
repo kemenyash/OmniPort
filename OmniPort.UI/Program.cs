@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using OmniPort.Core.Interfaces;
 using OmniPort.Data;
+using OmniPort.Data.MappingProfiles;
 using OmniPort.UI;
 using OmniPort.UI.Components;
 using OmniPort.UI.Services;

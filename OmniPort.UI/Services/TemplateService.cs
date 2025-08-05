@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using AutoMapper.QueryableExtensions;
 using Microsoft.EntityFrameworkCore;
 using OmniPort.Core.Interfaces;
 using OmniPort.Core.Models;
@@ -30,24 +31,16 @@ namespace OmniPort.UI.Services
                 .Include(t => t.Fields)
                 .FirstOrDefaultAsync(t => t.Id == templateId);
 
-            return template != null ? mapper.Map<ImportTemplate>(template) : null;
+            return template is null ? null : mapper.Map<ImportTemplate>(template);
         }
 
         public async Task<List<FieldMapping>> GetMappingsByTemplateIdAsync(int templateId)
         {
-            var template = await dataContext.Templates
-                .Include(t => t.Fields)
-                .FirstOrDefaultAsync(t => t.Id == templateId);
+            var fields = await dataContext.TemplateFields
+                .Where(f => f.TemplateId == templateId)
+                .ToListAsync();
 
-            if (template == null)
-                return new List<FieldMapping>();
-
-            return template.Fields.Select(f => new FieldMapping
-            {
-                SourceField = f.Name,
-                TargetField = f.Name,
-                TargetType = f.Type
-            }).ToList();
+            return mapper.Map<List<FieldMapping>>(fields);
         }
 
         public async Task<int> CreateTemplateAsync(ImportTemplate template, SourceType sourceType, List<FieldMapping> fields)
@@ -55,13 +48,9 @@ namespace OmniPort.UI.Services
             var entity = mapper.Map<TemplateData>(template);
             entity.CreatedAt = DateTime.UtcNow;
             entity.SourceType = sourceType;
-            entity.Fields = fields.Select(f => new TemplateFieldData
-            {
-                Name = f.TargetField,
-                Type = f.TargetType
-            }).ToList();
+            entity.Fields = mapper.Map<List<TemplateFieldData>>(fields);
 
-            dataContext.Templates.Add(entity);
+            await dataContext.Templates.AddAsync(entity);
             await dataContext.SaveChangesAsync();
 
             return entity.Id;
@@ -73,18 +62,14 @@ namespace OmniPort.UI.Services
                 .Include(t => t.Fields)
                 .FirstOrDefaultAsync(t => t.Id == templateId);
 
-            if (existing == null)
+            if (existing is null)
                 return false;
 
             existing.Name = updatedTemplate.TemplateName;
             existing.SourceType = updatedTemplate.SourceType;
 
             dataContext.TemplateFields.RemoveRange(existing.Fields);
-            existing.Fields = fields.Select(f => new TemplateFieldData
-            {
-                Name = f.TargetField,
-                Type = f.TargetType
-            }).ToList();
+            existing.Fields = mapper.Map<List<TemplateFieldData>>(fields);
 
             await dataContext.SaveChangesAsync();
             return true;
@@ -98,20 +83,21 @@ namespace OmniPort.UI.Services
                 .Include(t => t.TargetMappings)
                 .FirstOrDefaultAsync(t => t.Id == templateId);
 
-            if (template == null)
+            if (template is null)
                 return false;
 
             if (template.Fields?.Any() == true)
                 dataContext.TemplateFields.RemoveRange(template.Fields);
 
-            var sourceMappingIds = template.SourceMappings.Select(m => m.Id).ToList();
-            var targetMappingIds = template.TargetMappings.Select(m => m.Id).ToList();
+            var mappingIds = template.SourceMappings.Select(m => m.Id)
+                .Concat(template.TargetMappings.Select(m => m.Id))
+                .Distinct()
+                .ToList();
 
-            var allMappingIds = sourceMappingIds.Concat(targetMappingIds).Distinct().ToList();
-            if (allMappingIds.Any())
+            if (mappingIds.Any())
             {
                 var mappingFields = await dataContext.TemplateMappingFields
-                    .Where(f => allMappingIds.Contains(f.MappingId))
+                    .Where(f => mappingIds.Contains(f.MappingId))
                     .ToListAsync();
 
                 dataContext.TemplateMappingFields.RemoveRange(mappingFields);
@@ -133,13 +119,7 @@ namespace OmniPort.UI.Services
         {
             return await dataContext.Templates
                 .OrderByDescending(t => t.CreatedAt)
-                .Select(t => new TemplateSummary
-                {
-                    Id = t.Id,
-                    Name = t.Name,
-                    SourceType = t.SourceType,
-                    CreatedAt = t.CreatedAt
-                })
+                .ProjectTo<TemplateSummary>(mapper.ConfigurationProvider)
                 .ToListAsync();
         }
 
@@ -154,12 +134,9 @@ namespace OmniPort.UI.Services
             dataContext.TemplateMappings.Add(mapping);
             await dataContext.SaveChangesAsync();
 
-            var mappingFields = targetToSourceFieldIds.Select(kv => new TemplateMappingFieldData
-            {
-                MappingId = mapping.Id,
-                TargetFieldId = kv.Key,
-                SourceFieldId = kv.Value
-            });
+            var mappingFields = mapper.Map<List<TemplateMappingFieldData>>(targetToSourceFieldIds);
+            foreach (var field in mappingFields)
+                field.MappingId = mapping.Id;
 
             dataContext.TemplateMappingFields.AddRange(mappingFields);
             await dataContext.SaveChangesAsync();
@@ -167,13 +144,13 @@ namespace OmniPort.UI.Services
 
         public async Task<Dictionary<string, string?>> GetFieldMappingLabelsAsync(int mappingId)
         {
-            var mapping = await dataContext.TemplateMappingFields
+            var mappingFields = await dataContext.TemplateMappingFields
                 .Include(f => f.TargetField)
                 .Include(f => f.SourceField)
                 .Where(f => f.MappingId == mappingId)
                 .ToListAsync();
 
-            return mapping.ToDictionary(
+            return mappingFields.ToDictionary(
                 f => f.TargetField.Name,
                 f => f.SourceField?.Name
             );
