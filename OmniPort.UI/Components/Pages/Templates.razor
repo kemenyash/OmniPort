@@ -13,6 +13,7 @@
             <th class="p-3">Name</th>
             <th class="p-3">Created</th>
             <th class="p-3">Source Type</th>
+            <th class="p-3"></th>
         </tr>
     </thead>
     <tbody>
@@ -24,13 +25,17 @@
                     <td class="p-3">@tpl.Name</td>
                     <td class="p-3">@tpl.CreatedAt.ToShortDateString()</td>
                     <td class="p-3">@tpl.SourceType</td>
+                    <td class="p-3 flex gap-2">
+                        <button class="text-blue-600 hover:underline" @onclick="() => EditTemplate(tpl.Id)">Edit</button>
+                        <button class="text-red-600 hover:underline" @onclick="() => ConfirmDeleteTemplate(tpl.Id, tpl.Name)">Delete</button>
+                    </td>
                 </tr>
             }
         }
         else
         {
             <tr>
-                <td colspan="3" class="p-3 text-gray-500 italic">No templates found.</td>
+                <td colspan="4" class="p-3 text-gray-500 italic">No templates found.</td>
             </tr>
         }
     </tbody>
@@ -47,12 +52,22 @@
 {
     <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl" @onclick:stopPropagation>
-            <h2 class="text-xl font-semibold mb-4">Create Template</h2>
+            <h2 class="text-xl font-semibold mb-4">@((EditingTemplateId == null) ? "Create Template" : $"Edit Template")</h2>
 
             <EditForm Model="@NewTemplate" OnValidSubmit="SaveTemplateAsync">
                 <div class="mb-4">
                     <label class="block font-medium mb-1">Template Name</label>
                     <InputText class="w-full border rounded px-3 py-2" @bind-Value="NewTemplate.TemplateName" />
+                </div>
+
+                <div class="mb-4">
+                    <label class="block font-medium mb-1">Source Type</label>
+                    <InputSelect class="w-full border rounded px-3 py-2" @bind-Value="SelectedSourceType">
+                        @foreach (SourceType type in Enum.GetValues(typeof(SourceType)))
+                        {
+                            <option value="@type">@type</option>
+                        }
+                    </InputSelect>
                 </div>
 
                 @foreach (var field in NewFields)
@@ -83,12 +98,30 @@
     </div>
 }
 
+@if (ShowDeleteConfirm)
+{
+    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+            <h2 class="text-xl font-semibold mb-4">Confirm Delete</h2>
+            <p>Are you sure you want to delete template <strong>@TemplateToDeleteName</strong>?</p>
+            <div class="flex justify-end gap-3 mt-4">
+                <button class="px-4 py-2 bg-gray-300 rounded" @onclick="() => ShowDeleteConfirm = false">Cancel</button>
+                <button class="px-4 py-2 bg-red-600 text-white rounded" @onclick="DeleteTemplateAsync">Delete</button>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private bool ShowModal = false;
-
     private ImportTemplate NewTemplate = new();
     private List<FieldMapping> NewFields = new();
     private List<TemplateSummary> ExistingTemplates = new();
+    private int? EditingTemplateId = null;
+    private int? TemplateToDeleteId = null;
+    private string? TemplateToDeleteName;
+    private bool ShowDeleteConfirm = false;
+    private SourceType SelectedSourceType = SourceType.Unknown;
 
     protected override async Task OnInitializedAsync()
     {
@@ -107,12 +140,15 @@
         {
             new FieldMapping { SourceField = "", TargetType = FieldDataType.String }
         };
+        SelectedSourceType = SourceType.CSV;
+        EditingTemplateId = null;
         ShowModal = true;
     }
 
     private void CloseModal()
     {
         ShowModal = false;
+        EditingTemplateId = null;
     }
 
     private void AddField()
@@ -125,16 +161,62 @@
         NewFields.Remove(field);
     }
 
+    private async Task EditTemplate(int templateId)
+    {
+        var template = await TemplateService.GetTemplateAsync(templateId);
+        var mappings = await TemplateService.GetMappingsByTemplateIdAsync(templateId);
+
+        if (template == null || mappings == null)
+            return;
+
+        EditingTemplateId = templateId;
+        NewTemplate = template;
+        NewFields = mappings.ToList();
+        SelectedSourceType = template.SourceType;
+        ShowModal = true;
+    }
+
+    private async Task DeleteTemplateAsync()
+    {
+        if (TemplateToDeleteId.HasValue)
+        {
+            var deleted = await TemplateService.DeleteTemplateByIdAsync(TemplateToDeleteId.Value);
+            if (deleted)
+            {
+                await LoadTemplatesAsync();
+            }
+        }
+
+        TemplateToDeleteId = null;
+        TemplateToDeleteName = null;
+        ShowDeleteConfirm = false;
+    }
+
+    private void ConfirmDeleteTemplate(int id, string name)
+    {
+        TemplateToDeleteId = id;
+        TemplateToDeleteName = name;
+        ShowDeleteConfirm = true;
+    }
+
     private async Task SaveTemplateAsync()
     {
         if (string.IsNullOrWhiteSpace(NewTemplate.TemplateName) || !NewFields.Any())
             return;
 
         NewTemplate.Columns = NewFields.Select(f => f.SourceField).ToList();
+        NewTemplate.SourceType = SelectedSourceType;
 
-        await TemplateService.SaveTemplateAsync(NewTemplate, "CSV", NewFields);
+        if (EditingTemplateId.HasValue)
+        {
+            await TemplateService.UpdateTemplateByIdAsync(EditingTemplateId.Value, NewTemplate, NewFields);
+        }
+        else
+        {
+            await TemplateService.CreateTemplateAsync(NewTemplate, SelectedSourceType, NewFields);
+        }
+
         await LoadTemplatesAsync();
-
-        ShowModal = false;
+        CloseModal();
     }
 }

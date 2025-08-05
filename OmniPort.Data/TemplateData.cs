@@ -1,4 +1,6 @@
-﻿using System;
+﻿
+using OmniPort.Core.Models;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -16,13 +18,13 @@ namespace OmniPort.Data
         public int Id { get; set; }
 
         [Column("name")]
-        public string Name { get; set; } = null!;
+        public string Name { get; set; }
 
         [Column("created_at")]
         public DateTime CreatedAt { get; set; }
 
         [Column("source_type")]
-        public string SourceType { get; set; } = null!;
+        public SourceType SourceType { get; set; }
 
         [InverseProperty("SourceTemplate")]
         public ICollection<TemplateMappingData> SourceMappings { get; set; }

@@ -8,8 +8,9 @@ namespace OmniPort.Core.Models
 {
     public class TemplateSummary
     {
+        public int Id { get; set; }
         public string Name { get; set; } = default!;
-        public string SourceType { get; set; } = default!;
+        public SourceType SourceType { get; set; } = default!;
         public DateTime CreatedAt { get; set; }
     }
 }

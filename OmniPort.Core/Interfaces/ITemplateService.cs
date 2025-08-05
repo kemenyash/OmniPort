@@ -11,10 +11,14 @@ namespace OmniPort.Core.Interfaces
     {
         Task<List<string>> GetTemplateNamesAsync();
         Task<ImportTemplate?> GetTemplateAsync(int templateId);
+        Task<bool> DeleteTemplateByIdAsync(int templateId);
+        Task<bool> UpdateTemplateByIdAsync(int templateId, ImportTemplate updatedTemplate, List<FieldMapping> fields);
+
         Task<List<TemplateSummary>> GetTemplatesSummaryAsync();
-        Task<int> SaveTemplateAsync(ImportTemplate template, string sourceType, List<FieldMapping> fields);
+        Task<int> CreateTemplateAsync(ImportTemplate template, SourceType sourceType, List<FieldMapping> fields);
         Task SaveTemplateMappingAsync(int sourceTemplateId, int targetTemplateId, Dictionary<int, int?> targetToSourceFieldIds);
         Task<Dictionary<string, string?>> GetFieldMappingLabelsAsync(int mappingId);
+        Task<List<FieldMapping>> GetMappingsByTemplateIdAsync(int templateId);
     }
 
 }

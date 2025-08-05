@@ -10,5 +10,6 @@ namespace OmniPort.Core.Models
     {
         public string TemplateName { get; set; } = string.Empty;
         public List<string> Columns { get; set; } = new();
+        public SourceType SourceType { get; set; }
     }
 }
