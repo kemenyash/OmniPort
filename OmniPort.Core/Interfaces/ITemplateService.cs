@@ -11,7 +11,7 @@ namespace OmniPort.Core.Interfaces
     {
         Task<List<string>> GetTemplateNamesAsync();
         Task SaveMappingAsync(ImportProfile profile, int sourceTemplateId);
-
+        Task<List<JoinedTemplateSummary>> GetJoinedTemplatesAsync();
         Task<List<ImportTemplate>> GetTemplatesAsync();
         Task<ImportTemplate?> GetTemplateAsync(int templateId);
         Task<List<ImportProfile>> GetImportProfilesByTemplateIdAsync(int templateId);

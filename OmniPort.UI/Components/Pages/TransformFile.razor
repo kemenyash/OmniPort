@@ -1,5 +1,8 @@
 ﻿@page "/transform"
 @using OmniPort.UI.Components.Layout
+@using OmniPort.Core.Interfaces
+@using OmniPort.Core.Models
+@inject ITemplateService TemplateService
 @layout MainLayout
 @rendermode InteractiveServer
 
@@ -11,11 +14,11 @@
         <!-- Template Selection -->
         <div>
             <label class="block font-medium mb-1">Joined Template</label>
-            <InputSelect @bind-Value="Model.SelectedTemplate" class="w-full border rounded px-3 py-2">
+            <InputSelect @bind-Value="Model.SelectedTemplateId" class="w-full border rounded px-3 py-2">
                 <option disabled selected value="">Select a template</option>
-                @foreach (var template in Templates)
+                @foreach (var template in JoinedTemplates)
                 {
-                    <option>@template</option>
+                    <option value="@template.Id">@($"{template.SourceTemplate} → {template.TargetTemplate}")</option>
                 }
             </InputSelect>
         </div>
@@ -94,8 +97,12 @@
     private bool ShowFormatDialog = false;
 
     private TransformModel Model = new();
+    private List<JoinedTemplateSummary> JoinedTemplates = new();
 
-    private List<string> Templates = new() { "Joined Template A-B" };
+    protected override async Task OnInitializedAsync()
+    {
+        JoinedTemplates = await TemplateService.GetJoinedTemplatesAsync();
+    }
 
     private void HandleFile(InputFileChangeEventArgs e)
     {
@@ -104,7 +111,7 @@
 
     private void RunTransformation()
     {
-        if (string.IsNullOrWhiteSpace(Model.SelectedTemplate))
+        if (!Model.SelectedTemplateId.HasValue)
         {
             Console.WriteLine("No template selected.");
             return;
@@ -117,7 +124,7 @@
     {
         ShowFormatDialog = false;
 
-        Console.WriteLine($"Running transformation using template: {Model.SelectedTemplate}");
+        Console.WriteLine($"Running transformation using template ID: {Model.SelectedTemplateId}");
         Console.WriteLine($"Format: {Format}");
 
         if (InputMode == UploadMode.Upload && UploadedFile != null)
@@ -129,6 +136,7 @@
             Console.WriteLine($"Using remote file: {Model.FileUrl} (check every {Model.IntervalMinutes} min)");
         }
 
+        // TODO: Call transformation service with selected template
     }
 
     private string GetButtonClass(UploadMode mode)
@@ -142,7 +150,7 @@
 
     public class TransformModel
     {
-        public string? SelectedTemplate { get; set; }
+        public int? SelectedTemplateId { get; set; }
         public string? FileUrl { get; set; }
         public int IntervalMinutes { get; set; } = 15;
     }

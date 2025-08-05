@@ -35,6 +35,15 @@ namespace OmniPort.UI.Services
             return mapper.Map<List<ImportTemplate>>(entities);
         }
 
+        public async Task<List<JoinedTemplateSummary>> GetJoinedTemplatesAsync()
+        {
+            return await dataContext.TemplateMappings
+                .Include(m => m.SourceTemplate)
+                .Include(m => m.TargetTemplate)
+                .ProjectTo<JoinedTemplateSummary>(mapper.ConfigurationProvider)
+                .ToListAsync();
+        }
+
         public async Task<List<ImportProfile>> GetImportProfilesByTemplateIdAsync(int templateId)
         {
             var mappings = await dataContext.TemplateMappings

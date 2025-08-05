@@ -54,6 +54,12 @@ namespace OmniPort.Data.MappingProfiles
                 .ForMember(dest => dest.Id, opt => opt.Ignore())
                 .ForMember(dest => dest.TargetField, opt => opt.Ignore())
                 .ForMember(dest => dest.SourceField, opt => opt.Ignore());
+
+
+            CreateMap<TemplateMappingData, JoinedTemplateSummary>()
+                .ForMember(dest => dest.SourceTemplate, opt => opt.MapFrom(src => src.SourceTemplate.Name))
+                .ForMember(dest => dest.TargetTemplate, opt => opt.MapFrom(src => src.TargetTemplate.Name));
+
         }
     }
 }
