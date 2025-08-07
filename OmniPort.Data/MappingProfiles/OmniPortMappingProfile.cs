@@ -63,31 +63,33 @@ namespace OmniPort.Data.MappingProfiles
 
             // FileConversionData <-> ConversionHistory
             CreateMap<FileConversionData, ConversionHistory>()
+                .ForMember(dest => dest.TemplateMapId, opt => opt.MapFrom(src => src.TemplateMapId))
                 .ForMember(dest => dest.FileName, opt => opt.MapFrom(src => src.FileName))
                 .ForMember(dest => dest.ConvertedAt, opt => opt.MapFrom(src => src.ConvertedAt))
                 .ForMember(dest => dest.OutputLink, opt => opt.MapFrom(src => src.OutputUrl))
+                .ForMember(dest => dest.TemplateName, opt => opt.MapFrom(src =>
+                    src.TemplateMap != null && src.TemplateMap.SourceField != null && src.TemplateMap.TargetField != null
+                        ? $"{src.TemplateMap.SourceField.Name} → {src.TemplateMap.TargetField.Name}"
+                        : "Unknown Template"))
                 .ReverseMap()
                 .ForMember(dest => dest.Id, opt => opt.Ignore())
                 .ForMember(dest => dest.OutputUrl, opt => opt.MapFrom(src => src.OutputLink))
                 .ForMember(dest => dest.ConvertedAt, opt => opt.MapFrom(src => src.ConvertedAt))
-                .AfterMap((dest, src) =>
-                {
-                    dest.TemplateName = $"{src.TemplateMap.SourceField.Name} → {src.TemplateMap.TargetField.Name}";
-                })
                 .ForMember(dest => dest.FileName, opt => opt.MapFrom(src => src.FileName));
 
             // UrlConversionData <-> UrlConversionHistory
             CreateMap<UrlConversionData, UrlConversionHistory>()
+                .ForMember(dest => dest.TemplateMapId, opt => opt.MapFrom(src => src.TemplateMapId))
                 .ForMember(dest => dest.InputUrl, opt => opt.MapFrom(src => src.InputUrl))
                 .ForMember(dest => dest.ConvertedAt, opt => opt.MapFrom(src => src.ConvertedAt))
                 .ForMember(dest => dest.OutputLink, opt => opt.MapFrom(src => src.OutputUrl))
+                 .ForMember(dest => dest.TemplateName, opt => opt.MapFrom(src =>
+                    src.TemplateMap != null && src.TemplateMap.SourceField != null && src.TemplateMap.TargetField != null
+                        ? $"{src.TemplateMap.SourceField.Name} → {src.TemplateMap.TargetField.Name}"
+                        : "Unknown Template"))
                 .ReverseMap()
                 .ForMember(dest => dest.Id, opt => opt.Ignore())
                 .ForMember(dest => dest.OutputUrl, opt => opt.MapFrom(src => src.OutputLink))
-                .AfterMap((dest, src) =>
-                {
-                    dest.TemplateName = $"{src.TemplateMap.SourceField.Name} → {src.TemplateMap.TargetField.Name}";
-                })
                 .ForMember(dest => dest.ConvertedAt, opt => opt.MapFrom(src => src.ConvertedAt))
                 .ForMember(dest => dest.InputUrl, opt => opt.MapFrom(src => src.InputUrl));
 

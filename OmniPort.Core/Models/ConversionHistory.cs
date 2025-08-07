@@ -8,6 +8,7 @@ namespace OmniPort.Core.Models
 {
     public class ConversionHistory
     {
+        public int TemplateMapId { get; set; }
         public string FileName { get; set; } = default!;
         public DateTime ConvertedAt { get; set; }
         public string OutputLink { get; set; } = default!;

@@ -67,9 +67,38 @@
 
 <!-- Tables with history -->
 <div class="mt-10 space-y-10">
+
+    <!-- Watched URLs -->
+    @if (InputMode == UploadMode.Url)
+    {
+        <div>
+            <h2 class="text-lg font-semibold mb-2">Watched URLs</h2>
+            <table class="w-full table-auto border border-gray-300">
+                <thead>
+                    <tr class="bg-gray-100">
+                        <th class="px-4 py-2 text-left">URL</th>
+                        <th class="px-4 py-2 text-left">Check Interval (min)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var w in WatchedUrls)
+                    {
+                        <tr>
+                            <td class="border px-4 py-2">@w.Url</td>
+                            <td class="border px-4 py-2">@w.IntervalMinutes</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+
     <!-- File Conversion Table -->
+    @if (InputMode == UploadMode.Upload)
+    {
     <div>
-        <h2 class="text-lg font-semibold mb-2">📁 File Conversion History</h2>
+        <h2 class="text-lg font-semibold mb-2">File Conversion History</h2>
         <table class="w-full table-auto border border-gray-300">
             <thead>
                 <tr class="bg-gray-100">
@@ -92,10 +121,11 @@
             </tbody>
         </table>
     </div>
+    }
 
     <!-- URL Conversion Table -->
     <div>
-        <h2 class="text-lg font-semibold mb-2">🌐 URL Conversion History</h2>
+        <h2 class="text-lg font-semibold mb-2">URL Conversion History</h2>
         <table class="w-full table-auto border border-gray-300">
             <thead>
                 <tr class="bg-gray-100">
@@ -119,30 +149,6 @@
         </table>
     </div>
 
-    <!-- Watched URLs -->
-    @if (InputMode == UploadMode.Url)
-    {
-        <div>
-            <h2 class="text-lg font-semibold mb-2">⏱️ Watched URLs</h2>
-            <table class="w-full table-auto border border-gray-300">
-                <thead>
-                    <tr class="bg-gray-100">
-                        <th class="px-4 py-2 text-left">URL</th>
-                        <th class="px-4 py-2 text-left">Check Interval (min)</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var w in WatchedUrls)
-                    {
-                        <tr>
-                            <td class="border px-4 py-2">@w.Url</td>
-                            <td class="border px-4 py-2">@w.IntervalMinutes</td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    }
 </div>
 
 <!-- Output Format Dialog -->
@@ -207,24 +213,64 @@
         ShowFormatDialog = true;
     }
 
-    private void ConfirmFormat()
+    private async void ConfirmFormat()
     {
         ShowFormatDialog = false;
 
-        Console.WriteLine($"Running transformation using template ID: {Model.SelectedTemplateId}");
-        Console.WriteLine($"Format: {Format}");
+        if (!Model.SelectedTemplateId.HasValue)
+            return;
+
+        var templateId = Model.SelectedTemplateId.Value;
+        var templateName = JoinedTemplates.FirstOrDefault(t => t.Id == templateId)?.ToString() ?? "Unknown";
 
         if (InputMode == UploadMode.Upload && UploadedFile != null)
         {
-            Console.WriteLine($"Using uploaded file: {UploadedFile.Name}");
+            var fileName = UploadedFile.Name;
+            var outputLink = $"https://your-output-location.com/{Guid.NewGuid()}.{Format.ToString().ToLower()}";
+
+
+            var record = new ConversionHistory
+            {
+                FileName = fileName,
+                ConvertedAt = DateTime.UtcNow,
+                TemplateName = templateName,
+                OutputLink = outputLink
+            };
+
+            await TemplateService.AddFileConversionAsync(record);
         }
-        else if (InputMode == UploadMode.Url)
+        else if (InputMode == UploadMode.Url && !string.IsNullOrWhiteSpace(Model.FileUrl))
         {
-            Console.WriteLine($"Using remote file: {Model.FileUrl} (check every {Model.IntervalMinutes} min)");
+            var outputLink = $"https://your-output-location.com/{Guid.NewGuid()}.{Format.ToString().ToLower()}";
+
+            var urlRecord = new UrlConversionHistory
+            {
+                InputUrl = Model.FileUrl,
+                ConvertedAt = DateTime.UtcNow,
+                TemplateName = templateName,
+                OutputLink = outputLink,
+                TemplateMapId = templateId
+                
+            };
+
+            await TemplateService.AddUrlConversionAsync(urlRecord);
+
+            var watch = new WatchedUrl
+            {
+                Url = Model.FileUrl,
+                IntervalMinutes = Model.IntervalMinutes
+            };
+
+            await TemplateService.AddWatchedUrlAsync(watch);
         }
 
-        // TODO: Call transformation service with selected template
+        FileConversions = await TemplateService.GetFileConversionHistoryAsync();
+        UrlConversions = await TemplateService.GetUrlConversionHistoryAsync();
+        WatchedUrls = await TemplateService.GetWatchedUrlsAsync();
+
+        StateHasChanged();
     }
+
 
     private string GetButtonClass(UploadMode mode)
     {

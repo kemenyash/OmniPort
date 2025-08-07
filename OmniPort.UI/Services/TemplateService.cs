@@ -277,20 +277,30 @@ namespace OmniPort.UI.Services
         public async Task<List<ConversionHistory>> GetFileConversionHistoryAsync()
         {
             var entities = await dataContext.FileConversions
+                .Include(f => f.TemplateMap)
+                    .ThenInclude(m => m.SourceField)
+                .Include(f => f.TemplateMap)
+                    .ThenInclude(m => m.TargetField)
                 .OrderByDescending(f => f.ConvertedAt)
                 .ToListAsync();
 
             return mapper.Map<List<ConversionHistory>>(entities);
         }
 
+
         public async Task<List<UrlConversionHistory>> GetUrlConversionHistoryAsync()
         {
             var entities = await dataContext.UrlConversions
+                .Include(u => u.TemplateMap)
+                    .ThenInclude(m => m.SourceField)
+                .Include(u => u.TemplateMap)
+                    .ThenInclude(m => m.TargetField)
                 .OrderByDescending(u => u.ConvertedAt)
                 .ToListAsync();
 
             return mapper.Map<List<UrlConversionHistory>>(entities);
         }
+
 
         public async Task<List<WatchedUrl>> GetWatchedUrlsAsync()
         {
@@ -314,9 +324,14 @@ namespace OmniPort.UI.Services
         {
             var entity = mapper.Map<UrlConversionData>(model);
             entity.ConvertedAt = DateTime.UtcNow;
+            entity.TemplateMapId = model.TemplateMapId;
 
             await dataContext.UrlConversions.AddAsync(entity);
-            await dataContext.SaveChangesAsync();
+            try { await dataContext.SaveChangesAsync(); }
+            catch(Exception error)
+            {
+
+            }
         }
 
         public async Task AddWatchedUrlAsync(WatchedUrl model)
