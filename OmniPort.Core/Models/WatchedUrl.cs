@@ -6,12 +6,9 @@ using System.Threading.Tasks;
 
 namespace OmniPort.Core.Models
 {
-    public enum FieldType
+    public class WatchedUrl
     {
-        String,
-        Integer,
-        Decimal,
-        Boolean,
-        DateTime
+        public string Url { get; set; } = default!;
+        public int IntervalMinutes { get; set; }
     }
 }

@@ -9,6 +9,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "OmniPort.Tests", "OmniPort.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Parsing.Tests", "Parsing.Tests\Parsing.Tests.csproj", "{9A58D04A-02ED-491A-88EF-B6D5F78AB4F6}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OmniPort.UI", "OmniPort.UI\OmniPort.UI.csproj", "{92EF09F8-8BF6-4746-999E-BE1F448802ED}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OmniPort.Data", "OmniPort.Data\OmniPort.Data.csproj", "{C764BFA7-B935-437A-9367-7112968FDE40}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -23,6 +27,14 @@ Global
 		{9A58D04A-02ED-491A-88EF-B6D5F78AB4F6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9A58D04A-02ED-491A-88EF-B6D5F78AB4F6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9A58D04A-02ED-491A-88EF-B6D5F78AB4F6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{92EF09F8-8BF6-4746-999E-BE1F448802ED}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{92EF09F8-8BF6-4746-999E-BE1F448802ED}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{92EF09F8-8BF6-4746-999E-BE1F448802ED}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{92EF09F8-8BF6-4746-999E-BE1F448802ED}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C764BFA7-B935-437A-9367-7112968FDE40}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C764BFA7-B935-437A-9367-7112968FDE40}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C764BFA7-B935-437A-9367-7112968FDE40}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C764BFA7-B935-437A-9367-7112968FDE40}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

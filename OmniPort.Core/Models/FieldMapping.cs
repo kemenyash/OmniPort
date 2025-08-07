@@ -10,7 +10,7 @@ namespace OmniPort.Core.Models
     {
         public string SourceField { get; set; } = string.Empty;
         public string TargetField { get; set; } = string.Empty;
-        public FieldType TargetType { get; set; }
+        public FieldDataType TargetType { get; set; }
 
         // Optional: format for DateTime
         public string? DateFormat { get; set; }

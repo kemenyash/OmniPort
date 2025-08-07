@@ -19,11 +19,11 @@ namespace OmniPort.Core.Utilities
             {
                 return mapping.TargetType switch
                 {
-                    FieldType.String => value.ToString(),
-                    FieldType.Integer => Convert.ToInt32(value),
-                    FieldType.Decimal => Convert.ToDecimal(value, CultureInfo.InvariantCulture),
-                    FieldType.Boolean => Convert.ToBoolean(value),
-                    FieldType.DateTime => mapping.DateFormat != null
+                    FieldDataType.String => value.ToString(),
+                    FieldDataType.Integer => Convert.ToInt32(value),
+                    FieldDataType.Decimal => Convert.ToDecimal(value, CultureInfo.InvariantCulture),
+                    FieldDataType.Boolean => Convert.ToBoolean(value),
+                    FieldDataType.DateTime => mapping.DateFormat != null
                         ? DateTime.ParseExact(value.ToString(), mapping.DateFormat, CultureInfo.InvariantCulture)
                         : Convert.ToDateTime(value, CultureInfo.InvariantCulture),
                     _ => value

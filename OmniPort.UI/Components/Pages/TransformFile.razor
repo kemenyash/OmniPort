@@ -1,0 +1,287 @@
+﻿@page "/transform"
+@using OmniPort.UI.Components.Layout
+@using OmniPort.Core.Interfaces
+@using OmniPort.Core.Models
+@inject ITemplateService TemplateService
+@layout MainLayout
+@rendermode InteractiveServer
+
+<EditForm Model="@Model" OnValidSubmit="RunTransformation">
+    <div class="space-y-6">
+
+        <!-- Template Selection -->
+        <div>
+            <InputSelect @bind-Value="Model.SelectedTemplateId" class="w-full border rounded px-3 py-2">
+                <option disabled selected value="">Select template for transforming</option>
+                @foreach (var template in JoinedTemplates)
+                {
+                    <option value="@template.Id">@($"{template.SourceTemplate} → {template.TargetTemplate}")</option>
+                }
+            </InputSelect>
+        </div>
+
+        <!-- Toggle upload vs URL -->
+        <div class="flex gap-4">
+            <button type="button" @onclick="() => InputMode = UploadMode.Upload"
+                    class="@GetButtonClass(UploadMode.Upload)">
+                Upload File
+            </button>
+            <button type="button" @onclick="() => InputMode = UploadMode.Url"
+                    class="@GetButtonClass(UploadMode.Url)">
+                Provide URL
+            </button>
+        </div>
+
+        <!-- Conditional Upload -->
+        @if (InputMode == UploadMode.Upload)
+        {
+            <div>
+                <label class="block font-medium mb-1">Upload File</label>
+                <InputFile OnChange="HandleFile" class="w-full border rounded px-3 py-2" />
+            </div>
+        }
+
+        <!-- Conditional URL -->
+        @if (InputMode == UploadMode.Url)
+        {
+            <div>
+                <label class="block font-medium mb-1">File URL</label>
+                <InputText @bind-Value="Model.FileUrl" class="w-full border px-3 py-2 rounded" placeholder="https://example.com/data.csv" />
+            </div>
+
+            <div>
+                <label class="block font-medium mb-1">Check Interval (minutes)</label>
+                <InputNumber @bind-Value="Model.IntervalMinutes" class="w-32 border px-3 py-2 rounded" min="1" />
+            </div>
+        }
+
+        <!-- Run -->
+        <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+            Run Transformation
+        </button>
+    </div>
+</EditForm>
+
+<!-- Tables with history -->
+<div class="mt-10 space-y-10">
+
+    <!-- Watched URLs -->
+    @if (InputMode == UploadMode.Url)
+    {
+        <div>
+            <h2 class="text-lg font-semibold mb-2">Watched URLs</h2>
+            <table class="w-full table-auto border border-gray-300">
+                <thead>
+                    <tr class="bg-gray-100">
+                        <th class="px-4 py-2 text-left">URL</th>
+                        <th class="px-4 py-2 text-left">Check Interval (min)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var w in WatchedUrls)
+                    {
+                        <tr>
+                            <td class="border px-4 py-2">@w.Url</td>
+                            <td class="border px-4 py-2">@w.IntervalMinutes</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+
+    <!-- File Conversion Table -->
+    @if (InputMode == UploadMode.Upload)
+    {
+    <div>
+        <h2 class="text-lg font-semibold mb-2">File Conversion History</h2>
+        <table class="w-full table-auto border border-gray-300">
+            <thead>
+                <tr class="bg-gray-100">
+                    <th class="px-4 py-2 text-left">File Name</th>
+                    <th class="px-4 py-2 text-left">Converted At</th>
+                    <th class="px-4 py-2 text-left">Template</th>
+                    <th class="px-4 py-2 text-left">Output Link</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var f in FileConversions)
+                {
+                    <tr>
+                        <td class="border px-4 py-2">@f.FileName</td>
+                        <td class="border px-4 py-2">@f.ConvertedAt.ToLocalTime()</td>
+                        <td class="border px-4 py-2">@f.TemplateName</td>
+                        <td class="border px-4 py-2"><a href="@f.OutputLink" target="_blank" class="text-blue-600 underline">View</a></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    }
+
+    <!-- URL Conversion Table -->
+    <div>
+        <h2 class="text-lg font-semibold mb-2">URL Conversion History</h2>
+        <table class="w-full table-auto border border-gray-300">
+            <thead>
+                <tr class="bg-gray-100">
+                    <th class="px-4 py-2 text-left">Input URL</th>
+                    <th class="px-4 py-2 text-left">Converted At</th>
+                    <th class="px-4 py-2 text-left">Template</th>
+                    <th class="px-4 py-2 text-left">Output Link</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var u in UrlConversions)
+                {
+                    <tr>
+                        <td class="border px-4 py-2">@u.InputUrl</td>
+                        <td class="border px-4 py-2">@u.ConvertedAt.ToLocalTime()</td>
+                        <td class="border px-4 py-2">@u.TemplateName</td>
+                        <td class="border px-4 py-2"><a href="@u.OutputLink" target="_blank" class="text-blue-600 underline">View</a></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+<!-- Output Format Dialog -->
+@if (ShowFormatDialog)
+{
+    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+            <h2 class="text-xl font-semibold mb-4">Select Output Format</h2>
+
+            <div class="space-y-2">
+                <label><input type="radio" name="format" value="Csv" @onchange="() => Format = OutputFormat.Csv" checked="@IsChecked(OutputFormat.Csv)" class="mr-2" /> CSV</label>
+                <label><input type="radio" name="format" value="Json" @onchange="() => Format = OutputFormat.Json" checked="@IsChecked(OutputFormat.Json)" class="mr-2" /> JSON</label>
+                <label><input type="radio" name="format" value="Xml" @onchange="() => Format = OutputFormat.Xml" checked="@IsChecked(OutputFormat.Xml)" class="mr-2" /> XML</label>
+            </div>
+
+            <div class="flex justify-end gap-2 mt-6">
+                <button @onclick="() => ShowFormatDialog = false" class="bg-gray-200 px-4 py-2 rounded hover:bg-gray-300">Cancel</button>
+                <button @onclick="ConfirmFormat" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Confirm</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    enum UploadMode { Upload, Url }
+    enum OutputFormat { Csv, Json, Xml }
+
+    private UploadMode InputMode = UploadMode.Upload;
+    private OutputFormat Format = OutputFormat.Json;
+
+    private IBrowserFile? UploadedFile;
+    private bool ShowFormatDialog = false;
+
+    private TransformModel Model = new();
+    private List<JoinedTemplateSummary> JoinedTemplates = new();
+
+    private List<ConversionHistory> FileConversions = new();
+    private List<UrlConversionHistory> UrlConversions = new();
+    private List<WatchedUrl> WatchedUrls = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        JoinedTemplates = await TemplateService.GetJoinedTemplatesAsync();
+        FileConversions = await TemplateService.GetFileConversionHistoryAsync();
+        UrlConversions = await TemplateService.GetUrlConversionHistoryAsync();
+        WatchedUrls = await TemplateService.GetWatchedUrlsAsync();
+    }
+
+    private void HandleFile(InputFileChangeEventArgs e)
+    {
+        UploadedFile = e.File;
+    }
+
+    private void RunTransformation()
+    {
+        if (!Model.SelectedTemplateId.HasValue)
+        {
+            Console.WriteLine("No template selected.");
+            return;
+        }
+
+        ShowFormatDialog = true;
+    }
+
+    private async void ConfirmFormat()
+    {
+        ShowFormatDialog = false;
+
+        if (!Model.SelectedTemplateId.HasValue)
+            return;
+
+        var templateId = Model.SelectedTemplateId.Value;
+        var templateName = JoinedTemplates.FirstOrDefault(t => t.Id == templateId)?.ToString() ?? "Unknown";
+
+        if (InputMode == UploadMode.Upload && UploadedFile != null)
+        {
+            var fileName = UploadedFile.Name;
+            var outputLink = $"https://your-output-location.com/{Guid.NewGuid()}.{Format.ToString().ToLower()}";
+
+
+            var record = new ConversionHistory
+            {
+                FileName = fileName,
+                ConvertedAt = DateTime.UtcNow,
+                TemplateName = templateName,
+                OutputLink = outputLink
+            };
+
+            await TemplateService.AddFileConversionAsync(record);
+        }
+        else if (InputMode == UploadMode.Url && !string.IsNullOrWhiteSpace(Model.FileUrl))
+        {
+            var outputLink = $"https://your-output-location.com/{Guid.NewGuid()}.{Format.ToString().ToLower()}";
+
+            var urlRecord = new UrlConversionHistory
+            {
+                InputUrl = Model.FileUrl,
+                ConvertedAt = DateTime.UtcNow,
+                TemplateName = templateName,
+                OutputLink = outputLink,
+                TemplateMapId = templateId
+                
+            };
+
+            await TemplateService.AddUrlConversionAsync(urlRecord);
+
+            var watch = new WatchedUrl
+            {
+                Url = Model.FileUrl,
+                IntervalMinutes = Model.IntervalMinutes
+            };
+
+            await TemplateService.AddWatchedUrlAsync(watch);
+        }
+
+        FileConversions = await TemplateService.GetFileConversionHistoryAsync();
+        UrlConversions = await TemplateService.GetUrlConversionHistoryAsync();
+        WatchedUrls = await TemplateService.GetWatchedUrlsAsync();
+
+        StateHasChanged();
+    }
+
+
+    private string GetButtonClass(UploadMode mode)
+    {
+        return InputMode == mode
+            ? "bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition"
+            : "bg-gray-200 text-gray-700 px-3 py-1 rounded hover:bg-gray-300 transition";
+    }
+
+    private bool IsChecked(OutputFormat f) => Format == f;
+
+    public class TransformModel
+    {
+        public int? SelectedTemplateId { get; set; }
+        public string? FileUrl { get; set; }
+        public int IntervalMinutes { get; set; } = 15;
+    }
+}

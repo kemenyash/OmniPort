@@ -361,3 +361,6 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/OmniPort.UI/omniport.db
+/OmniPort.UI/omniport.db-shm
+/OmniPort.UI/omniport.db-wal
