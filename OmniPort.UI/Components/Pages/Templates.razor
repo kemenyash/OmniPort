@@ -4,7 +4,7 @@
 @inject NavigationManager Navigation
 @inject ITemplateService TemplateService
 
-<h1 class="text-2xl font-bold mb-6">Templates</h1>
+<h1 class="text-2xl font-bold mb-6">Basic Templates</h1>
 
 <!-- Existing Templates Table -->
 <table class="min-w-full bg-white shadow rounded mb-6">
@@ -44,7 +44,6 @@
 <!-- Buttons -->
 <div class="flex gap-4 mb-8">
     <button class="bg-blue-600 text-white px-4 py-2 rounded" @onclick="ShowCreateTemplateModal">Create Template</button>
-    <button class="bg-gray-200 px-4 py-2 rounded" @onclick="@(() => Navigation.NavigateTo("/join-templates"))">Join Templates</button>
 </div>
 
 <!-- Modal -->

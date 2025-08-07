@@ -6,16 +6,13 @@
 @layout MainLayout
 @rendermode InteractiveServer
 
-<h1 class="text-2xl font-bold mb-4">Transform File</h1>
-
 <EditForm Model="@Model" OnValidSubmit="RunTransformation">
     <div class="space-y-6">
 
         <!-- Template Selection -->
         <div>
-            <label class="block font-medium mb-1">Joined Template</label>
             <InputSelect @bind-Value="Model.SelectedTemplateId" class="w-full border rounded px-3 py-2">
-                <option disabled selected value="">Select a template</option>
+                <option disabled selected value="">Select template for transforming</option>
                 @foreach (var template in JoinedTemplates)
                 {
                     <option value="@template.Id">@($"{template.SourceTemplate} → {template.TargetTemplate}")</option>
