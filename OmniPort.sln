@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OmniPort.UI", "OmniPort.UI\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OmniPort.Data", "OmniPort.Data\OmniPort.Data.csproj", "{C764BFA7-B935-437A-9367-7112968FDE40}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OmniPort.UI.Presentation", "OmniPort.UI.Presentation\OmniPort.UI.Presentation.csproj", "{8991BB3D-51F5-4B06-8647-47EE0C6759EE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -35,6 +37,10 @@ Global
 		{C764BFA7-B935-437A-9367-7112968FDE40}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C764BFA7-B935-437A-9367-7112968FDE40}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C764BFA7-B935-437A-9367-7112968FDE40}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8991BB3D-51F5-4B06-8647-47EE0C6759EE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8991BB3D-51F5-4B06-8647-47EE0C6759EE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8991BB3D-51F5-4B06-8647-47EE0C6759EE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8991BB3D-51F5-4B06-8647-47EE0C6759EE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

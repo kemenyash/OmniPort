@@ -2,10 +2,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using OmniPort.Core.Interfaces;
 using OmniPort.Data;
-using OmniPort.Data.MappingProfiles;
 using OmniPort.UI;
 using OmniPort.UI.Components;
-using OmniPort.UI.Services;
+using OmniPort.UI.Presentation.Interfaces;
+using OmniPort.UI.Presentation.Mapping;
+using OmniPort.UI.Presentation.Services;
+using OmniPort.UI.Presentation.ViewModels;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<OmniPortDataContext>(options =>
@@ -17,10 +19,21 @@ builder.Services.AddAutoMapper(cfg =>
 
 
 
-builder.Services.AddScoped<ITemplateService, TemplateService>();
+builder.Services.AddScoped<ICRUDService, CRUDService>();
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+
+builder.Services.AddScoped<ITemplateManager, TemplateManager>();
+builder.Services.AddScoped<IJoinTemplateManager, JoinTemplateManager>();
+builder.Services.AddScoped<ITransformationManager, TransformationManager>();
+builder.Services.AddScoped<ITransformationExecutionService, TransformationExecutor>();
+
+builder.Services.AddScoped<TemplateEditorViewModel>();
+builder.Services.AddScoped<JoinTemplatesViewModel>();
+builder.Services.AddScoped<TransformationViewModel>();
+
 
 var app = builder.Build();
 

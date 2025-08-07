@@ -1,8 +1,13 @@
 ﻿using AutoMapper;
 using OmniPort.Core.Models;
 using OmniPort.Data;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 
-namespace OmniPort.Data.MappingProfiles
+namespace OmniPort.UI.Presentation.Mapping
 {
     public class OmniPortMappingProfile : Profile
     {
