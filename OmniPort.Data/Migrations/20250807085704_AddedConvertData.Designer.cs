@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using OmniPort.Data;
 
@@ -10,9 +11,11 @@ using OmniPort.Data;
 namespace OmniPort.Data.Migrations
 {
     [DbContext(typeof(OmniPortDataContext))]
-    partial class OmniPortDataContextModelSnapshot : ModelSnapshot
+    [Migration("20250807085704_AddedConvertData")]
+    partial class AddedConvertData
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.7");
@@ -38,13 +41,7 @@ namespace OmniPort.Data.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("output_url");
 
-                    b.Property<int>("TemplateMapId")
-                        .HasColumnType("INTEGER")
-                        .HasColumnName("template_map_id");
-
                     b.HasKey("Id");
-
-                    b.HasIndex("TemplateMapId");
 
                     b.ToTable("file_conversions");
                 });
@@ -176,13 +173,7 @@ namespace OmniPort.Data.Migrations
                         .HasColumnType("TEXT")
                         .HasColumnName("output_url");
 
-                    b.Property<int>("TemplateMapId")
-                        .HasColumnType("INTEGER")
-                        .HasColumnName("template_map_id");
-
                     b.HasKey("Id");
-
-                    b.HasIndex("TemplateMapId");
 
                     b.ToTable("url_conversions");
                 });
@@ -210,17 +201,6 @@ namespace OmniPort.Data.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("watched_urls");
-                });
-
-            modelBuilder.Entity("OmniPort.Data.FileConversionData", b =>
-                {
-                    b.HasOne("OmniPort.Data.TemplateMappingFieldData", "TemplateMap")
-                        .WithMany()
-                        .HasForeignKey("TemplateMapId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("TemplateMap");
                 });
 
             modelBuilder.Entity("OmniPort.Data.TemplateFieldData", b =>
@@ -276,17 +256,6 @@ namespace OmniPort.Data.Migrations
                     b.Navigation("SourceField");
 
                     b.Navigation("TargetField");
-                });
-
-            modelBuilder.Entity("OmniPort.Data.UrlConversionData", b =>
-                {
-                    b.HasOne("OmniPort.Data.TemplateMappingFieldData", "TemplateMap")
-                        .WithMany()
-                        .HasForeignKey("TemplateMapId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("TemplateMap");
                 });
 
             modelBuilder.Entity("OmniPort.Data.TemplateData", b =>

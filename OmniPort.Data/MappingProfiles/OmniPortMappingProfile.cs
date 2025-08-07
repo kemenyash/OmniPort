@@ -60,6 +60,48 @@ namespace OmniPort.Data.MappingProfiles
                 .ForMember(dest => dest.SourceTemplate, opt => opt.MapFrom(src => src.SourceTemplate.Name))
                 .ForMember(dest => dest.TargetTemplate, opt => opt.MapFrom(src => src.TargetTemplate.Name));
 
+
+            // FileConversionData <-> ConversionHistory
+            CreateMap<FileConversionData, ConversionHistory>()
+                .ForMember(dest => dest.FileName, opt => opt.MapFrom(src => src.FileName))
+                .ForMember(dest => dest.ConvertedAt, opt => opt.MapFrom(src => src.ConvertedAt))
+                .ForMember(dest => dest.OutputLink, opt => opt.MapFrom(src => src.OutputUrl))
+                .ReverseMap()
+                .ForMember(dest => dest.Id, opt => opt.Ignore())
+                .ForMember(dest => dest.OutputUrl, opt => opt.MapFrom(src => src.OutputLink))
+                .ForMember(dest => dest.ConvertedAt, opt => opt.MapFrom(src => src.ConvertedAt))
+                .AfterMap((dest, src) =>
+                {
+                    dest.TemplateName = $"{src.TemplateMap.SourceField.Name} → {src.TemplateMap.TargetField.Name}";
+                })
+                .ForMember(dest => dest.FileName, opt => opt.MapFrom(src => src.FileName));
+
+            // UrlConversionData <-> UrlConversionHistory
+            CreateMap<UrlConversionData, UrlConversionHistory>()
+                .ForMember(dest => dest.InputUrl, opt => opt.MapFrom(src => src.InputUrl))
+                .ForMember(dest => dest.ConvertedAt, opt => opt.MapFrom(src => src.ConvertedAt))
+                .ForMember(dest => dest.OutputLink, opt => opt.MapFrom(src => src.OutputUrl))
+                .ReverseMap()
+                .ForMember(dest => dest.Id, opt => opt.Ignore())
+                .ForMember(dest => dest.OutputUrl, opt => opt.MapFrom(src => src.OutputLink))
+                .AfterMap((dest, src) =>
+                {
+                    dest.TemplateName = $"{src.TemplateMap.SourceField.Name} → {src.TemplateMap.TargetField.Name}";
+                })
+                .ForMember(dest => dest.ConvertedAt, opt => opt.MapFrom(src => src.ConvertedAt))
+                .ForMember(dest => dest.InputUrl, opt => opt.MapFrom(src => src.InputUrl));
+
+            // WatchedUrlData <-> WatchedUrl
+            CreateMap<WatchedUrlData, WatchedUrl>()
+                .ForMember(dest => dest.Url, opt => opt.MapFrom(src => src.Url))
+                .ForMember(dest => dest.IntervalMinutes, opt => opt.MapFrom(src => src.IntervalMinutes))
+                .ReverseMap()
+                .ForMember(dest => dest.Id, opt => opt.Ignore())
+                .ForMember(dest => dest.Url, opt => opt.MapFrom(src => src.Url))
+                .ForMember(dest => dest.IntervalMinutes, opt => opt.MapFrom(src => src.IntervalMinutes))
+                .ForMember(dest => dest.CreatedAt, opt => opt.Ignore());
+
+
         }
     }
 }

@@ -65,6 +65,86 @@
     </div>
 </EditForm>
 
+<!-- Tables with history -->
+<div class="mt-10 space-y-10">
+    <!-- File Conversion Table -->
+    <div>
+        <h2 class="text-lg font-semibold mb-2">📁 File Conversion History</h2>
+        <table class="w-full table-auto border border-gray-300">
+            <thead>
+                <tr class="bg-gray-100">
+                    <th class="px-4 py-2 text-left">File Name</th>
+                    <th class="px-4 py-2 text-left">Converted At</th>
+                    <th class="px-4 py-2 text-left">Template</th>
+                    <th class="px-4 py-2 text-left">Output Link</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var f in FileConversions)
+                {
+                    <tr>
+                        <td class="border px-4 py-2">@f.FileName</td>
+                        <td class="border px-4 py-2">@f.ConvertedAt.ToLocalTime()</td>
+                        <td class="border px-4 py-2">@f.TemplateName</td>
+                        <td class="border px-4 py-2"><a href="@f.OutputLink" target="_blank" class="text-blue-600 underline">View</a></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <!-- URL Conversion Table -->
+    <div>
+        <h2 class="text-lg font-semibold mb-2">🌐 URL Conversion History</h2>
+        <table class="w-full table-auto border border-gray-300">
+            <thead>
+                <tr class="bg-gray-100">
+                    <th class="px-4 py-2 text-left">Input URL</th>
+                    <th class="px-4 py-2 text-left">Converted At</th>
+                    <th class="px-4 py-2 text-left">Template</th>
+                    <th class="px-4 py-2 text-left">Output Link</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var u in UrlConversions)
+                {
+                    <tr>
+                        <td class="border px-4 py-2">@u.InputUrl</td>
+                        <td class="border px-4 py-2">@u.ConvertedAt.ToLocalTime()</td>
+                        <td class="border px-4 py-2">@u.TemplateName</td>
+                        <td class="border px-4 py-2"><a href="@u.OutputLink" target="_blank" class="text-blue-600 underline">View</a></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Watched URLs -->
+    @if (InputMode == UploadMode.Url)
+    {
+        <div>
+            <h2 class="text-lg font-semibold mb-2">⏱️ Watched URLs</h2>
+            <table class="w-full table-auto border border-gray-300">
+                <thead>
+                    <tr class="bg-gray-100">
+                        <th class="px-4 py-2 text-left">URL</th>
+                        <th class="px-4 py-2 text-left">Check Interval (min)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var w in WatchedUrls)
+                    {
+                        <tr>
+                            <td class="border px-4 py-2">@w.Url</td>
+                            <td class="border px-4 py-2">@w.IntervalMinutes</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
 <!-- Output Format Dialog -->
 @if (ShowFormatDialog)
 {
@@ -99,9 +179,16 @@
     private TransformModel Model = new();
     private List<JoinedTemplateSummary> JoinedTemplates = new();
 
+    private List<ConversionHistory> FileConversions = new();
+    private List<UrlConversionHistory> UrlConversions = new();
+    private List<WatchedUrl> WatchedUrls = new();
+
     protected override async Task OnInitializedAsync()
     {
         JoinedTemplates = await TemplateService.GetJoinedTemplatesAsync();
+        FileConversions = await TemplateService.GetFileConversionHistoryAsync();
+        UrlConversions = await TemplateService.GetUrlConversionHistoryAsync();
+        WatchedUrls = await TemplateService.GetWatchedUrlsAsync();
     }
 
     private void HandleFile(InputFileChangeEventArgs e)

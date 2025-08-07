@@ -273,5 +273,73 @@ namespace OmniPort.UI.Services
             );
         }
 
+
+        public async Task<List<ConversionHistory>> GetFileConversionHistoryAsync()
+        {
+            var entities = await dataContext.FileConversions
+                .OrderByDescending(f => f.ConvertedAt)
+                .ToListAsync();
+
+            return mapper.Map<List<ConversionHistory>>(entities);
+        }
+
+        public async Task<List<UrlConversionHistory>> GetUrlConversionHistoryAsync()
+        {
+            var entities = await dataContext.UrlConversions
+                .OrderByDescending(u => u.ConvertedAt)
+                .ToListAsync();
+
+            return mapper.Map<List<UrlConversionHistory>>(entities);
+        }
+
+        public async Task<List<WatchedUrl>> GetWatchedUrlsAsync()
+        {
+            var entities = await dataContext.WatchedUrls
+                .OrderByDescending(w => w.CreatedAt)
+                .ToListAsync();
+
+            return mapper.Map<List<WatchedUrl>>(entities);
+        }
+
+        public async Task AddFileConversionAsync(ConversionHistory model)
+        {
+            var entity = mapper.Map<FileConversionData>(model);
+            entity.ConvertedAt = DateTime.UtcNow;
+
+            await dataContext.FileConversions.AddAsync(entity);
+            await dataContext.SaveChangesAsync();
+        }
+
+        public async Task AddUrlConversionAsync(UrlConversionHistory model)
+        {
+            var entity = mapper.Map<UrlConversionData>(model);
+            entity.ConvertedAt = DateTime.UtcNow;
+
+            await dataContext.UrlConversions.AddAsync(entity);
+            await dataContext.SaveChangesAsync();
+        }
+
+        public async Task AddWatchedUrlAsync(WatchedUrl model)
+        {
+            var entity = mapper.Map<WatchedUrlData>(model);
+            entity.CreatedAt = DateTime.UtcNow;
+
+            await dataContext.WatchedUrls.AddAsync(entity);
+            await dataContext.SaveChangesAsync();
+        }
+
+        public async Task DeleteWatchedUrlAsync(string url)
+        {
+            var entity = await dataContext.WatchedUrls
+                .FirstOrDefaultAsync(w => w.Url == url);
+
+            if (entity is not null)
+            {
+                dataContext.WatchedUrls.Remove(entity);
+                await dataContext.SaveChangesAsync();
+            }
+        }
+
+
     }
 }
