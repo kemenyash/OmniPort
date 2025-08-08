@@ -1,6 +1,7 @@
 ﻿@page "/transform"
 @using OmniPort.Core.Models
 @using OmniPort.UI.Presentation.ViewModels
+@using Microsoft.AspNetCore.Components.Forms
 @inject TransformationViewModel ViewModel
 
 <EditForm Model="@ViewModel.FormModel" OnValidSubmit="RunTransformation">
@@ -9,20 +10,20 @@
         <!-- Template Selection -->
         <div>
             <label>Template</label>
-            <InputSelect @bind-Value="ViewModel.FormModel.SelectedTemplateId" class="w-full border px-3 py-2 rounded">
+            <InputSelect @bind-Value="@ViewModel.FormModel.SelectedTemplateId" class="w-full border px-3 py-2 rounded">
                 <option value="0" disabled>Select template</option>
                 @foreach (var t in ViewModel.JoinedTemplates)
                 {
-                    <option value="@t.Id">@t.ToString()</option>
+                    <option value="@t.Id">@t.FullName</option>
                 }
             </InputSelect>
         </div>
 
         <!-- Mode Selection -->
-        <div class="flex gap-4">
+        <div class="flex gap-4 items-center">
             <label>Import mode:</label>
-            <button type="button" @onclick="() => inputMode = UploadMode.Upload" class="@GetButtonClass(UploadMode.Upload)">Upload</button>
-            <button type="button" @onclick="() => inputMode = UploadMode.Url" class="@GetButtonClass(UploadMode.Url)">URL</button>
+            <button type="button" @onclick="() => SetMode(UploadMode.Upload)" class="@GetButtonClass(UploadMode.Upload)">Upload</button>
+            <button type="button" @onclick="() => SetMode(UploadMode.Url)" class="@GetButtonClass(UploadMode.Url)">URL</button>
         </div>
 
         <!-- Upload -->
@@ -30,7 +31,7 @@
         {
             <div>
                 <label>Upload File</label>
-                <InputFile OnChange="e => ViewModel.SetUploadedFile(e.File)" class="w-full border px-3 py-2 rounded" />
+                <InputFile OnChange="EventCallback.Factory.Create<InputFileChangeEventArgs>(this, OnFileChange)" class="w-full border px-3 py-2 rounded" />
             </div>
         }
 
@@ -47,16 +48,6 @@
                 <InputNumber @bind-Value="ViewModel.FormModel.IntervalMinutes" class="w-32 border px-3 py-2 rounded" />
             </div>
         }
-
-        <!-- Output Format -->
-        <div>
-            <label>Output Format</label>
-            <InputSelect @bind-Value="ViewModel.FormModel.OutputExtension" class="w-full border px-3 py-2 rounded">
-                <option value="csv">CSV</option>
-                <option value="json">JSON</option>
-                <option value="xml">XML</option>
-            </InputSelect>
-        </div>
 
         <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded">Run Transformation</button>
     </div>
@@ -153,7 +144,7 @@
         await ViewModel.InitAsync();
     }
 
-    private async Task RunTransformation()
+    private async Task RunTransformation(EditContext _)
     {
         if (ViewModel.FormModel.SelectedTemplateId == 0)
             return;
@@ -162,6 +153,24 @@
             await ViewModel.RunUploadAsync();
         else
             await ViewModel.RunUrlAsync();
+    }
+
+    private void SetMode(UploadMode mode)
+    {
+        inputMode = mode;
+    }
+
+    private Task OnFileChange(InputFileChangeEventArgs e)
+    {
+        const long maxFileSize = 128L * 1024 * 1024;
+
+        var file = e.File;
+        ViewModel.SetUploadedFile(
+            file.Name,
+            () => Task.FromResult<Stream>(file.OpenReadStream(maxFileSize))
+        );
+
+        return Task.CompletedTask;
     }
 
     private string GetButtonClass(UploadMode mode) =>

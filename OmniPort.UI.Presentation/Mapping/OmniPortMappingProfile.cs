@@ -63,6 +63,7 @@ namespace OmniPort.UI.Presentation.Mapping
 
             CreateMap<TemplateMappingData, JoinedTemplateSummary>()
                 .ForMember(dest => dest.SourceTemplate, opt => opt.MapFrom(src => src.SourceTemplate.Name))
+                .ForMember(dest => dest.OutputFormat, opt => opt.MapFrom(src => src.TargetTemplate.SourceType))
                 .ForMember(dest => dest.TargetTemplate, opt => opt.MapFrom(src => src.TargetTemplate.Name));
 
 

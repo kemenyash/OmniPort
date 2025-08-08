@@ -23,7 +23,7 @@ builder.Services.AddScoped<ICRUDService, CRUDService>();
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
-
+builder.Services.AddHttpClient();
 
 builder.Services.AddScoped<ITemplateManager, TemplateManager>();
 builder.Services.AddScoped<IJoinTemplateManager, JoinTemplateManager>();

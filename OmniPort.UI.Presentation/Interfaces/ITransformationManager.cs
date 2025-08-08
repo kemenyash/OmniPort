@@ -17,6 +17,8 @@ namespace OmniPort.UI.Presentation.Interfaces
         Task AddFileConversionAsync(ConversionHistory record);
         Task AddUrlConversionAsync(UrlConversionHistory record);
         Task AddWatchedUrlAsync(WatchedUrl watch);
+        Task<(ImportProfile Profile, SourceType importSourceType, SourceType convertSourceType)> GetImportProfileForJoinAsync(int joinId);
+
     }
 
 }

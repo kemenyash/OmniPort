@@ -11,7 +11,6 @@ namespace OmniPort.UI.Presentation.Models
         public int SelectedTemplateId { get; set; }
         public string? FileUrl { get; set; }
         public int IntervalMinutes { get; set; }
-        public string OutputExtension { get; set; }
     }
 
 }
