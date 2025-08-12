@@ -1,19 +1,23 @@
 ﻿using AutoMapper;
 using AutoMapper.QueryableExtensions;
-using DocumentFormat.OpenXml.InkML;
 using Microsoft.EntityFrameworkCore;
 using OmniPort.Core.Interfaces;
 using OmniPort.Core.Models;
 using OmniPort.Data;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 
-namespace OmniPort.UI.Services
+namespace OmniPort.UI.Presentation.Services
 {
-    public class TemplateService : ITemplateService
+    public class CRUDService : ICRUDService
     {
         private readonly OmniPortDataContext dataContext;
         private readonly IMapper mapper;
 
-        public TemplateService(OmniPortDataContext db, IMapper mapper)
+        public CRUDService(OmniPortDataContext db, IMapper mapper)
         {
             dataContext = db;
             this.mapper = mapper;
@@ -328,7 +332,7 @@ namespace OmniPort.UI.Services
 
             await dataContext.UrlConversions.AddAsync(entity);
             try { await dataContext.SaveChangesAsync(); }
-            catch(Exception error)
+            catch (Exception error)
             {
 
             }

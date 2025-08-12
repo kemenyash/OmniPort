@@ -1,8 +1,13 @@
 ﻿using AutoMapper;
 using OmniPort.Core.Models;
 using OmniPort.Data;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 
-namespace OmniPort.Data.MappingProfiles
+namespace OmniPort.UI.Presentation.Mapping
 {
     public class OmniPortMappingProfile : Profile
     {
@@ -58,6 +63,7 @@ namespace OmniPort.Data.MappingProfiles
 
             CreateMap<TemplateMappingData, JoinedTemplateSummary>()
                 .ForMember(dest => dest.SourceTemplate, opt => opt.MapFrom(src => src.SourceTemplate.Name))
+                .ForMember(dest => dest.OutputFormat, opt => opt.MapFrom(src => src.TargetTemplate.SourceType))
                 .ForMember(dest => dest.TargetTemplate, opt => opt.MapFrom(src => src.TargetTemplate.Name));
 
 

@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace OmniPort.Core.Interfaces
 {
-    public interface ITemplateService
+    public interface ICRUDService
     {
         Task<List<string>> GetTemplateNamesAsync();
         Task SaveMappingAsync(ImportProfile profile, int sourceTemplateId);

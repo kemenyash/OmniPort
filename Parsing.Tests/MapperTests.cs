@@ -15,7 +15,14 @@ namespace Parsing.Tests
         {
             var profile = new ImportProfile
             {
-                Template = new ImportTemplate { Columns = ["Name", "Age"] },
+                Template = new ImportTemplate 
+                { 
+                    Fields = new List<TemplateField>
+                    {
+                        new() { Name = "Name", Type = FieldDataType.String },
+                        new() { Name = "Age", Type = FieldDataType.Integer }
+                    } 
+                },
                 Mappings = new List<FieldMapping>
             {
                 new() { SourceField = "full_name", TargetField = "Name", TargetType = FieldDataType.String },
