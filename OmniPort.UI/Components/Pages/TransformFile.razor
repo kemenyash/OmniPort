@@ -10,7 +10,7 @@
         <!-- Template Selection -->
         <div>
             <label>Template</label>
-            <InputSelect @bind-Value="@ViewModel.FormModel.SelectedTemplateId" class="w-full border px-3 py-2 rounded">
+            <InputSelect @bind-Value="@ViewModel.FormModel.SelectedMappingTemplateId" class="w-full border px-3 py-2 rounded">
                 <option value="0" disabled>Select template</option>
                 @foreach (var t in ViewModel.JoinedTemplates)
                 {
@@ -97,7 +97,7 @@
                 <tr>
                     <td class="border px-4 py-2">@u.InputUrl</td>
                     <td class="border px-4 py-2">@u.ConvertedAt.ToLocalTime()</td>
-                    <td class="border px-4 py-2">@u.TemplateName</td>
+                    <td class="border px-4 py-2">@u.MappingTemplateName</td>
                     <td class="border px-4 py-2">
                         <a href="@u.OutputLink" target="_blank" class="text-blue-600 underline">View</a>
                     </td>
@@ -126,7 +126,7 @@
                 <tr>
                     <td class="border px-4 py-2">@f.FileName</td>
                     <td class="border px-4 py-2">@f.ConvertedAt.ToLocalTime()</td>
-                    <td class="border px-4 py-2">@f.TemplateName</td>
+                    <td class="border px-4 py-2">@f.MappingTemplateName</td>
                     <td class="border px-4 py-2">
                         <a href="@f.OutputLink" target="_blank" class="text-blue-600 underline">View</a>
                     </td>
@@ -146,7 +146,7 @@
 
     private async Task RunTransformation(EditContext _)
     {
-        if (ViewModel.FormModel.SelectedTemplateId == 0)
+        if (ViewModel.FormModel.SelectedMappingTemplateId == 0)
             return;
 
         if (inputMode == UploadMode.Upload)
@@ -162,14 +162,8 @@
 
     private Task OnFileChange(InputFileChangeEventArgs e)
     {
-        const long maxFileSize = 128L * 1024 * 1024;
-
         var file = e.File;
-        ViewModel.SetUploadedFile(
-            file.Name,
-            () => Task.FromResult<Stream>(file.OpenReadStream(maxFileSize))
-        );
-
+        ViewModel.SetUploadedFile(file); 
         return Task.CompletedTask;
     }
 

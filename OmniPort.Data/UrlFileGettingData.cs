@@ -8,17 +8,18 @@ using System.Threading.Tasks;
 
 namespace OmniPort.Data
 {
-    [Table("watched_urls")]
-    public class WatchedUrlData
+    [Table("url_file_getting")]
+    public class UrlFileGettingData
     {
         [Key]
         [Column("id")]
         public int Id { get; set; }
-        [Column("url")]
-        public string Url { get; set; }
-        [Column("interval_minutes")]
-        public int IntervalMinutes { get; set; }
-        [Column("created_at")]
-        public DateTime CreatedAt { get; set; }
+
+        [Required, Column("url")]
+        public string Url { get; set; } = null!;
+
+        [Required, Column("check_interval_min")]
+        public int CheckIntervalMinutes { get; set; }
+
     }
 }

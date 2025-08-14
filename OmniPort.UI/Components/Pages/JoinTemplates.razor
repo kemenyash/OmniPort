@@ -23,7 +23,7 @@ else
                     <option disabled value="">Select Template</option>
                     @foreach (var t in ViewModel.Templates)
                     {
-                        <option value="@t.Id">@t.TemplateName</option>
+                        <option value="@t.Id">@t.Name</option>
                     }
                 </select>
             </div>
@@ -50,7 +50,7 @@ else
                     <option disabled value="">Select Schema</option>
                     @foreach (var t in ViewModel.Templates)
                     {
-                        <option value="@t.Id">@t.TemplateName</option>
+                        <option value="@t.Id">@t.Name</option>
                     }
                 </select>
             </div>

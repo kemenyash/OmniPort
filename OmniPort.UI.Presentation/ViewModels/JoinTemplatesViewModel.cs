@@ -1,113 +1,114 @@
-﻿using OmniPort.Core.Models;
+﻿using OmniPort.Core.Interfaces;
+using OmniPort.Core.Records;
 using OmniPort.UI.Presentation.Interfaces;
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace OmniPort.UI.Presentation.ViewModels
 {
     public class JoinTemplatesViewModel
     {
-        private readonly ITemplateManager templateManager;
-        private readonly IJoinTemplateManager joinTemplateManager;
+        private readonly ITemplateManager _service;
 
-        public List<ImportTemplate> Templates { get; private set; } = new();
-        public List<JoinedTemplateSummary> JoinedTemplates { get; private set; } = new();
+        public JoinTemplatesViewModel(ITemplateManager service)
+        {
+            _service = service;
+        }
+
+        public List<BasicTemplateDto> Templates { get; private set; } = new();
 
         public int? SourceId { get; private set; }
         public int? TargetId { get; private set; }
 
-        public ImportTemplate? SourceTemplate { get; private set; }
-        public ImportTemplate? TargetTemplate { get; private set; }
+        public BasicTemplateDto? SourceTemplate { get; private set; }
+        public BasicTemplateDto? TargetTemplate { get; private set; }
 
-        public Dictionary<string, string> Mappings { get; private set; } = new();
+        private readonly Dictionary<int, int?> _targetToSource = new();
 
-        public bool CanSave => SourceId.HasValue && TargetId.HasValue && Mappings.Any();
+        public List<JoinedTemplateSummaryDto> JoinedTemplates { get; private set; } = new();
 
-        public JoinTemplatesViewModel(ITemplateManager templateManager, IJoinTemplateManager joinTemplateManager)
-        {
-            this.templateManager = templateManager;
-            this.joinTemplateManager = joinTemplateManager;
-        }
+        public bool CanSave => SourceId.HasValue && TargetId.HasValue;
 
         public async Task InitAsync()
         {
-            Templates = await templateManager.GetTemplatesAsync();
-            JoinedTemplates = await joinTemplateManager.GetJoinedTemplatesAsync();
+            var summaries = await _service.GetBasicTemplatesSummaryAsync();
+            var ids = summaries.Select(x => x.Id).ToList();
 
-            if (Templates.Count >= 2)
+            Templates = new List<BasicTemplateDto>();
+            foreach (var id in ids)
             {
-                SourceId = Templates[0].Id;
-                TargetId = Templates[1].Id;
-                await LoadTemplates();
+                var dto = await _service.GetBasicTemplateAsync(id);
+                if (dto != null) Templates.Add(dto);
             }
+
+            JoinedTemplates = (await _service.GetJoinedTemplatesAsync()).ToList();
         }
 
         public async Task SetSourceTemplateAsync(int id)
         {
             SourceId = id;
-            Mappings.Clear();
-            await LoadTemplates();
+            SourceTemplate = await _service.GetBasicTemplateAsync(id);
         }
 
         public async Task SetTargetTemplateAsync(int id)
         {
             TargetId = id;
-            Mappings.Clear();
-            await LoadTemplates();
+            TargetTemplate = await _service.GetBasicTemplateAsync(id);
+
+            _targetToSource.Clear();
+            foreach (var tf in TargetTemplate?.Fields ?? Enumerable.Empty<TemplateFieldDto>())
+                _targetToSource[tf.Id] = null;
         }
 
-        public void MapField(string targetField, string? sourceField)
+        public string? GetMappedValue(string targetFieldName)
         {
-            if (string.IsNullOrWhiteSpace(sourceField))
-                Mappings.Remove(targetField);
-            else
-                Mappings[targetField] = sourceField;
+            var target = TargetTemplate?.Fields.FirstOrDefault(f => f.Name == targetFieldName);
+            if (target is null) return null;
+
+            if (_targetToSource.TryGetValue(target.Id, out var sourceId) && sourceId.HasValue)
+                return SourceTemplate?.Fields.FirstOrDefault(f => f.Id == sourceId.Value)?.Name;
+
+            return null;
         }
 
-        public string? GetMappedValue(string targetField) =>
-            Mappings.TryGetValue(targetField, out var val) ? val : null;
+        public void MapField(string targetFieldName, string? sourceFieldName)
+        {
+            if (TargetTemplate is null) return;
+            var target = TargetTemplate.Fields.FirstOrDefault(f => f.Name == targetFieldName);
+            if (target is null) return;
+
+            if (string.IsNullOrWhiteSpace(sourceFieldName))
+            {
+                _targetToSource[target.Id] = null;
+                return;
+            }
+
+            var src = SourceTemplate?.Fields.FirstOrDefault(f => f.Name == sourceFieldName);
+            _targetToSource[target.Id] = src?.Id;
+        }
 
         public async Task SaveMappingAsync()
         {
-            if (!CanSave || SourceTemplate is null || TargetTemplate is null)
-                return;
+            if (!CanSave || TargetId is null || SourceId is null) return;
 
-            var profile = new ImportProfile
-            {
-                ProfileName = $"{SourceTemplate.TemplateName} -> {TargetTemplate.TemplateName}",
-                Template = TargetTemplate,
-                Mappings = Mappings.Select(kv =>
-                {
-                    var field = TargetTemplate.Fields.FirstOrDefault(f => f.Name == kv.Key);
-                    return new FieldMapping
-                    {
-                        SourceField = kv.Value,
-                        TargetField = kv.Key,
-                        TargetType = field?.Type ?? FieldDataType.String
-                    };
-                }).ToList()
-            };
+            var name = $"{SourceTemplate!.Name} → {TargetTemplate!.Name}";
 
-            await joinTemplateManager.SaveMappingAsync(profile, SourceId.Value);
-            JoinedTemplates = await joinTemplateManager.GetJoinedTemplatesAsync();
+            var cmd = new CreateMappingTemplateDto(
+                name,
+                SourceId.Value,
+                TargetId.Value,
+                new Dictionary<int, int?>(_targetToSource)
+            );
+
+            await _service.CreateMappingTemplateAsync(cmd);
+            JoinedTemplates = (await _service.GetJoinedTemplatesAsync()).ToList();
         }
 
-        public async Task DeleteJoinTemplateAsync(int id)
+        public async Task DeleteJoinTemplateAsync(int mappingTemplateId)
         {
-            await joinTemplateManager.DeleteJoinTemplateAsync(id);
-            JoinedTemplates = await joinTemplateManager.GetJoinedTemplatesAsync();
-        }
-
-        private async Task LoadTemplates()
-        {
-            if (SourceId.HasValue)
-                SourceTemplate = await templateManager.GetTemplateByIdAsync(SourceId.Value);
-
-            if (TargetId.HasValue)
-                TargetTemplate = await templateManager.GetTemplateByIdAsync(TargetId.Value);
+            await _service.DeleteMappingTemplateAsync(mappingTemplateId);
+            JoinedTemplates = (await _service.GetJoinedTemplatesAsync()).ToList();
         }
     }
 }
