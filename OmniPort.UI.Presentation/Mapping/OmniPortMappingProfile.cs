@@ -1,11 +1,9 @@
 ﻿using AutoMapper;
 using OmniPort.Core.Models;
+using OmniPort.Core.Records;
 using OmniPort.Data;
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace OmniPort.UI.Presentation.Mapping
 {
@@ -13,103 +11,157 @@ namespace OmniPort.UI.Presentation.Mapping
     {
         public OmniPortMappingProfile()
         {
-            // Template <-> ImportTemplate
-            CreateMap<TemplateData, ImportTemplate>()
-                .ForMember(dest => dest.TemplateName, opt => opt.MapFrom(src => src.Name))
-                .ReverseMap()
-                .ForMember(dest => dest.Name, opt => opt.MapFrom(src => src.TemplateName));
+            // ----------- Entity -> DTO -----------
 
-            // TemplateFieldData <-> TemplateField 
-            CreateMap<TemplateFieldData, TemplateField>()
-                .ForMember(dest => dest.Name, opt => opt.MapFrom(src => src.Name))
-                .ForMember(dest => dest.Type, opt => opt.MapFrom(src => src.Type))
-                .ReverseMap();
+            // Field
+            CreateMap<FieldData, TemplateFieldDto>();
 
-            // TemplateFieldData <-> FieldMapping 
-            CreateMap<TemplateFieldData, FieldMapping>()
-                .ForMember(dest => dest.SourceField, opt => opt.MapFrom(src => src.Name))
-                .ForMember(dest => dest.TargetType, opt => opt.MapFrom(src => src.Type))
-                .ReverseMap()
-                .ForMember(dest => dest.Name, opt => opt.MapFrom(src => src.SourceField))
-                .ForMember(dest => dest.Type, opt => opt.MapFrom(src => src.TargetType))
-                .ForMember(dest => dest.Id, opt => opt.Ignore())
-                .ForMember(dest => dest.TemplateId, opt => opt.Ignore());
+            // Basic Template
+            CreateMap<BasicTemplateData, BasicTemplateDto>()
+                .ForCtorParam("Fields", opt => opt.MapFrom(s => s.Fields));
 
-            // TemplateSummary proection
-            CreateMap<TemplateData, TemplateSummary>()
-                .ForMember(dest => dest.Name, opt => opt.MapFrom(src => src.Name));
+            CreateMap<BasicTemplateData, TemplateSummaryDto>()
+                .ForCtorParam("FieldsCount", opt => opt.MapFrom(s => s.Fields.Count));
 
-            // TemplateMappingData -> ImportProfile
-            CreateMap<TemplateMappingData, ImportProfile>()
-                .ForMember(dest => dest.Id, opt => opt.MapFrom(src => src.Id))
-                .ForMember(dest => dest.Template, opt => opt.MapFrom(src => src.TargetTemplate))
-                .ForMember(dest => dest.Mappings, opt => opt.Ignore());
+            // Mapping Field (enriched with names/types)
+            CreateMap<MappingFieldData, MappingFieldDto>()
+                .ForCtorParam("SourceFieldName", opt => opt.MapFrom(s => s.SourceField.Name))
+                .ForCtorParam("SourceFieldType", opt => opt.MapFrom(s => s.SourceField.Type))
+                .ForCtorParam("TargetFieldName", opt => opt.MapFrom(s => s.TargetField.Name))
+                .ForCtorParam("TargetFieldType", opt => opt.MapFrom(s => s.TargetField.Type));
 
-            // TemplateMappingFieldData -> FieldMapping
-            CreateMap<TemplateMappingFieldData, FieldMapping>()
-                .ForMember(dest => dest.SourceField, opt => opt.MapFrom(src => src.SourceField != null ? src.SourceField.Name : null))
-                .ForMember(dest => dest.TargetField, opt => opt.MapFrom(src => src.TargetField.Name))
-                .ForMember(dest => dest.TargetType, opt => opt.MapFrom(src => src.TargetField.Type));
+            // Mapping Template
+            CreateMap<MappingTemplateData, MappingTemplateDto>()
+                .ForCtorParam("SourceTemplateName", opt => opt.MapFrom(s => s.SourceTemplate.Name))
+                .ForCtorParam("TargetTemplateName", opt => opt.MapFrom(s => s.TargetTemplate.Name))
+                .ForCtorParam("Fields", opt => opt.MapFrom(s => s.MappingFields));
 
-            // Dictionary<int, int?> -> List<TemplateMappingFieldData>
-            CreateMap<KeyValuePair<int, int?>, TemplateMappingFieldData>()
-                .ForMember(dest => dest.TargetFieldId, opt => opt.MapFrom(src => src.Key))
-                .ForMember(dest => dest.SourceFieldId, opt => opt.MapFrom(src => src.Value))
-                .ForMember(dest => dest.MappingId, opt => opt.Ignore())
-                .ForMember(dest => dest.Id, opt => opt.Ignore())
-                .ForMember(dest => dest.TargetField, opt => opt.Ignore())
-                .ForMember(dest => dest.SourceField, opt => opt.Ignore());
+            // Joined summary (for selectors)
+            CreateMap<MappingTemplateData, JoinedTemplateSummaryDto>()
+                .ForCtorParam("SourceTemplate", opt => opt.MapFrom(s => s.SourceTemplate.Name))
+                .ForCtorParam("TargetTemplate", opt => opt.MapFrom(s => s.TargetTemplate.Name))
+                .ForCtorParam("OutputFormat", opt => opt.MapFrom(s => s.TargetTemplate.SourceType));
+
+            // History
+            CreateMap<FileConversionHistoryData, FileConversionHistoryDto>()
+                .ForCtorParam("OutputLink", opt => opt.MapFrom(s => s.OutputUrl))
+                .ForCtorParam("MappingTemplateName", opt => opt.MapFrom(s => s.MappingTemplate.Name));
+
+            CreateMap<UrlConversionHistoryData, UrlConversionHistoryDto>()
+                .ForCtorParam("OutputLink", opt => opt.MapFrom(s => s.OutputUrl))
+                .ForCtorParam("InputUrl", opt => opt.MapFrom(s => s.InputUrl))
+                .ForCtorParam("MappingTemplateName", opt => opt.MapFrom(s => s.MappingTemplate.Name));
+
+            CreateMap<UrlFileGettingData, WatchedUrlDto>()
+                .ForCtorParam("IntervalMinutes", opt => opt.MapFrom(s => s.CheckIntervalMinutes));
 
 
-            CreateMap<TemplateMappingData, JoinedTemplateSummary>()
-                .ForMember(dest => dest.SourceTemplate, opt => opt.MapFrom(src => src.SourceTemplate.Name))
-                .ForMember(dest => dest.OutputFormat, opt => opt.MapFrom(src => src.TargetTemplate.SourceType))
-                .ForMember(dest => dest.TargetTemplate, opt => opt.MapFrom(src => src.TargetTemplate.Name));
+            // ----------- DTO(Create/Update/Form) -> Entity -----------
+
+            // CreateBasicTemplateDto -> BasicTemplateData
+            CreateMap<CreateBasicTemplateDto, BasicTemplateData>()
+                .ForMember(d => d.Id, opt => opt.Ignore())
+                .ForMember(d => d.Fields, opt => opt.MapFrom(s => s.Fields))
+                .ForMember(d => d.AsSourceMappings, opt => opt.Ignore())
+                .ForMember(d => d.AsTargetMappings, opt => opt.Ignore());
+
+            CreateMap<CreateTemplateFieldDto, FieldData>()
+                .ForMember(d => d.Id, opt => opt.Ignore())
+                .ForMember(d => d.TemplateSourceId, opt => opt.Ignore()) 
+                .ForMember(d => d.TemplateSource, opt => opt.Ignore());
+
+            // UpdateBasicTemplateDto
+            CreateMap<UpsertTemplateFieldDto, FieldData>()
+                .ForMember(d => d.TemplateSourceId, opt => opt.Ignore())
+                .ForMember(d => d.TemplateSource, opt => opt.Ignore());
+
+            // CreateMappingTemplateDto -> MappingTemplateData
+            CreateMap<CreateMappingTemplateDto, MappingTemplateData>()
+                .ForMember(d => d.Id, opt => opt.Ignore())
+                .ForMember(d => d.MappingFields, opt => opt.Ignore()) 
+                .ForMember(d => d.SourceTemplate, opt => opt.Ignore())
+                .ForMember(d => d.TargetTemplate, opt => opt.Ignore())
+                .ForMember(d => d.FileConversions, opt => opt.Ignore())
+                .ForMember(d => d.UrlConversions, opt => opt.Ignore());
+
+            // UpdateMappingTemplateDto -> MappingTemplateData
+            CreateMap<UpdateMappingTemplateDto, MappingTemplateData>()
+                .ForMember(d => d.MappingFields, opt => opt.Ignore())
+                .ForMember(d => d.SourceTemplate, opt => opt.Ignore())
+                .ForMember(d => d.TargetTemplate, opt => opt.Ignore())
+                .ForMember(d => d.FileConversions, opt => opt.Ignore())
+                .ForMember(d => d.UrlConversions, opt => opt.Ignore());
+
+            // Forms
+            CreateMap<TemplateEditForm, BasicTemplateData>()
+                .ForMember(d => d.Id, opt => opt.MapFrom(s => s.Id ?? 0))
+                .ForMember(d => d.Fields, opt => opt.Ignore()) 
+                .ForMember(d => d.AsSourceMappings, opt => opt.Ignore())
+                .ForMember(d => d.AsTargetMappings, opt => opt.Ignore());
+
+            CreateMap<TemplateFieldRow, FieldData>()
+                .ForMember(d => d.Id, opt => opt.MapFrom(s => s.Id ?? 0))
+                .ForMember(d => d.TemplateSourceId, opt => opt.Ignore())
+                .ForMember(d => d.TemplateSource, opt => opt.Ignore());
+
+            CreateMap<MappingTemplateForm, MappingTemplateData>()
+                .ForMember(d => d.Id, opt => opt.MapFrom(s => s.Id ?? 0))
+                .ForMember(d => d.MappingFields, opt => opt.Ignore())
+                .ForMember(d => d.SourceTemplate, opt => opt.Ignore())
+                .ForMember(d => d.TargetTemplate, opt => opt.Ignore())
+                .ForMember(d => d.FileConversions, opt => opt.Ignore())
+                .ForMember(d => d.UrlConversions, opt => opt.Ignore());
+        }
 
 
-            // FileConversionData <-> ConversionHistory
-            CreateMap<FileConversionData, ConversionHistory>()
-                .ForMember(dest => dest.TemplateMapId, opt => opt.MapFrom(src => src.TemplateMapId))
-                .ForMember(dest => dest.FileName, opt => opt.MapFrom(src => src.FileName))
-                .ForMember(dest => dest.ConvertedAt, opt => opt.MapFrom(src => src.ConvertedAt))
-                .ForMember(dest => dest.OutputLink, opt => opt.MapFrom(src => src.OutputUrl))
-                .ForMember(dest => dest.TemplateName, opt => opt.MapFrom(src =>
-                    src.TemplateMap != null && src.TemplateMap.SourceField != null && src.TemplateMap.TargetField != null
-                        ? $"{src.TemplateMap.SourceField.Name} → {src.TemplateMap.TargetField.Name}"
-                        : "Unknown Template"))
-                .ReverseMap()
-                .ForMember(dest => dest.Id, opt => opt.Ignore())
-                .ForMember(dest => dest.OutputUrl, opt => opt.MapFrom(src => src.OutputLink))
-                .ForMember(dest => dest.ConvertedAt, opt => opt.MapFrom(src => src.ConvertedAt))
-                .ForMember(dest => dest.FileName, opt => opt.MapFrom(src => src.FileName));
+        public static void UpsertFields(
+            BasicTemplateData entity,
+            IEnumerable<UpsertTemplateFieldDto> fieldsDto)
+        {
+            var byId = entity.Fields.ToDictionary(f => f.Id);
+            var incomingIds = new HashSet<int>();
 
-            // UrlConversionData <-> UrlConversionHistory
-            CreateMap<UrlConversionData, UrlConversionHistory>()
-                .ForMember(dest => dest.TemplateMapId, opt => opt.MapFrom(src => src.TemplateMapId))
-                .ForMember(dest => dest.InputUrl, opt => opt.MapFrom(src => src.InputUrl))
-                .ForMember(dest => dest.ConvertedAt, opt => opt.MapFrom(src => src.ConvertedAt))
-                .ForMember(dest => dest.OutputLink, opt => opt.MapFrom(src => src.OutputUrl))
-                 .ForMember(dest => dest.TemplateName, opt => opt.MapFrom(src =>
-                    src.TemplateMap != null && src.TemplateMap.SourceField != null && src.TemplateMap.TargetField != null
-                        ? $"{src.TemplateMap.SourceField.Name} → {src.TemplateMap.TargetField.Name}"
-                        : "Unknown Template"))
-                .ReverseMap()
-                .ForMember(dest => dest.Id, opt => opt.Ignore())
-                .ForMember(dest => dest.OutputUrl, opt => opt.MapFrom(src => src.OutputLink))
-                .ForMember(dest => dest.ConvertedAt, opt => opt.MapFrom(src => src.ConvertedAt))
-                .ForMember(dest => dest.InputUrl, opt => opt.MapFrom(src => src.InputUrl));
+            foreach (var f in fieldsDto)
+            {
+                if (f.Id.HasValue && byId.TryGetValue(f.Id.Value, out var existing))
+                {
+                    existing.Name = f.Name;
+                    existing.Type = f.Type;
+                    incomingIds.Add(existing.Id);
+                }
+                else
+                {
+                    entity.Fields.Add(new FieldData
+                    {
+                        Name = f.Name,
+                        Type = f.Type
+                    });
+                }
+            }
 
-            // WatchedUrlData <-> WatchedUrl
-            CreateMap<WatchedUrlData, WatchedUrl>()
-                .ForMember(dest => dest.Url, opt => opt.MapFrom(src => src.Url))
-                .ForMember(dest => dest.IntervalMinutes, opt => opt.MapFrom(src => src.IntervalMinutes))
-                .ReverseMap()
-                .ForMember(dest => dest.Id, opt => opt.Ignore())
-                .ForMember(dest => dest.Url, opt => opt.MapFrom(src => src.Url))
-                .ForMember(dest => dest.IntervalMinutes, opt => opt.MapFrom(src => src.IntervalMinutes))
-                .ForMember(dest => dest.CreatedAt, opt => opt.Ignore());
+            var toRemove = entity.Fields.Where(f => f.Id != 0 && !incomingIds.Contains(f.Id)).ToList();
+            foreach (var rem in toRemove) entity.Fields.Remove(rem);
+        }
+        public static List<MappingFieldData> BuildMappingFields(
+            int mappingTemplateId,
+            IReadOnlyDictionary<int, int?> targetToSource)
+        {
+            var result = new List<MappingFieldData>(targetToSource.Count);
+            foreach (var kv in targetToSource)
+            {
+                var targetId = kv.Key;
+                var sourceId = kv.Value;
 
+                if (sourceId is null) continue; 
 
+                result.Add(new MappingFieldData
+                {
+                    MappingTemplateId = mappingTemplateId,
+                    TargetFieldId = targetId,
+                    SourceFieldId = sourceId.Value
+                });
+            }
+            return result;
         }
     }
 }

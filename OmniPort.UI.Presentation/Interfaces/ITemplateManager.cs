@@ -1,4 +1,5 @@
 ﻿using OmniPort.Core.Models;
+using OmniPort.Core.Records;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,14 +11,27 @@ namespace OmniPort.UI.Presentation.Interfaces
 {
     public interface ITemplateManager
     {
-        Task<List<TemplateSummary>> GetTemplatesSummaryAsync();
-        Task<List<ImportTemplate>> GetTemplatesAsync();
-        Task<ImportTemplate?> GetTemplateByIdAsync(int id);
-        Task<ImportTemplate?> GetTemplateAsync(int id);
-        Task<List<FieldMapping>> GetMappingsByTemplateIdAsync(int id);
+        Task<IReadOnlyList<TemplateSummaryDto>> GetBasicTemplatesSummaryAsync();
+        Task<BasicTemplateDto?> GetBasicTemplateAsync(int templateId);
+        Task<int> CreateBasicTemplateAsync(CreateBasicTemplateDto dto);
+        Task<bool> UpdateBasicTemplateAsync(UpdateBasicTemplateDto dto);
+        Task<bool> DeleteBasicTemplateAsync(int templateId);
 
-        Task<bool> DeleteTemplateByIdAsync(int id);
-        Task CreateTemplateAsync(ImportTemplate template, SourceType sourceType, List<FieldMapping> fields);
-        Task UpdateTemplateByIdAsync(int id, ImportTemplate template, List<FieldMapping> fields);
+        // --- Mapping Templates (Source → Target) ---
+        Task<IReadOnlyList<JoinedTemplateSummaryDto>> GetJoinedTemplatesAsync();
+        Task<MappingTemplateDto?> GetMappingTemplateAsync(int mappingTemplateId);
+        Task<int> CreateMappingTemplateAsync(CreateMappingTemplateDto dto);
+        Task<bool> UpdateMappingTemplateAsync(UpdateMappingTemplateDto dto);
+        Task<bool> DeleteMappingTemplateAsync(int mappingTemplateId);
+
+        // --- History / Watch ---
+        Task<IReadOnlyList<FileConversionHistoryDto>> GetFileConversionHistoryAsync();
+        Task<IReadOnlyList<UrlConversionHistoryDto>> GetUrlConversionHistoryAsync();
+        Task AddFileConversionAsync(FileConversionHistoryDto dto);
+        Task AddUrlConversionAsync(UrlConversionHistoryDto dto);
+
+        Task<IReadOnlyList<WatchedUrlDto>> GetWatchedUrlsAsync();
+        Task<int> AddWatchedUrlAsync(AddWatchedUrlDto dto);
+        Task<bool> DeleteWatchedUrlAsync(int watchedUrlId);
     }
 }

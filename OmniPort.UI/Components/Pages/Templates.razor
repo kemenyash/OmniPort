@@ -10,7 +10,7 @@
     <thead>
         <tr class="bg-gray-100 text-left">
             <th class="p-3">Name</th>
-            <th class="p-3">Created</th>
+            <th class="p-3">Fields</th>
             <th class="p-3">Source Type</th>
             <th class="p-3"></th>
         </tr>
@@ -22,7 +22,7 @@
             {
                 <tr>
                     <td class="p-3">@tpl.Name</td>
-                    <td class="p-3">@tpl.CreatedAt.ToShortDateString()</td>
+                    <td class="p-3">@tpl.FieldsCount</td>
                     <td class="p-3">@tpl.SourceType</td>
                     <td class="p-3 flex gap-2">
                         <button class="text-blue-600 hover:underline" @onclick="() => ViewModel.StartEditAsync(tpl.Id)">Edit</button>
@@ -55,7 +55,7 @@
             <EditForm Model="@ViewModel.CurrentTemplate" OnValidSubmit="ViewModel.SaveAsync">
                 <div class="mb-4">
                     <label class="block font-medium mb-1">Template Name</label>
-                    <InputText class="w-full border rounded px-3 py-2" @bind-Value="ViewModel.CurrentTemplate.TemplateName" />
+                    <InputText class="w-full border rounded px-3 py-2" @bind-Value="ViewModel.CurrentTemplate.Name" />
                 </div>
 
                 <div class="mb-4">
@@ -71,8 +71,8 @@
                 @foreach (var field in ViewModel.CurrentFields)
                 {
                     <div class="grid grid-cols-4 gap-2 items-center mb-2">
-                        <InputText class="border rounded px-2 py-1 col-span-2" @bind-Value="field.SourceField" placeholder="Field name" />
-                        <InputSelect class="border rounded px-2 py-1" @bind-Value="field.TargetType">
+                        <InputText class="border rounded px-2 py-1 col-span-2" @bind-Value="field.Name" placeholder="Field name" />
+                        <InputSelect class="border rounded px-2 py-1" @bind-Value="field.Type">
                             @foreach (FieldDataType type in Enum.GetValues(typeof(FieldDataType)))
                             {
                                 <option value="@type">@type</option>

@@ -19,14 +19,12 @@ builder.Services.AddAutoMapper(cfg =>
 
 
 
-builder.Services.AddScoped<ICRUDService, CRUDService>();
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddHttpClient();
 
 builder.Services.AddScoped<ITemplateManager, TemplateManager>();
-builder.Services.AddScoped<IJoinTemplateManager, JoinTemplateManager>();
 builder.Services.AddScoped<ITransformationManager, TransformationManager>();
 builder.Services.AddScoped<ITransformationExecutionService, TransformationExecutor>();
 
