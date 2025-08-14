@@ -3,6 +3,7 @@ using OmniPort.Core.Models;
 using OmniPort.Core.Records;
 using OmniPort.Core.Utilities; 
 using OmniPort.UI.Presentation.Interfaces;
+using OmniPort.UI.Presentation.Models;
 
 namespace OmniPort.UI.Presentation.ViewModels
 {

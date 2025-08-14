@@ -1,21 +1,21 @@
-﻿using System;
+﻿using OmniPort.Core.Models;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace OmniPort.Core.Models
+namespace OmniPort.UI.Presentation.Models
 {
-    public class MappingTemplateForm
+    public class TemplateEditForm
     {
         public int? Id { get; set; } // null => Create
 
         [Required] public string Name { get; set; } = string.Empty;
+        [Required] public SourceType SourceType { get; set; }
 
-        [Required] public int SourceTemplateId { get; set; }
-        [Required] public int TargetTemplateId { get; set; }
-
-        public Dictionary<int, int?> TargetToSource { get; set; } = new();
+        [MinLength(1)]
+        public List<TemplateFieldRow> Fields { get; set; } = new();
     }
 }
