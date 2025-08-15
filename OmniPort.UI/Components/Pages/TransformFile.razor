@@ -5,9 +5,11 @@
 @inject TransformationViewModel ViewModel
 
 <EditForm Model="@ViewModel.FormModel" OnValidSubmit="RunTransformation">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
     <div class="space-y-6">
 
-        <!-- Template Selection -->
         <div>
             <label>Template</label>
             <InputSelect @bind-Value="@ViewModel.FormModel.SelectedMappingTemplateId" class="w-full border px-3 py-2 rounded">
@@ -17,45 +19,67 @@
                     <option value="@t.Id">@t.FullName</option>
                 }
             </InputSelect>
+            <ValidationMessage For="@(() => ViewModel.FormModel.SelectedMappingTemplateId)" />
         </div>
 
-        <!-- Mode Selection -->
         <div class="flex gap-4 items-center">
             <label>Import mode:</label>
             <button type="button" @onclick="() => SetMode(UploadMode.Upload)" class="@GetButtonClass(UploadMode.Upload)">Upload</button>
             <button type="button" @onclick="() => SetMode(UploadMode.Url)" class="@GetButtonClass(UploadMode.Url)">URL</button>
         </div>
 
-        <!-- Upload -->
         @if (inputMode == UploadMode.Upload)
         {
-            <div>
+            <div class="space-y-1">
                 <label>Upload File</label>
                 <InputFile OnChange="EventCallback.Factory.Create<InputFileChangeEventArgs>(this, OnFileChange)" class="w-full border px-3 py-2 rounded" />
+
+                @if (!string.IsNullOrWhiteSpace(ViewModel.FormModel.UploadedFileName))
+                {
+                    <div class="text-sm text-gray-600">Selected: @ViewModel.FormModel.UploadedFileName</div>
+                }
             </div>
         }
 
-        <!-- URL -->
         @if (inputMode == UploadMode.Url)
         {
             <div>
                 <label>File URL</label>
-                <InputText @bind-Value="ViewModel.FormModel.FileUrl" class="w-full border px-3 py-2 rounded" />
+                <InputText @bind-Value="ViewModel.FormModel.FileUrl" class="w-full border px-3 py-2 rounded" placeholder="https://example.com/file.xlsx" />
+                <ValidationMessage For="@(() => ViewModel.FormModel.FileUrl)" />
             </div>
 
             <div>
                 <label>Check Interval (min)</label>
-                <InputNumber @bind-Value="ViewModel.FormModel.IntervalMinutes" class="w-32 border px-3 py-2 rounded" />
+                <InputNumber @bind-Value="ViewModel.FormModel.IntervalMinutes"
+                             class="w-32 border px-3 py-2 rounded"
+                             min="1" max="1440" />
+                <ValidationMessage For="@(() => ViewModel.FormModel.IntervalMinutes)" />
             </div>
         }
 
-        <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded">Run Transformation</button>
+        <div class="flex items-center gap-3">
+            <button type="submit"
+                    class="bg-green-600 text-white px-4 py-2 rounded disabled:opacity-50"
+                    disabled="@(!CanRun)">
+                Run Transformation
+            </button>
+
+            @if (inputMode == UploadMode.Url)
+            {
+                <button type="button"
+                        class="bg-indigo-600 text-white px-4 py-2 rounded disabled:opacity-50"
+                        disabled="@(!CanAddToWatchlist)"
+                        @onclick="AddToWatchlist">
+                    Add to Watchlist
+                </button>
+            }
+        </div>
     </div>
 </EditForm>
 
 <hr class="my-10" />
 
-<!-- Watched URLs -->
 @if (inputMode == UploadMode.Url && ViewModel.WatchedUrls.Any())
 {
     <h2 class="text-lg font-semibold mb-2">Watched URLs</h2>
@@ -78,7 +102,6 @@
     </table>
 }
 
-<!-- URL Conversion History -->
 @if (inputMode == UploadMode.Url && ViewModel.UrlConversions.Any())
 {
     <h2 class="text-lg font-semibold mb-2">URL Conversion History</h2>
@@ -107,7 +130,6 @@
     </table>
 }
 
-<!-- File Conversion History -->
 @if (inputMode == UploadMode.Upload && ViewModel.FileConversions.Any())
 {
     <h2 class="text-lg font-semibold mb-2">File Conversion History</h2>
@@ -139,6 +161,18 @@
 @code {
     private UploadMode inputMode = UploadMode.Upload;
 
+    private bool CanRun =>
+        ViewModel.FormModel.SelectedMappingTemplateId != 0 &&
+        (inputMode == UploadMode.Upload
+            ? !string.IsNullOrWhiteSpace(ViewModel.FormModel.UploadedFileName)
+            : !string.IsNullOrWhiteSpace(ViewModel.FormModel.FileUrl));
+
+    private bool CanAddToWatchlist =>
+        inputMode == UploadMode.Url &&
+        ViewModel.FormModel.SelectedMappingTemplateId != 0 &&
+        !string.IsNullOrWhiteSpace(ViewModel.FormModel.FileUrl) &&
+        (ViewModel.FormModel.IntervalMinutes.HasValue && ViewModel.FormModel.IntervalMinutes.Value > 0);
+
     protected override async Task OnInitializedAsync()
     {
         await ViewModel.InitAsync();
@@ -155,15 +189,26 @@
             await ViewModel.RunUrlAsync();
     }
 
-    private void SetMode(UploadMode mode)
+    private async Task AddToWatchlist()
     {
-        inputMode = mode;
+        var templateId = ViewModel.FormModel.SelectedMappingTemplateId;
+        var url = (ViewModel.FormModel.FileUrl ?? string.Empty).Trim();
+        var interval = ViewModel.FormModel.IntervalMinutes.GetValueOrDefault(15);
+
+        if (templateId == 0 || string.IsNullOrWhiteSpace(url) || interval <= 0)
+            return;
+
+        await ViewModel.AddToWatchlistAsync(url, interval, templateId);
+        await ViewModel.ReloadWatchedAsync();
     }
+
+    private void SetMode(UploadMode mode) => inputMode = mode;
 
     private Task OnFileChange(InputFileChangeEventArgs e)
     {
         var file = e.File;
-        ViewModel.SetUploadedFile(file); 
+        ViewModel.SetUploadedFile(file);
+        ViewModel.FormModel.UploadedFileName = file?.Name;
         return Task.CompletedTask;
     }
 

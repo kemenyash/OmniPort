@@ -10,17 +10,17 @@ using System.Threading.Tasks;
 
 public class TransformationManager : ITransformationManager
 {
-    private readonly OmniPortDataContext _db;
+    private readonly OmniPortDataContext dataContext;
 
     public TransformationManager(OmniPortDataContext db)
     {
-        _db = db;
+        dataContext = db;
     }
 
     public async Task<(ImportProfile Profile, SourceType ImportSourceType, SourceType ConvertSourceType)>
-        GetImportProfileForJoinAsync(int mappingTemplateId)
+    GetImportProfileForJoinAsync(int mappingTemplateId)
     {
-        var mapping = await _db.MappingTemplates
+        var mapping = await dataContext.MappingTemplates
             .Include(m => m.SourceTemplate).ThenInclude(t => t.Fields)
             .Include(m => m.TargetTemplate).ThenInclude(t => t.Fields)
             .FirstOrDefaultAsync(m => m.Id == mappingTemplateId);
@@ -28,7 +28,7 @@ public class TransformationManager : ITransformationManager
         if (mapping is null)
             throw new InvalidOperationException($"Join mapping {mappingTemplateId} not found.");
 
-        var fields = await _db.MappingFields
+        var fields = await dataContext.MappingFields
             .Include(f => f.TargetField)
             .Include(f => f.SourceField)
             .Where(f => f.MappingTemplateId == mappingTemplateId)

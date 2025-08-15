@@ -1,9 +1,14 @@
 ﻿using Microsoft.AspNetCore.Components.Forms;
 using OmniPort.Core.Models;
 using OmniPort.Core.Records;
-using OmniPort.Core.Utilities; 
+using OmniPort.Core.Utilities;
 using OmniPort.UI.Presentation.Interfaces;
 using OmniPort.UI.Presentation.Models;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace OmniPort.UI.Presentation.ViewModels
 {
@@ -106,14 +111,22 @@ namespace OmniPort.UI.Presentation.ViewModels
                 MappingTemplateName: string.Empty
             ));
 
-            if (FormModel.IntervalMinutes is int m && m > 0)
-            {
-                await templateManager.AddWatchedUrlAsync(new AddWatchedUrlDto(FormModel.FileUrl!, m));
-                WatchedUrls = (await templateManager.GetWatchedUrlsAsync()).ToList();
-            }
-
             UrlConversions = (await templateManager.GetUrlConversionHistoryAsync())
                 .OrderByDescending(x => x.ConvertedAt).ToList();
+        }
+
+        public async Task AddToWatchlistAsync(string url, int intervalMinutes, int mappingTemplateId)
+        {
+            if (string.IsNullOrWhiteSpace(url) || intervalMinutes <= 0)
+                return;
+
+            await templateManager.AddWatchedUrlAsync(new AddWatchedUrlDto(url, intervalMinutes));
+            WatchedUrls = (await templateManager.GetWatchedUrlsAsync()).ToList();
+        }
+
+        public async Task ReloadWatchedAsync()
+        {
+            WatchedUrls = (await templateManager.GetWatchedUrlsAsync()).ToList();
         }
 
         private sealed class LazyStream
