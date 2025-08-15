@@ -1,57 +1,75 @@
-﻿using OmniPort.Core.Models;
+﻿using OmniPort.Core.Interfaces;
+using OmniPort.Core.Models;
+using OmniPort.Core.Records;
 using OmniPort.UI.Presentation.Interfaces;
-using System;
+using OmniPort.UI.Presentation.Models;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace OmniPort.UI.Presentation.ViewModels
 {
     public class TemplateEditorViewModel
     {
-        private readonly ITemplateManager templateManager;
+        private readonly ITemplateManager _service;
 
-        public List<TemplateSummary> Templates { get; private set; } = new();
-        public ImportTemplate CurrentTemplate { get; private set; } = new();
-        public List<FieldMapping> CurrentFields { get; private set; } = new();
-        public SourceType SelectedSourceType { get; set; } = SourceType.CSV;
-        public int? EditingTemplateId { get; private set; }
-        public bool IsModalOpen { get; private set; }
-
-        public TemplateEditorViewModel(ITemplateManager templateManager)
+        public TemplateEditorViewModel(ITemplateManager service)
         {
-            this.templateManager = templateManager;
+            _service = service;
+        }
+
+        public List<TemplateSummaryDto> Templates { get; private set; } = new();
+
+        public bool IsModalOpen { get; private set; }
+        public int? EditingTemplateId { get; private set; }
+        public TemplateEditForm CurrentTemplate { get; private set; } = new();
+        public List<TemplateFieldRow> CurrentFields => CurrentTemplate.Fields;
+
+        public SourceType SelectedSourceType
+        {
+            get => CurrentTemplate.SourceType;
+            set => CurrentTemplate.SourceType = value;
         }
 
         public async Task LoadTemplatesAsync()
         {
-            Templates = await templateManager.GetTemplatesSummaryAsync();
+            Templates = (await _service.GetBasicTemplatesSummaryAsync()).ToList();
         }
 
         public void StartCreate()
         {
-            CurrentTemplate = new ImportTemplate();
-            CurrentFields = new List<FieldMapping> { new() { SourceField = "", TargetType = FieldDataType.String } };
-            SelectedSourceType = SourceType.CSV;
             EditingTemplateId = null;
+            CurrentTemplate = new TemplateEditForm
+            {
+                SourceType = SourceType.CSV,
+                Fields = new List<TemplateFieldRow> { new() { Name = "Name", Type = FieldDataType.String } }
+            };
             IsModalOpen = true;
         }
 
         public async Task StartEditAsync(int id)
         {
-            var template = await templateManager.GetTemplateAsync(id);
-            var fields = await templateManager.GetMappingsByTemplateIdAsync(id);
+            var dto = await _service.GetBasicTemplateAsync(id);
+            if (dto is null) return;
 
-            if (template is null || fields is null)
-                return;
-
-            CurrentTemplate = template;
-            CurrentFields = fields.ToList();
-            SelectedSourceType = template.SourceType;
-            EditingTemplateId = id;
+            EditingTemplateId = dto.Id;
+            CurrentTemplate = new TemplateEditForm
+            {
+                Id = dto.Id,
+                Name = dto.Name,
+                SourceType = dto.SourceType,
+                Fields = dto.Fields.Select(f => new TemplateFieldRow
+                {
+                    Id = f.Id,
+                    Name = f.Name,
+                    Type = f.Type
+                }).ToList()
+            };
             IsModalOpen = true;
         }
+
+        public void AddField() => CurrentTemplate.Fields.Add(new TemplateFieldRow { Name = "", Type = FieldDataType.String });
+        public void RemoveField(TemplateFieldRow row) => CurrentTemplate.Fields.Remove(row);
 
         public void CancelEdit()
         {
@@ -59,39 +77,35 @@ namespace OmniPort.UI.Presentation.ViewModels
             EditingTemplateId = null;
         }
 
-        public void AddField() =>
-            CurrentFields.Add(new FieldMapping { SourceField = "", TargetType = FieldDataType.String });
-
-        public void RemoveField(FieldMapping field) =>
-            CurrentFields.Remove(field);
-
         public async Task SaveAsync()
         {
-            if (string.IsNullOrWhiteSpace(CurrentTemplate.TemplateName) || !CurrentFields.Any())
-                return;
-
-            CurrentTemplate.Fields = CurrentFields
-                .Select(f => new TemplateField { Name = f.SourceField, Type = f.TargetType })
-                .ToList();
-
-            CurrentTemplate.SourceType = SelectedSourceType;
-
-            if (EditingTemplateId.HasValue)
+            if (EditingTemplateId is null)
             {
-                await templateManager.UpdateTemplateByIdAsync(EditingTemplateId.Value, CurrentTemplate, CurrentFields);
+                var create = new CreateBasicTemplateDto(
+                    CurrentTemplate.Name,
+                    CurrentTemplate.SourceType,
+                    CurrentTemplate.Fields.Select(f => new CreateTemplateFieldDto(f.Name, f.Type)).ToList()
+                );
+                await _service.CreateBasicTemplateAsync(create);
             }
             else
             {
-                await templateManager.CreateTemplateAsync(CurrentTemplate, SelectedSourceType, CurrentFields);
+                var update = new UpdateBasicTemplateDto(
+                    EditingTemplateId.Value,
+                    CurrentTemplate.Name,
+                    CurrentTemplate.SourceType,
+                    CurrentTemplate.Fields.Select(f => new UpsertTemplateFieldDto(f.Id, f.Name, f.Type)).ToList()
+                );
+                await _service.UpdateBasicTemplateAsync(update);
             }
 
+            IsModalOpen = false;
             await LoadTemplatesAsync();
-            CancelEdit();
         }
 
         public async Task DeleteAsync(int id)
         {
-            await templateManager.DeleteTemplateByIdAsync(id);
+            await _service.DeleteBasicTemplateAsync(id);
             await LoadTemplatesAsync();
         }
     }

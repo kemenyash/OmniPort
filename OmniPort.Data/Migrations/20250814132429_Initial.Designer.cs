@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using OmniPort.Data;
 
@@ -10,9 +11,11 @@ using OmniPort.Data;
 namespace OmniPort.Data.Migrations
 {
     [DbContext(typeof(OmniPortDataContext))]
-    partial class OmniPortDataContextModelSnapshot : ModelSnapshot
+    [Migration("20250814132429_Initial")]
+    partial class Initial
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.7");
@@ -234,7 +237,7 @@ namespace OmniPort.Data.Migrations
                     b.HasOne("OmniPort.Data.MappingTemplateData", "MappingTemplate")
                         .WithMany("FileConversions")
                         .HasForeignKey("MappingTemplateId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("MappingTemplate");
@@ -251,13 +254,13 @@ namespace OmniPort.Data.Migrations
                     b.HasOne("OmniPort.Data.FieldData", "SourceField")
                         .WithMany()
                         .HasForeignKey("SourceFieldId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("OmniPort.Data.FieldData", "TargetField")
                         .WithMany()
                         .HasForeignKey("TargetFieldId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("MappingTemplate");
@@ -272,13 +275,13 @@ namespace OmniPort.Data.Migrations
                     b.HasOne("OmniPort.Data.BasicTemplateData", "SourceTemplate")
                         .WithMany("AsSourceMappings")
                         .HasForeignKey("SourceTemplateId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("OmniPort.Data.BasicTemplateData", "TargetTemplate")
                         .WithMany("AsTargetMappings")
                         .HasForeignKey("TargetTemplateId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("SourceTemplate");
@@ -291,7 +294,7 @@ namespace OmniPort.Data.Migrations
                     b.HasOne("OmniPort.Data.MappingTemplateData", "MappingTemplate")
                         .WithMany("UrlConversions")
                         .HasForeignKey("MappingTemplateId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("MappingTemplate");
