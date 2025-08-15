@@ -24,9 +24,9 @@ namespace OmniPort.Data
         {
             base.OnModelCreating(modelBuilder);
 
-
             modelBuilder.Entity<BasicTemplateData>()
                 .HasIndex(x => x.Name).IsUnique(false);
+
 
             modelBuilder.Entity<BasicTemplateData>()
                 .HasMany(t => t.Fields)
@@ -38,13 +38,13 @@ namespace OmniPort.Data
                 .HasMany(t => t.AsSourceMappings)
                 .WithOne(m => m.SourceTemplate)
                 .HasForeignKey(m => m.SourceTemplateId)
-                .OnDelete(DeleteBehavior.Restrict);
+                .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<BasicTemplateData>()
                 .HasMany(t => t.AsTargetMappings)
                 .WithOne(m => m.TargetTemplate)
                 .HasForeignKey(m => m.TargetTemplateId)
-                .OnDelete(DeleteBehavior.Restrict);
+                .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<FieldData>()
                 .HasIndex(f => new { f.TemplateSourceId, f.Name })
@@ -59,6 +59,17 @@ namespace OmniPort.Data
                 .HasForeignKey(f => f.MappingTemplateId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            modelBuilder.Entity<MappingFieldData>()
+                .HasOne(mf => mf.SourceField)
+                .WithMany()
+                .HasForeignKey(mf => mf.SourceFieldId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<MappingFieldData>()
+                .HasOne(mf => mf.TargetField)
+                .WithMany()
+                .HasForeignKey(mf => mf.TargetFieldId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<MappingFieldData>()
                 .HasIndex(x => new { x.MappingTemplateId, x.SourceFieldId, x.TargetFieldId })
@@ -68,17 +79,18 @@ namespace OmniPort.Data
                 .HasOne(h => h.MappingTemplate)
                 .WithMany(m => m.FileConversions)
                 .HasForeignKey(h => h.MappingTemplateId)
-                .OnDelete(DeleteBehavior.Restrict);
+                .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<UrlConversionHistoryData>()
                 .HasOne(h => h.MappingTemplate)
                 .WithMany(m => m.UrlConversions)
                 .HasForeignKey(h => h.MappingTemplateId)
-                .OnDelete(DeleteBehavior.Restrict);
+                .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<UrlFileGettingData>()
                 .HasIndex(x => x.Url)
                 .IsUnique();
         }
+
     }
 }
