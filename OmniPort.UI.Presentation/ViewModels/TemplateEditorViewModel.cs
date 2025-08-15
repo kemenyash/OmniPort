@@ -11,12 +11,9 @@ namespace OmniPort.UI.Presentation.ViewModels
 {
     public class TemplateEditorViewModel
     {
-        private readonly ITemplateManager _service;
+        private readonly IAppSyncContext _sync;
 
-        public TemplateEditorViewModel(ITemplateManager service)
-        {
-            _service = service;
-        }
+        public TemplateEditorViewModel(IAppSyncContext sync) => _sync = sync;
 
         public List<TemplateSummaryDto> Templates { get; private set; } = new();
 
@@ -33,7 +30,15 @@ namespace OmniPort.UI.Presentation.ViewModels
 
         public async Task LoadTemplatesAsync()
         {
-            Templates = (await _service.GetBasicTemplatesSummaryAsync()).ToList();
+            if (!_sync.Templates.Any())
+                await _sync.InitializeAsync();
+            Templates = _sync.Templates.ToList();
+            _sync.Changed += OnChanged;
+        }
+
+        private void OnChanged()
+        {
+            Templates = _sync.Templates.ToList();
         }
 
         public void StartCreate()
@@ -49,23 +54,19 @@ namespace OmniPort.UI.Presentation.ViewModels
 
         public async Task StartEditAsync(int id)
         {
-            var dto = await _service.GetBasicTemplateAsync(id);
-            if (dto is null) return;
+            var full = _sync.BasicTemplatesFull.FirstOrDefault(x => x.Id == id);
+            if (full == null) return;
 
-            EditingTemplateId = dto.Id;
+            EditingTemplateId = full.Id;
             CurrentTemplate = new TemplateEditForm
             {
-                Id = dto.Id,
-                Name = dto.Name,
-                SourceType = dto.SourceType,
-                Fields = dto.Fields.Select(f => new TemplateFieldRow
-                {
-                    Id = f.Id,
-                    Name = f.Name,
-                    Type = f.Type
-                }).ToList()
+                Id = full.Id,
+                Name = full.Name,
+                SourceType = full.SourceType,
+                Fields = full.Fields.Select(f => new TemplateFieldRow { Id = f.Id, Name = f.Name, Type = f.Type }).ToList()
             };
             IsModalOpen = true;
+            await Task.CompletedTask;
         }
 
         public void AddField() => CurrentTemplate.Fields.Add(new TemplateFieldRow { Name = "", Type = FieldDataType.String });
@@ -86,7 +87,7 @@ namespace OmniPort.UI.Presentation.ViewModels
                     CurrentTemplate.SourceType,
                     CurrentTemplate.Fields.Select(f => new CreateTemplateFieldDto(f.Name, f.Type)).ToList()
                 );
-                await _service.CreateBasicTemplateAsync(create);
+                await _sync.CreateBasicTemplateAsync(create);
             }
             else
             {
@@ -96,17 +97,12 @@ namespace OmniPort.UI.Presentation.ViewModels
                     CurrentTemplate.SourceType,
                     CurrentTemplate.Fields.Select(f => new UpsertTemplateFieldDto(f.Id, f.Name, f.Type)).ToList()
                 );
-                await _service.UpdateBasicTemplateAsync(update);
+                await _sync.UpdateBasicTemplateAsync(update);
             }
 
             IsModalOpen = false;
-            await LoadTemplatesAsync();
         }
 
-        public async Task DeleteAsync(int id)
-        {
-            await _service.DeleteBasicTemplateAsync(id);
-            await LoadTemplatesAsync();
-        }
+        public async Task DeleteAsync(int id) => await _sync.DeleteBasicTemplateAsync(id);
     }
 }
