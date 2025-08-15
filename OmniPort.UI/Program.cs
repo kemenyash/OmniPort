@@ -17,6 +17,7 @@ builder.Services.AddAutoMapper(cfg =>
     cfg.AddProfile<OmniPortMappingProfile>();
 });
 
+builder.Services.Configure<UploadLimits>(builder.Configuration.GetSection("UploadLimits"));
 
 
 // Add services to the container.

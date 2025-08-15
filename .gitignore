@@ -364,3 +364,4 @@ FodyWeavers.xsd
 /OmniPort.UI/omniport.db
 /OmniPort.UI/omniport.db-shm
 /OmniPort.UI/omniport.db-wal
+/OmniPort.UI/wwwroot/exports/
