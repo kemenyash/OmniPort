@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Components.Forms;
+using OmniPort.Core.Interfaces;
 using OmniPort.Core.Models;
 using OmniPort.Core.Records;
 using OmniPort.Core.Utilities;
@@ -14,12 +15,12 @@ namespace OmniPort.UI.Presentation.ViewModels
 {
     public class TransformationViewModel
     {
-        private readonly ITemplateManager templateManager;
+        private readonly IAppSyncContext sync;
         private readonly ITransformationExecutionService executor;
 
-        public TransformationViewModel(ITemplateManager templateManager, ITransformationExecutionService executor)
+        public TransformationViewModel(IAppSyncContext sync, ITransformationExecutionService executor)
         {
-            this.templateManager = templateManager;
+            this.sync = sync;
             this.executor = executor;
         }
 
@@ -36,25 +37,36 @@ namespace OmniPort.UI.Presentation.ViewModels
 
         public async Task InitAsync()
         {
-            JoinedTemplates = (await templateManager.GetJoinedTemplatesAsync()).ToList();
-            FileConversions = (await templateManager.GetFileConversionHistoryAsync()).OrderByDescending(x => x.ConvertedAt).ToList();
-            UrlConversions = (await templateManager.GetUrlConversionHistoryAsync()).OrderByDescending(x => x.ConvertedAt).ToList();
-            WatchedUrls = (await templateManager.GetWatchedUrlsAsync()).ToList();
+            if (!sync.JoinedTemplates.Any())
+                await sync.InitializeAsync();
+
+            BindFromSync();
+            sync.Changed += () => BindFromSync();
 
             if (FormModel.SelectedMappingTemplateId == 0 && JoinedTemplates.Any())
                 FormModel.SelectedMappingTemplateId = JoinedTemplates.First().Id;
+        }
+
+        private void BindFromSync()
+        {
+            JoinedTemplates = sync.JoinedTemplates.ToList();
+            FileConversions = sync.FileConversions.ToList();
+            UrlConversions = sync.UrlConversions.ToList();
+            WatchedUrls = sync.WatchedUrls.ToList();
         }
 
         public void SetUploadedFile(string fileName, Func<Task<Stream>> openStream)
         {
             _uploadedFileName = fileName;
             _uploadObject = new LazyStream(openStream);
+            FormModel.UploadedFileName = fileName;
         }
 
         public void SetUploadedFile(IBrowserFile file)
         {
             _uploadedFileName = file.Name;
             _uploadObject = file;
+            FormModel.UploadedFileName = file.Name;
         }
 
         public async Task RunUploadAsync()
@@ -73,7 +85,7 @@ namespace OmniPort.UI.Presentation.ViewModels
                 outputExtension: ext
             );
 
-            await templateManager.AddFileConversionAsync(new FileConversionHistoryDto(
+            await sync.AddFileConversionAsync(new FileConversionHistoryDto(
                 Id: 0,
                 ConvertedAt: DateTime.UtcNow,
                 FileName: _uploadedFileName!,
@@ -81,9 +93,6 @@ namespace OmniPort.UI.Presentation.ViewModels
                 MappingTemplateId: FormModel.SelectedMappingTemplateId,
                 MappingTemplateName: string.Empty
             ));
-
-            FileConversions = (await templateManager.GetFileConversionHistoryAsync())
-                .OrderByDescending(x => x.ConvertedAt).ToList();
         }
 
         public async Task RunUrlAsync()
@@ -102,7 +111,7 @@ namespace OmniPort.UI.Presentation.ViewModels
                 outputExtension: ext
             );
 
-            await templateManager.AddUrlConversionAsync(new UrlConversionHistoryDto(
+            await sync.AddUrlConversionAsync(new UrlConversionHistoryDto(
                 Id: 0,
                 ConvertedAt: DateTime.UtcNow,
                 InputUrl: FormModel.FileUrl!,
@@ -110,24 +119,15 @@ namespace OmniPort.UI.Presentation.ViewModels
                 MappingTemplateId: FormModel.SelectedMappingTemplateId,
                 MappingTemplateName: string.Empty
             ));
-
-            UrlConversions = (await templateManager.GetUrlConversionHistoryAsync())
-                .OrderByDescending(x => x.ConvertedAt).ToList();
         }
 
         public async Task AddToWatchlistAsync(string url, int intervalMinutes, int mappingTemplateId)
         {
-            if (string.IsNullOrWhiteSpace(url) || intervalMinutes <= 0)
-                return;
-
-            await templateManager.AddWatchedUrlAsync(new AddWatchedUrlDto(url, intervalMinutes));
-            WatchedUrls = (await templateManager.GetWatchedUrlsAsync()).ToList();
+            if (string.IsNullOrWhiteSpace(url) || intervalMinutes <= 0) return;
+            await sync.AddWatchedUrlAsync(new AddWatchedUrlDto(url, intervalMinutes));
         }
 
-        public async Task ReloadWatchedAsync()
-        {
-            WatchedUrls = (await templateManager.GetWatchedUrlsAsync()).ToList();
-        }
+        public async Task ReloadWatchedAsync() => await sync.RefreshAllAsync();
 
         private sealed class LazyStream
         {

@@ -9,12 +9,9 @@ namespace OmniPort.UI.Presentation.ViewModels
 {
     public class JoinTemplatesViewModel
     {
-        private readonly ITemplateManager _service;
+        private readonly IAppSyncContext _sync;
 
-        public JoinTemplatesViewModel(ITemplateManager service)
-        {
-            _service = service;
-        }
+        public JoinTemplatesViewModel(IAppSyncContext sync) => _sync = sync;
 
         public List<BasicTemplateDto> Templates { get; private set; } = new();
 
@@ -32,33 +29,37 @@ namespace OmniPort.UI.Presentation.ViewModels
 
         public async Task InitAsync()
         {
-            var summaries = await _service.GetBasicTemplatesSummaryAsync();
-            var ids = summaries.Select(x => x.Id).ToList();
+            if (!_sync.Templates.Any())
+                await _sync.InitializeAsync();
 
-            Templates = new List<BasicTemplateDto>();
-            foreach (var id in ids)
-            {
-                var dto = await _service.GetBasicTemplateAsync(id);
-                if (dto != null) Templates.Add(dto);
-            }
-
-            JoinedTemplates = (await _service.GetJoinedTemplatesAsync()).ToList();
+            Templates = _sync.BasicTemplatesFull.ToList();
+            JoinedTemplates = _sync.JoinedTemplates.ToList();
+            _sync.Changed += OnChanged;
         }
 
-        public async Task SetSourceTemplateAsync(int id)
+        private void OnChanged()
+        {
+            Templates = _sync.BasicTemplatesFull.ToList();
+            JoinedTemplates = _sync.JoinedTemplates.ToList();
+        }
+
+        public Task SetSourceTemplateAsync(int id)
         {
             SourceId = id;
-            SourceTemplate = await _service.GetBasicTemplateAsync(id);
+            SourceTemplate = Templates.FirstOrDefault(x => x.Id == id);
+            return Task.CompletedTask;
         }
 
-        public async Task SetTargetTemplateAsync(int id)
+        public Task SetTargetTemplateAsync(int id)
         {
             TargetId = id;
-            TargetTemplate = await _service.GetBasicTemplateAsync(id);
+            TargetTemplate = Templates.FirstOrDefault(x => x.Id == id);
 
             _targetToSource.Clear();
             foreach (var tf in TargetTemplate?.Fields ?? Enumerable.Empty<TemplateFieldDto>())
                 _targetToSource[tf.Id] = null;
+
+            return Task.CompletedTask;
         }
 
         public string? GetMappedValue(string targetFieldName)
@@ -93,22 +94,10 @@ namespace OmniPort.UI.Presentation.ViewModels
             if (!CanSave || TargetId is null || SourceId is null) return;
 
             var name = $"{SourceTemplate!.Name} → {TargetTemplate!.Name}";
-
-            var cmd = new CreateMappingTemplateDto(
-                name,
-                SourceId.Value,
-                TargetId.Value,
-                new Dictionary<int, int?>(_targetToSource)
-            );
-
-            await _service.CreateMappingTemplateAsync(cmd);
-            JoinedTemplates = (await _service.GetJoinedTemplatesAsync()).ToList();
+            var cmd = new CreateMappingTemplateDto(name, SourceId.Value, TargetId.Value, new Dictionary<int, int?>(_targetToSource));
+            await _sync.CreateMappingTemplateAsync(cmd);
         }
 
-        public async Task DeleteJoinTemplateAsync(int mappingTemplateId)
-        {
-            await _service.DeleteMappingTemplateAsync(mappingTemplateId);
-            JoinedTemplates = (await _service.GetJoinedTemplatesAsync()).ToList();
-        }
+        public async Task DeleteJoinTemplateAsync(int mappingTemplateId) => await _sync.DeleteMappingTemplateAsync(mappingTemplateId);
     }
 }

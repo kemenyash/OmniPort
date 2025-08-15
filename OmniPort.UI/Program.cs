@@ -1,9 +1,11 @@
+using DocumentFormat.OpenXml.Office2016.Drawing.ChartDrawing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using OmniPort.Core.Interfaces;
 using OmniPort.Data;
 using OmniPort.UI;
 using OmniPort.UI.Components;
+using OmniPort.UI.Presentation;
 using OmniPort.UI.Presentation.Interfaces;
 using OmniPort.UI.Presentation.Mapping;
 using OmniPort.UI.Presentation.Services;
@@ -32,7 +34,7 @@ builder.Services.AddScoped<ITransformationExecutionService, TransformationExecut
 builder.Services.AddScoped<TemplateEditorViewModel>();
 builder.Services.AddScoped<JoinTemplatesViewModel>();
 builder.Services.AddScoped<TransformationViewModel>();
-
+builder.Services.AddSingleton<IAppSyncContext, AppSyncContext>();
 
 var app = builder.Build();
 
@@ -56,5 +58,5 @@ app.UseAntiforgery();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
-
+await app.Services.GetRequiredService<IAppSyncContext>().InitializeAsync();
 app.Run();

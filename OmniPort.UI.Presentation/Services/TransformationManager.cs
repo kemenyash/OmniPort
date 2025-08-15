@@ -17,8 +17,7 @@ public class TransformationManager : ITransformationManager
         dataContext = db;
     }
 
-    public async Task<(ImportProfile Profile, SourceType ImportSourceType, SourceType ConvertSourceType)>
-    GetImportProfileForJoinAsync(int mappingTemplateId)
+    public async Task<(ImportProfile Profile, SourceType ImportSourceType, SourceType ConvertSourceType)> GetImportProfileForJoinAsync(int mappingTemplateId)
     {
         var mapping = await dataContext.MappingTemplates
             .Include(m => m.SourceTemplate).ThenInclude(t => t.Fields)
