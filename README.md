@@ -1,4 +1,4 @@
-# OmniPort – data transformation and mapping Service
+# OmniPort – data transformation and mapping service
 
 **OmniPort** is a system for uploading, transforming, and converting data between various formats (**CSV, Excel, JSON, XML**) using flexible mapping templates.  
 
