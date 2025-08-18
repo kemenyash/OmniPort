@@ -1,9 +1,9 @@
-# OmniPort – Data Transformation and Mapping Service
+# OmniPort – data transformation and mapping service
 
 **OmniPort** is a system for uploading, transforming, and converting data between various formats (**CSV, Excel, JSON, XML**) using flexible mapping templates.  
 
 The application allows you to configure field mappings between the source and target formats, store conversion history, and automatically process data from URLs.  
-OmniPort is an excellent alternative to paid mapping services: simply create a template for your input and output data, map their fields, run the transformation — and you can obtain a permanent link for data synchronization, for example, with marketplaces like **Amazon**, **eBay**, or other services, without writing additional automation scripts.
+OmniPort is an excellent alternative to paid mapping services: simply create a template for your input and output data, map their fields, run the transformation - and you can obtain a permanent link for data synchronization, for example, with marketplaces like **Amazon**, **eBay**, or other services, without writing additional automation scripts.
 
 ---
 
