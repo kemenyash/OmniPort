@@ -1,6 +1,6 @@
 ﻿namespace OmniPort.Core.Records
 {
-    using OmniPort.Core.Models;
+    using OmniPort.Core.Enums;
     using System;
     using System.Collections.Generic;
 

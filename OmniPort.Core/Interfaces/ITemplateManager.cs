@@ -1,13 +1,11 @@
-﻿using OmniPort.Core.Models;
-using OmniPort.Core.Records;
+﻿using OmniPort.Core.Records;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.AccessControl;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace OmniPort.UI.Presentation.Interfaces
+namespace OmniPort.Core.Interfaces
 {
     public interface ITemplateManager
     {

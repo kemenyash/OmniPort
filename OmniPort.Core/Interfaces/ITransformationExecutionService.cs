@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace OmniPort.UI.Presentation.Interfaces
+namespace OmniPort.Core.Interfaces
 {
     public interface ITransformationExecutionService
     {
