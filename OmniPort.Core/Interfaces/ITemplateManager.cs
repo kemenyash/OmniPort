@@ -15,14 +15,12 @@ namespace OmniPort.Core.Interfaces
         Task<bool> UpdateBasicTemplateAsync(UpdateBasicTemplateDto dto);
         Task<bool> DeleteBasicTemplateAsync(int templateId);
 
-        // --- Mapping Templates (Source → Target) ---
         Task<IReadOnlyList<JoinedTemplateSummaryDto>> GetJoinedTemplatesAsync();
         Task<MappingTemplateDto?> GetMappingTemplateAsync(int mappingTemplateId);
         Task<int> CreateMappingTemplateAsync(CreateMappingTemplateDto dto);
         Task<bool> UpdateMappingTemplateAsync(UpdateMappingTemplateDto dto);
         Task<bool> DeleteMappingTemplateAsync(int mappingTemplateId);
 
-        // --- History / Watch ---
         Task<IReadOnlyList<FileConversionHistoryDto>> GetFileConversionHistoryAsync();
         Task<IReadOnlyList<UrlConversionHistoryDto>> GetUrlConversionHistoryAsync();
         Task AddFileConversionAsync(FileConversionHistoryDto dto);

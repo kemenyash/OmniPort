@@ -18,10 +18,10 @@ namespace OmniPort.UI.Presentation.Services
 {
     public sealed class WatchedHashSyncService : BackgroundService
     {
-        private readonly IAppSyncContext _sync;                 // singleton — ок
-        private readonly IHttpClientFactory _httpFactory;       // singleton — ок
-        private readonly ISourceFingerprintStore _fingerprints; // singleton — ок (in-memory)
-        private readonly IServiceProvider _root;                // для створення scope
+        private readonly IAppSyncContext _sync;                
+        private readonly IHttpClientFactory _httpFactory;       
+        private readonly ISourceFingerprintStore _fingerprints; 
+        private readonly IServiceProvider _root;                
         private readonly ILogger<WatchedHashSyncService> _log;
 
         private readonly TimeSpan _scanPeriod = TimeSpan.FromSeconds(20);
@@ -110,7 +110,12 @@ namespace OmniPort.UI.Presentation.Services
             {
                 var http = _httpFactory.CreateClient();
                 using var resp = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
-                resp.EnsureSuccessStatusCode();
+                if (!resp.IsSuccessStatusCode)
+                {
+                    _log.LogError("Error fetching {Url}: {StatusCode} {ReasonPhrase}",
+                        url, resp.StatusCode, resp.ReasonPhrase);
+                    return;
+                }
 
                 await using var stream = await resp.Content.ReadAsStreamAsync(ct);
                 var currentHash = await ComputeSha256HexAsync(stream, ct);

@@ -25,7 +25,10 @@ namespace OmniPort.Core.Parsers
             while (csv.Read())
             {
                 var dict = csv.GetRecord<dynamic>() as IDictionary<string, object?>;
-                if (dict != null) yield return new Dictionary<string, object?>(dict);
+                if (dict != null)
+                {
+                    yield return new Dictionary<string, object?>(dict);
+                }
             }
         }
     }
