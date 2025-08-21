@@ -1,4 +1,5 @@
-﻿using OmniPort.Core.Mappers;
+﻿using OmniPort.Core.Enums;
+using OmniPort.Core.Mappers;
 using OmniPort.Core.Models;
 using System;
 using System.Collections.Generic;

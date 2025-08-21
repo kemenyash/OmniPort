@@ -15,16 +15,23 @@ namespace OmniPort.Core.Parsers
             {
                 using var workbook = new XLWorkbook(stream);
 
-                var worksheet = workbook.Worksheets.FirstOrDefault()
-                    ?? throw new InvalidOperationException("Workbook has no worksheets.");
+                var worksheet = workbook.Worksheets.FirstOrDefault();
+                if (worksheet == null)
+                {
+                    throw new InvalidOperationException("Workbook has no worksheets.");
+                }
 
                 var range = worksheet.RangeUsed();
-                if (range is null)
+                if (range == null)
+                {
                     return Enumerable.Empty<IDictionary<string, object?>>();
+                }
 
                 var rows = range.RowsUsed().ToList();
                 if (rows.Count < 2)
+                {
                     return Enumerable.Empty<IDictionary<string, object?>>();
+                }
 
                 var headerRow = rows[0];
                 var headers = headerRow.CellsUsed()
@@ -34,7 +41,9 @@ namespace OmniPort.Core.Parsers
                 for (int i = 0; i < headers.Count; i++)
                 {
                     if (string.IsNullOrWhiteSpace(headers[i]))
+                    {
                         headers[i] = $"Column{i + 1}";
+                    }
                 }
 
                 var result = new List<IDictionary<string, object?>>(rows.Count - 1);

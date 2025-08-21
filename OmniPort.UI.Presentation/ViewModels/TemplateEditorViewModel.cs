@@ -1,7 +1,6 @@
-﻿using OmniPort.Core.Interfaces;
-using OmniPort.Core.Models;
+﻿using OmniPort.Core.Enums;
+using OmniPort.Core.Interfaces;
 using OmniPort.Core.Records;
-using OmniPort.UI.Presentation.Interfaces;
 using OmniPort.UI.Presentation.Models;
 using System.Collections.Generic;
 using System.Linq;

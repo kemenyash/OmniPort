@@ -6,7 +6,6 @@ using OmniPort.Data;
 using OmniPort.UI;
 using OmniPort.UI.Components;
 using OmniPort.UI.Presentation;
-using OmniPort.UI.Presentation.Interfaces;
 using OmniPort.UI.Presentation.Mapping;
 using OmniPort.UI.Presentation.Services;
 using OmniPort.UI.Presentation.ViewModels;
@@ -35,6 +34,8 @@ builder.Services.AddScoped<TemplateEditorViewModel>();
 builder.Services.AddScoped<JoinTemplatesViewModel>();
 builder.Services.AddScoped<TransformationViewModel>();
 builder.Services.AddSingleton<IAppSyncContext, AppSyncContext>();
+builder.Services.AddSingleton<ISourceFingerprintStore, InMemorySourceFingerprintStore>();
+builder.Services.AddHostedService<WatchedHashSyncService>();
 
 var app = builder.Build();
 

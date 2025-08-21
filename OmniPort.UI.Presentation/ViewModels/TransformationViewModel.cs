@@ -3,13 +3,7 @@ using OmniPort.Core.Interfaces;
 using OmniPort.Core.Models;
 using OmniPort.Core.Records;
 using OmniPort.Core.Utilities;
-using OmniPort.UI.Presentation.Interfaces;
 using OmniPort.UI.Presentation.Models;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace OmniPort.UI.Presentation.ViewModels
 {
@@ -128,12 +122,5 @@ namespace OmniPort.UI.Presentation.ViewModels
         }
 
         public async Task ReloadWatchedAsync() => await sync.RefreshAllAsync();
-
-        private sealed class LazyStream
-        {
-            private readonly Func<Task<Stream>> _factory;
-            public LazyStream(Func<Task<Stream>> factory) => _factory = factory;
-            public async Task<Stream> OpenAsync() => await _factory();
-        }
     }
 }

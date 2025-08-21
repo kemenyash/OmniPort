@@ -113,56 +113,5 @@ namespace OmniPort.UI.Presentation.Mapping
                 .ForMember(d => d.FileConversions, opt => opt.Ignore())
                 .ForMember(d => d.UrlConversions, opt => opt.Ignore());
         }
-
-
-        public static void UpsertFields(
-            BasicTemplateData entity,
-            IEnumerable<UpsertTemplateFieldDto> fieldsDto)
-        {
-            var byId = entity.Fields.ToDictionary(f => f.Id);
-            var incomingIds = new HashSet<int>();
-
-            foreach (var f in fieldsDto)
-            {
-                if (f.Id.HasValue && byId.TryGetValue(f.Id.Value, out var existing))
-                {
-                    existing.Name = f.Name;
-                    existing.Type = f.Type;
-                    incomingIds.Add(existing.Id);
-                }
-                else
-                {
-                    entity.Fields.Add(new FieldData
-                    {
-                        Name = f.Name,
-                        Type = f.Type
-                    });
-                }
-            }
-
-            var toRemove = entity.Fields.Where(f => f.Id != 0 && !incomingIds.Contains(f.Id)).ToList();
-            foreach (var rem in toRemove) entity.Fields.Remove(rem);
-        }
-        public static List<MappingFieldData> BuildMappingFields(
-            int mappingTemplateId,
-            IReadOnlyDictionary<int, int?> targetToSource)
-        {
-            var result = new List<MappingFieldData>(targetToSource.Count);
-            foreach (var kv in targetToSource)
-            {
-                var targetId = kv.Key;
-                var sourceId = kv.Value;
-
-                if (sourceId is null) continue; 
-
-                result.Add(new MappingFieldData
-                {
-                    MappingTemplateId = mappingTemplateId,
-                    TargetFieldId = targetId,
-                    SourceFieldId = sourceId.Value
-                });
-            }
-            return result;
-        }
     }
 }

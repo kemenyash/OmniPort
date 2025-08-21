@@ -1,8 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using OmniPort.Core.Enums;
+using OmniPort.Core.Interfaces;
 using OmniPort.Core.Models;
 using OmniPort.Data;
-
-using OmniPort.UI.Presentation.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Linq;
