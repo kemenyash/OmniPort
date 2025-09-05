@@ -7,9 +7,9 @@ using OmniPort.Core.Utilities;
 using System;
 using System.Buffers;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
@@ -18,14 +18,14 @@ namespace OmniPort.UI.Presentation.Services
 {
     public sealed class WatchedHashSyncService : BackgroundService
     {
-        private readonly IAppSyncContext _sync;                
-        private readonly IHttpClientFactory _httpFactory;       
-        private readonly ISourceFingerprintStore _fingerprints; 
-        private readonly IServiceProvider _root;                
-        private readonly ILogger<WatchedHashSyncService> _log;
+        private readonly IAppSyncContext syncContext;
+        private readonly IHttpClientFactory httpFactory;
+        private readonly ISourceFingerprintStore fingerprints;
+        private readonly IServiceProvider serviceProvider;
+        private readonly ILogger<WatchedHashSyncService> logger;
 
-        private readonly TimeSpan _scanPeriod = TimeSpan.FromSeconds(20);
-        private readonly ConcurrentDictionary<string, SemaphoreSlim> _locks = new(StringComparer.OrdinalIgnoreCase);
+        private readonly TimeSpan scanPeriod = TimeSpan.FromSeconds(20);
+        private readonly ConcurrentDictionary<string, SemaphoreSlim> locks = new(StringComparer.OrdinalIgnoreCase);
 
         public WatchedHashSyncService(
             IAppSyncContext sync,
@@ -34,134 +34,260 @@ namespace OmniPort.UI.Presentation.Services
             IServiceProvider root,
             ILogger<WatchedHashSyncService> log)
         {
-            _sync = sync;
-            _httpFactory = httpFactory;
-            _fingerprints = fingerprints;
-            _root = root;
-            _log = log;
+            syncContext = sync;
+            this.httpFactory = httpFactory;
+            this.fingerprints = fingerprints;
+            serviceProvider = root;
+            logger = log;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            try { await _sync.InitializeAsync(stoppingToken); }
-            catch (Exception ex) { _log.LogError(ex, "AppSyncContext initialization failed"); }
+            try { await syncContext.InitializeAsync(stoppingToken); }
+            catch (Exception ex) { logger.LogError(ex, "AppSyncContext initialization failed"); }
 
             while (!stoppingToken.IsCancellationRequested)
             {
                 try { await TickAsync(stoppingToken); }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
-                catch (Exception ex) { _log.LogError(ex, "Unhandled error in watch loop"); }
+                catch (Exception ex) { logger.LogError(ex, "Unhandled error in watch loop"); }
 
-                try { await Task.Delay(_scanPeriod, stoppingToken); }
+                try { await Task.Delay(scanPeriod, stoppingToken); }
                 catch (OperationCanceledException) { }
             }
         }
 
         private async Task TickAsync(CancellationToken ct)
         {
-            var watched = _sync.WatchedUrls;
+            var watched = syncContext.WatchedUrls;
             if (watched.Count == 0) return;
 
-            var urls = watched
-                .GroupBy(w => (w.Url ?? string.Empty).Trim(), StringComparer.OrdinalIgnoreCase)
-                .Select(g => new { Url = g.Key, Interval = TimeSpan.FromMinutes(g.Min(x => x.IntervalMinutes)) })
+            var items = watched
+                .Select(w => new
+                {
+                    StoredUrl = (w.Url ?? string.Empty).Trim(),
+                    Interval = TimeSpan.FromMinutes(w.IntervalMinutes),
+                    MappingTemplateId = ExtractMapIdOrDefault(w.Url)
+                })
                 .ToList();
 
             var now = DateTime.UtcNow;
 
-            foreach (var w in urls)
+            foreach (var item in items)
             {
-                var lastConv = _sync.UrlConversions
-                    .Where(x => string.Equals(x.InputUrl, w.Url, StringComparison.OrdinalIgnoreCase))
+                var lastConv = syncContext.UrlConversions
+                    .Where(x => string.Equals(x.InputUrl, item.StoredUrl, StringComparison.OrdinalIgnoreCase))
                     .OrderByDescending(x => x.ConvertedAt)
                     .FirstOrDefault();
 
                 if (lastConv == null)
                 {
-                    var mappingId = ResolveMappingTemplateId(w.Url, null);
+                    var mappingId = item.MappingTemplateId ?? ResolveMappingTemplateIdFallback(item.StoredUrl, null);
                     if (mappingId is not null)
-                        _ = Task.Run(() => ProcessOneAsync(w.Url, mappingId.Value, ct), ct);
+                        _ = Task.Run(() => ProcessOneAsync(item.StoredUrl, mappingId.Value, ct), ct);
 
                     continue;
                 }
 
                 var lastAt = lastConv.ConvertedAt;
-                if (now - lastAt < w.Interval) continue;
+                if (now - lastAt < item.Interval) continue;
 
-                var mappingIdExisting = ResolveMappingTemplateId(w.Url, lastConv);
+                var mappingIdExisting = item.MappingTemplateId ?? ResolveMappingTemplateIdFallback(item.StoredUrl, lastConv);
                 if (mappingIdExisting is not null)
-                    _ = Task.Run(() => ProcessOneAsync(w.Url, mappingIdExisting.Value, ct), ct);
+                    _ = Task.Run(() => ProcessOneAsync(item.StoredUrl, mappingIdExisting.Value, ct), ct);
             }
         }
 
-
-        private int? ResolveMappingTemplateId(string url, UrlConversionHistoryDto? lastConv)
+        private static int? ExtractMapIdOrDefault(string? storedUrl)
         {
-            if (lastConv != null) return lastConv.MappingTemplateId;
-            if (_sync.JoinedTemplates.Count == 1) return _sync.JoinedTemplates[0].Id;
-            return null; 
+            if (string.IsNullOrWhiteSpace(storedUrl)) return null;
+            return UrlWatchTagger.TryExtractMapId(storedUrl, out var id) ? id : (int?)null;
         }
 
-        private async Task ProcessOneAsync(string url, int mappingTemplateId, CancellationToken ct)
+        private int? ResolveMappingTemplateIdFallback(string storedUrl, UrlConversionHistoryDto? lastConv)
         {
-            var gate = _locks.GetOrAdd(url, _ => new SemaphoreSlim(1, 1));
+            if (lastConv != null) return lastConv.MappingTemplateId;
+            if (syncContext.JoinedTemplates.Count == 1) return syncContext.JoinedTemplates[0].Id;
+            return null;
+        }
+
+        private async Task ProcessOneAsync(string storedUrl, int mappingTemplateId, CancellationToken ct)
+        {
+            var effectiveUrl = UrlWatchTagger.StripTag(storedUrl);
+            var gateKey = effectiveUrl;
+            var gate = locks.GetOrAdd(gateKey, _ => new SemaphoreSlim(1, 1));
             await gate.WaitAsync(ct);
+
             try
             {
-                var http = _httpFactory.CreateClient();
-                using var resp = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
-                if (!resp.IsSuccessStatusCode)
+                using var handler = new SocketsHttpHandler
                 {
-                    _log.LogError("Error fetching {Url}: {StatusCode} {ReasonPhrase}",
-                        url, resp.StatusCode, resp.ReasonPhrase);
-                    return;
+                    AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate | DecompressionMethods.Brotli,
+                    AllowAutoRedirect = true,
+                    MaxAutomaticRedirections = 10,
+                    UseCookies = true,
+                    CookieContainer = new CookieContainer()
+                };
+                using var http = new HttpClient(handler, disposeHandler: true);
+
+                var (contentStream, contentType) = await DownloadEffectiveContentAsync(http, effectiveUrl, ct);
+                await using (contentStream) 
+                {
+                    var currentHash = await ComputeSha256HexAsync(contentStream, ct);
+
+                    var prevHash = await fingerprints.GetHashAsync(effectiveUrl, mappingTemplateId, ct);
+                    if (string.Equals(prevHash, currentHash, StringComparison.Ordinal))
+                    {
+                        logger.LogDebug("No changes by hash for {Url}", effectiveUrl);
+                        return;
+                    }
                 }
 
-                await using var stream = await resp.Content.ReadAsStreamAsync(ct);
-                var currentHash = await ComputeSha256HexAsync(stream, ct);
-
-                var prevHash = await _fingerprints.GetHashAsync(url, mappingTemplateId, ct);
-                if (string.Equals(prevHash, currentHash, StringComparison.Ordinal))
-                {
-                    _log.LogDebug("No changes by hash for {Url}", url);
-                    return;
-                }
-
-                var mapping = _sync.JoinedTemplates.FirstOrDefault(x => x.Id == mappingTemplateId);
+                var mapping = syncContext.JoinedTemplates.FirstOrDefault(x => x.Id == mappingTemplateId);
                 if (mapping is null)
                 {
-                    _log.LogWarning("Mapping {MappingId} not found for {Url}", mappingTemplateId, url);
+                    logger.LogWarning("Mapping {MappingId} not found for {Url}", mappingTemplateId, storedUrl);
                     return;
                 }
 
                 var ext = FileToFormatConverter.ToExtension(mapping.OutputFormat);
 
-                using var scope = _root.CreateScope();
+                using var scope = serviceProvider.CreateScope();
                 var executor = scope.ServiceProvider.GetRequiredService<ITransformationExecutionService>();
 
-                var output = await executor.TransformFromUrlAsync(mappingTemplateId, url, ext);
+                var output = await executor.TransformFromUrlAsync(mappingTemplateId, storedUrl, ext);
 
-                await _sync.AddUrlConversionAsync(new UrlConversionHistoryDto(
+                await syncContext.AddUrlConversionAsync(new UrlConversionHistoryDto(
                     Id: 0,
                     ConvertedAt: DateTime.UtcNow,
-                    InputUrl: url,
+                    InputUrl: storedUrl,
                     OutputLink: output,
                     MappingTemplateId: mappingTemplateId,
                     MappingTemplateName: string.Empty
                 ), ct);
 
-                await _fingerprints.SetHashAsync(url, currentHash, mappingTemplateId, ct);
+                var hash = await RecomputeHashForUrlAsync(http, effectiveUrl, ct);
+                await fingerprints.SetHashAsync(effectiveUrl, hash, mappingTemplateId, ct);
 
-                _log.LogInformation("Updated from {Url} (hash changed)", url);
+                logger.LogInformation("Updated from {Url} (hash changed)", effectiveUrl);
             }
             catch (OperationCanceledException) { }
             catch (Exception ex)
             {
-                _log.LogError(ex, "Error processing {Url}", url);
+                logger.LogError(ex, "Error processing {Url}", storedUrl);
             }
             finally
             {
                 gate.Release();
+            }
+        }
+
+        private static async Task<(Stream stream, string contentType)> DownloadEffectiveContentAsync(HttpClient http, string effectiveUrl, CancellationToken ct)
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Get, effectiveUrl);
+            req.Headers.UserAgent.ParseAdd("OmniPort/1.0");
+            req.Headers.Accept.ParseAdd("*/*");
+
+            using var resp = await http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+            resp.EnsureSuccessStatusCode();
+
+            var ctHeader = resp.Content.Headers.ContentType?.MediaType ?? string.Empty;
+            var s1 = await resp.Content.ReadAsStreamAsync(ct);
+
+            var buffered = await BufferToSeekableAsync(s1, ct);
+
+            if (IsHtml(ctHeader, await PeekTextAsync(buffered, 4096)))
+            {
+                var maybeLink = TryFindDirectFileLink(await PeekTextAsync(buffered, 512 * 1024), new Uri(effectiveUrl));
+                if (maybeLink is not null)
+                {
+                    using var req2 = new HttpRequestMessage(HttpMethod.Get, maybeLink);
+                    req2.Headers.UserAgent.ParseAdd("OmniPort/1.0");
+                    req2.Headers.Referrer = new Uri(effectiveUrl);
+                    req2.Headers.Accept.ParseAdd("*/*");
+
+                    using var resp2 = await http.SendAsync(req2, HttpCompletionOption.ResponseHeadersRead, ct);
+                    resp2.EnsureSuccessStatusCode();
+
+                    var s2 = await resp2.Content.ReadAsStreamAsync(ct);
+                    var buffered2 = await BufferToSeekableAsync(s2, ct);
+                    return (buffered2, resp2.Content.Headers.ContentType?.MediaType ?? string.Empty);
+                }
+            }
+
+            return (buffered, ctHeader);
+
+            static bool IsHtml(string contentType, string head)
+                => contentType.Contains("html", StringComparison.OrdinalIgnoreCase)
+                   || head.StartsWith("<!DOCTYPE html", StringComparison.OrdinalIgnoreCase)
+                   || head.Contains("<html", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static Uri? TryFindDirectFileLink(string html, Uri baseUri)
+        {
+            string? href = null;
+            if (IndexOfHrefWithExtensions(html, out href, new[] { ".xlsx", ".csv", ".json", ".xml" }) < 0)
+                return null;
+
+            return Uri.TryCreate(baseUri, href, out var abs) ? abs : null;
+
+            static int IndexOfHrefWithExtensions(string html, out string? href, string[] exts)
+            {
+                href = null;
+                var lower = html.ToLowerInvariant();
+                var key = "href";
+                int pos = 0;
+                while ((pos = lower.IndexOf(key, pos, StringComparison.Ordinal)) >= 0)
+                {
+                    int eq = lower.IndexOf('=', pos + key.Length);
+                    if (eq < 0) { pos += key.Length; continue; }
+                    int i = eq + 1;
+                    while (i < html.Length && char.IsWhiteSpace(html[i])) i++;
+                    if (i >= html.Length) break;
+
+                    char quote = html[i];
+                    string candidate;
+                    if (quote == '"' || quote == '\'')
+                    {
+                        i++;
+                        int j = html.IndexOf(quote, i);
+                        if (j < 0) break;
+                        candidate = html.Substring(i, j - i);
+                        pos = j + 1;
+                    }
+                    else
+                    {
+                        int j = i;
+                        while (j < html.Length && !char.IsWhiteSpace(html[j]) && html[j] != '>')
+                            j++;
+                        candidate = html.Substring(i, j - i);
+                        pos = j;
+                    }
+
+                    if (exts.Any(e => candidate.Contains(e, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        href = candidate.Trim();
+                        return pos;
+                    }
+                }
+                return -1;
+            }
+        }
+
+        private static async Task<Stream> BufferToSeekableAsync(Stream src, CancellationToken ct)
+        {
+            var ms = new MemoryStream();
+            await src.CopyToAsync(ms, ct);
+            ms.Position = 0;
+            return ms;
+        }
+
+        private static async Task<string> RecomputeHashForUrlAsync(HttpClient http, string effectiveUrl, CancellationToken ct)
+        {
+            var (stream, _) = await DownloadEffectiveContentAsync(http, effectiveUrl, ct);
+            await using (stream)
+            {
+                return await ComputeSha256HexAsync(stream, ct);
             }
         }
 
@@ -182,6 +308,18 @@ namespace OmniPort.UI.Presentation.Services
             {
                 ArrayPool<byte>.Shared.Return(buffer);
             }
+        }
+
+        private static async Task<string> PeekTextAsync(Stream s, int maxBytes)
+        {
+            if (!s.CanSeek) return "(non-seekable)";
+            long pos = s.Position;
+            var toRead = (int)Math.Min(maxBytes, s.Length - s.Position);
+            var buf = new byte[toRead];
+            int read = await s.ReadAsync(buf.AsMemory(0, toRead));
+            s.Position = pos;
+            try { return Encoding.UTF8.GetString(buf, 0, read).Replace("\0", "").Trim(); }
+            catch { return "(binary or non-UTF8)"; }
         }
     }
 }

@@ -205,6 +205,10 @@ namespace OmniPort.Data.Migrations
                         .HasColumnType("INTEGER")
                         .HasColumnName("check_interval_min");
 
+                    b.Property<int>("MappingTemplateId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("mapping_template_id");
+
                     b.Property<string>("Url")
                         .IsRequired()
                         .HasColumnType("TEXT")
@@ -212,7 +216,9 @@ namespace OmniPort.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Url")
+                    b.HasIndex("MappingTemplateId");
+
+                    b.HasIndex("Url", "MappingTemplateId")
                         .IsUnique();
 
                     b.ToTable("url_file_getting");
@@ -290,6 +296,17 @@ namespace OmniPort.Data.Migrations
                 {
                     b.HasOne("OmniPort.Data.MappingTemplateData", "MappingTemplate")
                         .WithMany("UrlConversions")
+                        .HasForeignKey("MappingTemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("MappingTemplate");
+                });
+
+            modelBuilder.Entity("OmniPort.Data.UrlFileGettingData", b =>
+                {
+                    b.HasOne("OmniPort.Data.MappingTemplateData", "MappingTemplate")
+                        .WithMany()
                         .HasForeignKey("MappingTemplateId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();

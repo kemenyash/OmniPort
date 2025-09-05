@@ -27,7 +27,7 @@ namespace OmniPort.Core.Interfaces
         Task AddUrlConversionAsync(UrlConversionHistoryDto dto);
 
         Task<IReadOnlyList<WatchedUrlDto>> GetWatchedUrlsAsync();
-        Task<int> AddWatchedUrlAsync(AddWatchedUrlDto dto);
+        Task<int> AddWatchedUrlAsync(string url, int intervalMinutes, int mappingTemplateId);
         Task<bool> DeleteWatchedUrlAsync(int watchedUrlId);
     }
 }

@@ -75,6 +75,7 @@
     public record WatchedUrlDto(
         int Id,
         string Url,
-        int IntervalMinutes
+        int IntervalMinutes,
+        string MappingTemplateName
     );
 }
