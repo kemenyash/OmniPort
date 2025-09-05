@@ -62,53 +62,27 @@ namespace OmniPort.UI.Presentation.Services
             var watched = syncContext.WatchedUrls;
             if (watched.Count == 0) return;
 
-            var items = watched
-                .Select(w => new
-                {
-                    StoredUrl = (w.Url ?? string.Empty).Trim(),
-                    Interval = TimeSpan.FromMinutes(w.IntervalMinutes),
-                    MappingTemplateId = ExtractMapIdOrDefault(w.Url)
-                })
-                .ToList();
-
             var now = DateTime.UtcNow;
 
-            foreach (var item in items)
+            foreach (var w in watched)
             {
+                var storedUrl = (w.Url ?? string.Empty).Trim();
+                var interval = TimeSpan.FromMinutes(w.IntervalMinutes);
+
+                var mapId = w.MappingTemplateId;
+
                 var lastConv = syncContext.UrlConversions
-                    .Where(x => string.Equals(x.InputUrl, item.StoredUrl, StringComparison.OrdinalIgnoreCase))
+                    .Where(x =>
+                        string.Equals(x.InputUrl, storedUrl, StringComparison.OrdinalIgnoreCase) &&
+                        x.MappingTemplateId == mapId)
                     .OrderByDescending(x => x.ConvertedAt)
                     .FirstOrDefault();
 
-                if (lastConv == null)
+                if (lastConv == null || now - lastConv.ConvertedAt >= interval)
                 {
-                    var mappingId = item.MappingTemplateId ?? ResolveMappingTemplateIdFallback(item.StoredUrl, null);
-                    if (mappingId is not null)
-                        _ = Task.Run(() => ProcessOneAsync(item.StoredUrl, mappingId.Value, ct), ct);
-
-                    continue;
+                    _ = Task.Run(() => ProcessOneAsync(storedUrl, mapId, ct), ct);
                 }
-
-                var lastAt = lastConv.ConvertedAt;
-                if (now - lastAt < item.Interval) continue;
-
-                var mappingIdExisting = item.MappingTemplateId ?? ResolveMappingTemplateIdFallback(item.StoredUrl, lastConv);
-                if (mappingIdExisting is not null)
-                    _ = Task.Run(() => ProcessOneAsync(item.StoredUrl, mappingIdExisting.Value, ct), ct);
             }
-        }
-
-        private static int? ExtractMapIdOrDefault(string? storedUrl)
-        {
-            if (string.IsNullOrWhiteSpace(storedUrl)) return null;
-            return UrlWatchTagger.TryExtractMapId(storedUrl, out var id) ? id : (int?)null;
-        }
-
-        private int? ResolveMappingTemplateIdFallback(string storedUrl, UrlConversionHistoryDto? lastConv)
-        {
-            if (lastConv != null) return lastConv.MappingTemplateId;
-            if (syncContext.JoinedTemplates.Count == 1) return syncContext.JoinedTemplates[0].Id;
-            return null;
         }
 
         private async Task ProcessOneAsync(string storedUrl, int mappingTemplateId, CancellationToken ct)
