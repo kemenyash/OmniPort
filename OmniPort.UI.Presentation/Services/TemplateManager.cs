@@ -209,17 +209,30 @@ namespace OmniPort.UI.Presentation.Services
                 .ToListAsync();
         }
 
-        public async Task<int> AddWatchedUrlAsync(AddWatchedUrlDto dto)
+        public async Task<int> AddWatchedUrlAsync(string url, int intervalMinutes, int mappingTemplateId)
         {
+            var existing = await dataContext.UrlFileGetting
+                .FirstOrDefaultAsync(x => x.Url == url && x.MappingTemplateId == mappingTemplateId);
+
+            if (existing is not null)
+            {
+                existing.CheckIntervalMinutes = intervalMinutes;
+                await dataContext.SaveChangesAsync();
+                return existing.Id;
+            }
+
             var e = new UrlFileGettingData
             {
-                Url = dto.Url,
-                CheckIntervalMinutes = dto.IntervalMinutes
+                Url = url,
+                CheckIntervalMinutes = intervalMinutes,
+                MappingTemplateId = mappingTemplateId
             };
+
             dataContext.UrlFileGetting.Add(e);
             await dataContext.SaveChangesAsync();
             return e.Id;
         }
+
 
         public async Task<bool> DeleteWatchedUrlAsync(int watchedUrlId)
         {

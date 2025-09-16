@@ -54,6 +54,8 @@ namespace OmniPort.UI.Presentation.Mapping
                 .ForCtorParam("MappingTemplateName", opt => opt.MapFrom(s => s.MappingTemplate.Name));
 
             CreateMap<UrlFileGettingData, WatchedUrlDto>()
+                .ForCtorParam("MappingTemplateId", opt => opt.MapFrom(s => s.MappingTemplateId))
+                .ForCtorParam("MappingTemplateName", opt => opt.MapFrom(s => s.MappingTemplate.Name))
                 .ForCtorParam("IntervalMinutes", opt => opt.MapFrom(s => s.CheckIntervalMinutes));
 
 

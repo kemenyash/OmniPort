@@ -21,5 +21,10 @@ namespace OmniPort.Data
         [Required, Column("check_interval_min")]
         public int CheckIntervalMinutes { get; set; }
 
+        [Required, Column("mapping_template_id")]
+        public int MappingTemplateId { get; set; }
+
+        [ForeignKey(nameof(MappingTemplateId))]
+        public MappingTemplateData MappingTemplate { get; set; } = null!;
     }
 }

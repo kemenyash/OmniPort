@@ -210,7 +210,7 @@ namespace OmniPort.UI.Presentation
             {
                 using var scope = _root.CreateScope();
                 var tm = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
-                await tm.AddWatchedUrlAsync(dto);
+                await tm.AddWatchedUrlAsync(dto.Url, dto.IntervalMinutes, dto.MappingTemplateId);
                 _watched = (await tm.GetWatchedUrlsAsync()).ToList();
             }
             finally { _gate.Release(); }

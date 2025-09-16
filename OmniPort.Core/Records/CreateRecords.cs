@@ -25,6 +25,7 @@
 
     public record AddWatchedUrlDto(
         [property: Required, Url] string Url,
-        [property: Range(1, 24 * 60)] int IntervalMinutes
+        [property: Range(1, 24 * 60)] int IntervalMinutes,
+        [property: Required] int MappingTemplateId
     );
 }

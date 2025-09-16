@@ -26,20 +26,6 @@ namespace OmniPort.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "url_file_getting",
-                columns: table => new
-                {
-                    id = table.Column<int>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    url = table.Column<string>(type: "TEXT", nullable: false),
-                    check_interval_min = table.Column<int>(type: "INTEGER", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_url_file_getting", x => x.id);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "fields",
                 columns: table => new
                 {
@@ -78,13 +64,13 @@ namespace OmniPort.Data.Migrations
                         column: x => x.source_template_id,
                         principalTable: "basic_templates",
                         principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
+                        onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
                         name: "FK_template_mapping_basic_templates_target_template_id",
                         column: x => x.target_template_id,
                         principalTable: "basic_templates",
                         principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -106,7 +92,7 @@ namespace OmniPort.Data.Migrations
                         column: x => x.mapping_template_id,
                         principalTable: "template_mapping",
                         principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -127,13 +113,13 @@ namespace OmniPort.Data.Migrations
                         column: x => x.source_field_id,
                         principalTable: "fields",
                         principalColumn: "id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_mapping_fields_fields_target_field_id",
                         column: x => x.target_field_id,
                         principalTable: "fields",
                         principalColumn: "id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_mapping_fields_template_mapping_mapping_template_id",
                         column: x => x.mapping_template_id,
@@ -161,7 +147,28 @@ namespace OmniPort.Data.Migrations
                         column: x => x.mapping_template_id,
                         principalTable: "template_mapping",
                         principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "url_file_getting",
+                columns: table => new
+                {
+                    id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    url = table.Column<string>(type: "TEXT", nullable: false),
+                    check_interval_min = table.Column<int>(type: "INTEGER", nullable: false),
+                    mapping_template_id = table.Column<int>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_url_file_getting", x => x.id);
+                    table.ForeignKey(
+                        name: "FK_url_file_getting_template_mapping_mapping_template_id",
+                        column: x => x.mapping_template_id,
+                        principalTable: "template_mapping",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateIndex(
@@ -217,9 +224,14 @@ namespace OmniPort.Data.Migrations
                 column: "mapping_template_id");
 
             migrationBuilder.CreateIndex(
-                name: "IX_url_file_getting_url",
+                name: "IX_url_file_getting_mapping_template_id",
                 table: "url_file_getting",
-                column: "url",
+                column: "mapping_template_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_url_file_getting_url_mapping_template_id",
+                table: "url_file_getting",
+                columns: new[] { "url", "mapping_template_id" },
                 unique: true);
         }
 

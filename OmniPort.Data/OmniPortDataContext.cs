@@ -88,8 +88,8 @@ namespace OmniPort.Data
                 .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<UrlFileGettingData>()
-                .HasIndex(x => x.Url)
-                .IsUnique();
+                 .HasIndex(x => new { x.Url, x.MappingTemplateId })
+                 .IsUnique();
         }
 
     }

@@ -118,7 +118,7 @@ namespace OmniPort.UI.Presentation.ViewModels
         public async Task AddToWatchlistAsync(string url, int intervalMinutes, int mappingTemplateId)
         {
             if (string.IsNullOrWhiteSpace(url) || intervalMinutes <= 0) return;
-            await sync.AddWatchedUrlAsync(new AddWatchedUrlDto(url, intervalMinutes));
+            await sync.AddWatchedUrlAsync(new AddWatchedUrlDto(url, intervalMinutes, mappingTemplateId));
         }
 
         public async Task ReloadWatchedAsync() => await sync.RefreshAllAsync();
