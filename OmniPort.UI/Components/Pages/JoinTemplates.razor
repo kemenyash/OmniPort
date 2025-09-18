@@ -1,5 +1,8 @@
 ﻿@page "/join-templates"
+@using System.Linq
+@using OmniPort.Core.Enums
 @using OmniPort.Core.Models
+@using OmniPort.Core.Records
 @using OmniPort.UI.Presentation.ViewModels
 @inject JoinTemplatesViewModel ViewModel
 
@@ -29,15 +32,20 @@ else
             </div>
 
             <p class="text-sm text-gray-500 mb-3 italic">Fields from original data</p>
-            <ul class="list-disc pl-5 space-y-1">
-                @foreach (var field in ViewModel.SourceTemplate?.Fields ?? [])
-                {
-                    <li>
-                        <span class="font-medium">@field.Name</span>
-                        <span class="text-gray-500 text-sm">(@field.Type)</span>
-                    </li>
-                }
-            </ul>
+
+            @if (ViewModel.SourceTemplate?.Fields is { Count: > 0 } roots)
+            {
+                <ul class="list-disc pl-5 space-y-1">
+                    @foreach (var f in roots)
+                    {
+                        @RenderFieldTree(f)
+                    }
+                </ul>
+            }
+            else
+            {
+                <div class="text-gray-500 italic">No fields.</div>
+            }
         </div>
 
         <!-- Target Template -->
@@ -55,28 +63,28 @@ else
                 </select>
             </div>
 
-            <p class="text-sm text-gray-500 mb-3 italic">Match source fields to target structure</p>
-            <div class="space-y-4">
-                @foreach (var target in ViewModel.TargetFlattened) 
-                {
-                    <div>
-                        <label class="block font-medium text-gray-800">
-                            @target.Path <span class="text-gray-500 text-sm">(@target.Type)</span>
-                        </label>
+            <p class="text-sm text-gray-500 mb-3 italic">
+                Match source fields to target structure (full hierarchy)
+            </p>
 
-                        <select class="w-full mt-1 px-3 py-2 border rounded bg-gray-50"
-                                value="@ViewModel.GetMappedValue(target.Path)"
-                                @onchange="e => ViewModel.MapField(target.Path, e.Value?.ToString())">
-                            <option value="">-- Not Mapped --</option>
-                            @foreach (var s in ViewModel.SourceFlattened)
-                            {
-                                <option value="@s.Path">@s.Path (@s.Type)</option>
-                            }
-                        </select>
-                    </div>
-                }
+            @if (ViewModel.TargetFlattened?.Any() == true)
+            {
+                var targetRoots = ViewModel.TargetFlattened
+                .Where(ff => IsRootPath(ff.Path))
+                .OrderBy(ff => ff.Path, StringComparer.OrdinalIgnoreCase)
+                .ToList();
 
-            </div>
+                <div class="space-y-4">
+                    @foreach (var node in targetRoots)
+                    {
+                        @RenderTargetNode(node)
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="text-gray-500 italic">Select target template to map.</div>
+            }
         </div>
     </div>
 
@@ -140,4 +148,225 @@ else
         if (int.TryParse(e.Value?.ToString(), out var id))
             await ViewModel.SetTargetTemplateAsync(id);
     }
+
+
+    private RenderFragment RenderTargetNode(JoinTemplatesViewModel.FlatField node) => builder =>
+    {
+        var hasChildren = GetImmediateChildren(node, ViewModel.TargetFlattened).Any();
+
+        if (hasChildren) 
+        {
+            builder.OpenElement(0, "div");
+            builder.AddAttribute(1, "class", "border rounded-lg p-3 bg-gray-50");
+
+            builder.OpenElement(2, "div");
+            builder.AddAttribute(3, "class", "font-semibold mb-2");
+            builder.AddContent(4, $"{node.Path} ({node.Type})");
+            builder.CloseElement();
+
+            var kids = GetImmediateChildren(node, ViewModel.TargetFlattened).ToList();
+            foreach (var k in kids)
+            {
+                if (GetImmediateChildren(k, ViewModel.TargetFlattened).Any())
+                {
+                    builder.OpenElement(10, "div");
+                    builder.AddAttribute(11, "class", "ml-3 mb-3");
+                    builder.AddContent(12, RenderTargetNode(k));
+                    builder.CloseElement();
+                }
+                else
+                {
+                    builder.AddContent(20, RenderLeafMappingBlock(k));
+                }
+            }
+
+            builder.CloseElement(); 
+        }
+        else
+        {
+            builder.AddContent(30, RenderLeafMappingBlock(node));
+        }
+    };
+
+    private RenderFragment RenderLeafMappingBlock(JoinTemplatesViewModel.FlatField node) => builder =>
+    {
+        var current = ViewModel.GetMappedValue(node.Path);          
+        var topValue = GetTopSelectValue(current);                  
+
+        builder.OpenElement(0, "div");
+        builder.AddAttribute(1, "class", "mb-3");
+
+        builder.OpenElement(2, "label");
+        builder.AddAttribute(3, "class", "block text-sm font-medium");
+        builder.AddContent(4, $"{node.Path} ({node.Type})");
+        builder.CloseElement();
+
+        builder.OpenElement(5, "select");
+        builder.AddAttribute(6, "class", "w-full mt-1 px-3 py-2 border rounded bg-white");
+        builder.AddAttribute(7, "value", topValue);
+        builder.AddAttribute(8, "onchange",
+            EventCallback.Factory.Create<ChangeEventArgs>(this,
+                e => ViewModel.MapField(node.Path, e.Value?.ToString()))); 
+
+        builder.OpenElement(9, "option"); builder.AddAttribute(10, "value", "");
+        builder.AddContent(11, "-- Not Mapped --"); builder.CloseElement();
+
+        foreach (var s in ViewModel.SourceFlattened)
+        {
+            if (IsTopOptionCandidate(s)) 
+            {
+                builder.OpenElement(12, "option");
+                builder.AddAttribute(13, "value", s.Path);
+                builder.AddContent(14, $"{s.Path} ({s.Type})");
+                builder.CloseElement();
+            }
+        }
+        builder.CloseElement(); 
+
+        if (!string.IsNullOrWhiteSpace(topValue) && HasDescendants(topValue!))
+        {
+            builder.OpenElement(20, "div");
+            builder.AddAttribute(21, "class", "mt-2");
+
+            builder.OpenElement(22, "label");
+            builder.AddAttribute(23, "class", "block text-xs text-gray-600");
+            builder.AddContent(24, $"Inside {topValue}");
+            builder.CloseElement();
+
+            builder.OpenElement(25, "select");
+            builder.AddAttribute(26, "class", "w-full mt-1 px-3 py-2 border rounded bg-white");
+            builder.AddAttribute(27, "value", current ?? topValue); 
+            builder.AddAttribute(28, "onchange",
+                EventCallback.Factory.Create<ChangeEventArgs>(this,
+                    e => ViewModel.MapField(node.Path, e.Value?.ToString())));
+
+            builder.OpenElement(29, "option");
+            builder.AddAttribute(30, "value", topValue);
+            builder.AddContent(31, $"— Map to the whole {topValue} —");
+            builder.CloseElement();
+
+            var baseDepth = GetDepth(topValue!);
+            foreach (var d in GetDescendants(topValue!))
+            {
+                var depth = Math.Max(0, GetDepth(d.Path) - baseDepth);
+                var label = GetIndentedLabel(d.Path, d.Type, depth);
+                builder.OpenElement(40, "option");
+                builder.AddAttribute(41, "value", d.Path);
+                builder.AddContent(42, label);
+                builder.CloseElement();
+            }
+
+            builder.CloseElement(); 
+            builder.CloseElement(); 
+        }
+
+        builder.CloseElement(); 
+    };
+
+    private static bool IsRootPath(string path) => !path.Contains('.');
+
+    private static bool IsTopOptionCandidate(JoinTemplatesViewModel.FlatField s)
+        => (!s.Path.Contains('.') && !s.Path.Contains("[]")) 
+           || s.Type == FieldDataType.Object
+           || s.Type == FieldDataType.Array;              
+
+    private static string? GetTopSelectValue(string? fullPath)
+    {
+        if (string.IsNullOrWhiteSpace(fullPath)) return null;
+        var dot = fullPath.IndexOf('.');
+        return dot >= 0 ? fullPath[..dot] : fullPath; 
+    }
+
+    private static int GetDepth(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return 0;
+        var dotDepth = path.Count(c => c == '.');
+        var arrDepth = path.Split("[]").Length - 1;
+        return dotDepth + arrDepth;
+    }
+
+    private FieldDataType? GetSourceType(string? sourcePath)
+        => string.IsNullOrWhiteSpace(sourcePath)
+           ? null
+           : ViewModel.SourceFlattened.FirstOrDefault(x => x.Path == sourcePath).Type;
+
+    private bool HasDescendants(string sourcePath)
+    {
+        var t = GetSourceType(sourcePath);
+        if (t == FieldDataType.Object)
+            return ViewModel.SourceFlattened.Any(x => x.Path.StartsWith(sourcePath + ".", StringComparison.Ordinal));
+        if (t == FieldDataType.Array)
+            return ViewModel.SourceFlattened.Any(x => x.Path.StartsWith(sourcePath + "[]", StringComparison.Ordinal));
+        return false;
+    }
+
+    private IEnumerable<JoinTemplatesViewModel.FlatField> GetDescendants(string sourcePath)
+    {
+        var t = GetSourceType(sourcePath);
+        if (t == FieldDataType.Object)
+            return ViewModel.SourceFlattened.Where(x => x.Path.StartsWith(sourcePath + ".", StringComparison.Ordinal))
+                                            .OrderBy(x => x.Path, StringComparer.OrdinalIgnoreCase);
+        if (t == FieldDataType.Array)
+            return ViewModel.SourceFlattened.Where(x => x.Path.StartsWith(sourcePath + "[]", StringComparison.Ordinal))
+                                            .OrderBy(x => x.Path, StringComparer.OrdinalIgnoreCase);
+        return Enumerable.Empty<JoinTemplatesViewModel.FlatField>();
+    }
+
+    private static IEnumerable<JoinTemplatesViewModel.FlatField> GetImmediateChildren(
+        JoinTemplatesViewModel.FlatField parent,
+        IEnumerable<JoinTemplatesViewModel.FlatField> all)
+    {
+        var parentDepth = GetDepth(parent.Path);
+        var prefix = parent.Path + ".";
+        return all.Where(x =>
+                    x.Path.StartsWith(prefix, StringComparison.Ordinal) &&
+                    GetDepth(x.Path) == parentDepth + 1)
+                  .OrderBy(x => x.Path, StringComparer.OrdinalIgnoreCase);
+    }
+
+
+    private RenderFragment RenderFieldTree(TemplateFieldDto f) => builder =>
+    {
+        var seq = 0;
+        void RenderNode(TemplateFieldDto node)
+        {
+            builder.OpenElement(seq++, "li");
+
+            builder.OpenElement(seq++, "div");
+            builder.AddAttribute(seq++, "class", "flex items-center gap-2");
+            builder.OpenElement(seq++, "span");
+            builder.AddAttribute(seq++, "class", "font-medium");
+            builder.AddContent(seq++, node.Name);
+            builder.CloseElement();
+            builder.OpenElement(seq++, "span");
+            builder.AddAttribute(seq++, "class", "text-gray-500 text-sm");
+            var typeText = node.Type.ToString();
+            if (node.Type == FieldDataType.Array && node.ItemType.HasValue)
+                typeText += $"[{node.ItemType}]";
+            builder.AddContent(seq++, $" ({typeText})");
+            builder.CloseElement();
+            builder.CloseElement();
+
+            var children = (node.Children ?? Enumerable.Empty<TemplateFieldDto>()).ToList();
+            var itemChildren = (node.ChildrenItems ?? Enumerable.Empty<TemplateFieldDto>()).ToList();
+
+            if (children.Any() || itemChildren.Any())
+            {
+                builder.OpenElement(seq++, "ul");
+                builder.AddAttribute(seq++, "class", "list-disc pl-5 mt-1");
+                foreach (var ch in children)
+                    builder.AddContent(seq++, RenderFieldTree(ch));
+                foreach (var ch in itemChildren)
+                    builder.AddContent(seq++, RenderFieldTree(ch));
+                builder.CloseElement();
+            }
+
+            builder.CloseElement();
+        }
+
+        RenderNode(f);
+    };
+
+    private static string GetIndentedLabel(string path, FieldDataType type, int depth)
+        => new string(' ', depth * 2) + path + $" ({type})";
 }
