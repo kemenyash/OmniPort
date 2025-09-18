@@ -33,7 +33,10 @@ namespace OmniPort.Data.Migrations
                         .Annotation("Sqlite:Autoincrement", true),
                     basic_template_id = table.Column<int>(type: "INTEGER", nullable: false),
                     field_type = table.Column<int>(type: "INTEGER", nullable: false),
-                    name = table.Column<string>(type: "TEXT", nullable: false)
+                    name = table.Column<string>(type: "TEXT", nullable: false),
+                    parent_field_id = table.Column<int>(type: "INTEGER", nullable: true),
+                    is_array_item = table.Column<bool>(type: "INTEGER", nullable: false),
+                    item_type = table.Column<int>(type: "INTEGER", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -42,6 +45,12 @@ namespace OmniPort.Data.Migrations
                         name: "FK_fields_basic_templates_basic_template_id",
                         column: x => x.basic_template_id,
                         principalTable: "basic_templates",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_fields_fields_parent_field_id",
+                        column: x => x.parent_field_id,
+                        principalTable: "fields",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -177,10 +186,15 @@ namespace OmniPort.Data.Migrations
                 column: "name");
 
             migrationBuilder.CreateIndex(
-                name: "IX_fields_basic_template_id_name",
+                name: "IX_fields_basic_template_id_parent_field_id_is_array_item_name",
                 table: "fields",
-                columns: new[] { "basic_template_id", "name" },
+                columns: new[] { "basic_template_id", "parent_field_id", "is_array_item", "name" },
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_fields_parent_field_id",
+                table: "fields",
+                column: "parent_field_id");
 
             migrationBuilder.CreateIndex(
                 name: "IX_file_conversion_history_mapping_template_id",

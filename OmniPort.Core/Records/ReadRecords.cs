@@ -7,8 +7,12 @@
     public record TemplateFieldDto(
         int Id,
         string Name,
-        FieldDataType Type
+        FieldDataType Type,
+        FieldDataType? ItemType,
+        IReadOnlyList<TemplateFieldDto> Children,
+        IReadOnlyList<TemplateFieldDto> ChildrenItems
     );
+
 
     public record BasicTemplateDto(
         int Id,
@@ -32,6 +36,11 @@
         int TargetFieldId,
         string TargetFieldName,
         FieldDataType TargetFieldType
+    );
+
+    public record MappingEntryDto(
+    string TargetPath,     
+    string? SourcePath     
     );
 
     public record MappingTemplateDto(

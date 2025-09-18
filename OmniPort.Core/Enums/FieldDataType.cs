@@ -12,6 +12,8 @@ namespace OmniPort.Core.Enums
         Integer,
         Decimal,
         Boolean,
-        DateTime
+        DateTime,
+        Array,
+        Object
     }
 }

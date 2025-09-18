@@ -2,11 +2,11 @@
 @using OmniPort.Core.Enums
 @using OmniPort.Core.Models
 @using OmniPort.UI.Presentation.ViewModels
+@using OmniPort.UI.Presentation.Models
 @inject TemplateEditorViewModel ViewModel
 
 <h1 class="text-2xl font-bold mb-6">Basic Templates</h1>
 
-<!-- Templates Table -->
 <table class="min-w-full bg-white shadow rounded mb-6">
     <thead>
         <tr class="bg-gray-100 text-left">
@@ -41,22 +41,24 @@
     </tbody>
 </table>
 
-<!-- Add Button -->
 <div class="flex gap-4 mb-8">
     <button class="bg-blue-600 text-white px-4 py-2 rounded" @onclick="ViewModel.StartCreate">Create Template</button>
 </div>
 
-<!-- Modal Dialog -->
 @if (ViewModel.IsModalOpen)
 {
     <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl" @onclick:stopPropagation>
+        <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-3xl" @onclick:stopPropagation>
             <h2 class="text-xl font-semibold mb-4">@((ViewModel.EditingTemplateId == null) ? "Create Template" : "Edit Template")</h2>
 
             <EditForm Model="@ViewModel.CurrentTemplate" OnValidSubmit="ViewModel.SaveAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
                 <div class="mb-4">
                     <label class="block font-medium mb-1">Template Name</label>
                     <InputText class="w-full border rounded px-3 py-2" @bind-Value="ViewModel.CurrentTemplate.Name" />
+                    <ValidationMessage For="@(() => ViewModel.CurrentTemplate.Name)" />
                 </div>
 
                 <div class="mb-4">
@@ -69,23 +71,26 @@
                     </InputSelect>
                 </div>
 
-                @foreach (var field in ViewModel.CurrentFields)
-                {
-                    <div class="grid grid-cols-4 gap-2 items-center mb-2">
-                        <InputText class="border rounded px-2 py-1 col-span-2" @bind-Value="field.Name" placeholder="Field name" />
-                        <InputSelect class="border rounded px-2 py-1" @bind-Value="field.Type">
-                            @foreach (FieldDataType type in Enum.GetValues(typeof(FieldDataType)))
-                            {
-                                <option value="@type">@type</option>
-                            }
-                        </InputSelect>
-                        <div class="flex items-center gap-2">
-                            <button type="button" class="text-red-500 hover:underline" @onclick="@(() => ViewModel.RemoveField(field))">Remove</button>
-                        </div>
+                <div class="mb-4">
+                    <div class="flex items-center justify-between">
+                        <label class="block font-medium mb-1">Fields</label>
+                        <button type="button" class="text-blue-600 hover:underline" @onclick="ViewModel.AddField">+ Add Field</button>
                     </div>
-                }
 
-                <button type="button" class="text-blue-600 hover:underline mb-4" @onclick="ViewModel.AddField">+ Add Field</button>
+                    @if (ViewModel.CurrentFields.Any())
+                    {
+                        @foreach (var field in ViewModel.CurrentFields)
+                        {
+                            <FieldRowEditor Field="field"
+                                            Level="0"
+                                            OnRemove="(() => ViewModel.RemoveField(field))" />
+                        }
+                    }
+                    else
+                    {
+                        <div class="text-gray-500 italic">No fields yet.</div>
+                    }
+                </div>
 
                 <div class="flex justify-end gap-3 mt-4">
                     <button type="button" class="px-4 py-2 bg-gray-300 rounded" @onclick="ViewModel.CancelEdit">Cancel</button>

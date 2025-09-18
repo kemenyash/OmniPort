@@ -1,4 +1,5 @@
-﻿using OmniPort.Core.Interfaces;
+﻿using OmniPort.Core.Enums;
+using OmniPort.Core.Interfaces;
 using OmniPort.Core.Records;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,13 +15,19 @@ namespace OmniPort.UI.Presentation.ViewModels
 
         public List<BasicTemplateDto> Templates { get; private set; } = new();
 
+        public IReadOnlyList<(string Path, FieldDataType Type)> SourceFlattened => _sourcePaths;
+        public IReadOnlyList<(string Path, FieldDataType Type)> TargetFlattened => _targetPaths;
+
+
         public int? SourceId { get; private set; }
         public int? TargetId { get; private set; }
 
         public BasicTemplateDto? SourceTemplate { get; private set; }
         public BasicTemplateDto? TargetTemplate { get; private set; }
 
-        private readonly Dictionary<int, int?> _targetToSource = new();
+        private List<(string Path, FieldDataType Type)> _sourcePaths = new();
+        private List<(string Path, FieldDataType Type)> _targetPaths = new();
+        private readonly Dictionary<string, string?> _targetToSourcePath = new(StringComparer.OrdinalIgnoreCase);
 
         public List<JoinedTemplateSummaryDto> JoinedTemplates { get; private set; } = new();
 
@@ -46,6 +53,7 @@ namespace OmniPort.UI.Presentation.ViewModels
         {
             SourceId = id;
             SourceTemplate = Templates.FirstOrDefault(x => x.Id == id);
+            _sourcePaths = FieldPathHelper.FlattenMany(SourceTemplate?.Fields ?? Array.Empty<TemplateFieldDto>()).ToList();
             return Task.CompletedTask;
         }
 
@@ -53,39 +61,24 @@ namespace OmniPort.UI.Presentation.ViewModels
         {
             TargetId = id;
             TargetTemplate = Templates.FirstOrDefault(x => x.Id == id);
+            _targetPaths = FieldPathHelper.FlattenMany(TargetTemplate?.Fields ?? Array.Empty<TemplateFieldDto>()).ToList();
 
-            _targetToSource.Clear();
-            foreach (var tf in TargetTemplate?.Fields ?? Enumerable.Empty<TemplateFieldDto>())
-                _targetToSource[tf.Id] = null;
+            _targetToSourcePath.Clear();
+            foreach (var t in _targetPaths) _targetToSourcePath[t.Path] = null;
 
             return Task.CompletedTask;
         }
 
-        public string? GetMappedValue(string targetFieldName)
+        public string? GetMappedValue(string targetPath)
         {
-            var target = TargetTemplate?.Fields.FirstOrDefault(f => f.Name == targetFieldName);
-            if (target is null) return null;
-
-            if (_targetToSource.TryGetValue(target.Id, out var sourceId) && sourceId.HasValue)
-                return SourceTemplate?.Fields.FirstOrDefault(f => f.Id == sourceId.Value)?.Name;
-
-            return null;
+            return _targetToSourcePath.TryGetValue(targetPath, out var sp) ? sp : null;
         }
 
-        public void MapField(string targetFieldName, string? sourceFieldName)
+        public void MapField(string targetPath, string? sourcePath)
         {
-            if (TargetTemplate is null) return;
-            var target = TargetTemplate.Fields.FirstOrDefault(f => f.Name == targetFieldName);
-            if (target is null) return;
+            if (!_targetToSourcePath.ContainsKey(targetPath)) return;
 
-            if (string.IsNullOrWhiteSpace(sourceFieldName))
-            {
-                _targetToSource[target.Id] = null;
-                return;
-            }
-
-            var src = SourceTemplate?.Fields.FirstOrDefault(f => f.Name == sourceFieldName);
-            _targetToSource[target.Id] = src?.Id;
+            _targetToSourcePath[targetPath] = string.IsNullOrWhiteSpace(sourcePath) ? null : sourcePath;
         }
 
         public async Task SaveMappingAsync()
@@ -93,7 +86,14 @@ namespace OmniPort.UI.Presentation.ViewModels
             if (!CanSave || TargetId is null || SourceId is null) return;
 
             var name = $"{SourceTemplate!.Name} → {TargetTemplate!.Name}";
-            var cmd = new CreateMappingTemplateDto(name, SourceId.Value, TargetId.Value, new Dictionary<int, int?>(_targetToSource));
+            var mappings = _targetToSourcePath.Select(kv => new MappingEntryDto(kv.Key, kv.Value)).ToList();
+
+            var cmd = new CreateMappingTemplateDto(
+                name,
+                SourceId.Value,
+                TargetId.Value,
+                mappings
+            );
             await _sync.CreateMappingTemplateAsync(cmd);
         }
 

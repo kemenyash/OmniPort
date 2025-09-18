@@ -57,23 +57,25 @@ else
 
             <p class="text-sm text-gray-500 mb-3 italic">Match source fields to target structure</p>
             <div class="space-y-4">
-                @foreach (var field in ViewModel.TargetTemplate?.Fields ?? [])
+                @foreach (var target in ViewModel.TargetFlattened) 
                 {
                     <div>
                         <label class="block font-medium text-gray-800">
-                            @field.Name <span class="text-gray-500 text-sm">(@field.Type)</span>
+                            @target.Path <span class="text-gray-500 text-sm">(@target.Type)</span>
                         </label>
+
                         <select class="w-full mt-1 px-3 py-2 border rounded bg-gray-50"
-                                value="@ViewModel.GetMappedValue(field.Name)"
-                                @onchange="e => ViewModel.MapField(field.Name, e.Value?.ToString())">
+                                value="@ViewModel.GetMappedValue(target.Path)"
+                                @onchange="e => ViewModel.MapField(target.Path, e.Value?.ToString())">
                             <option value="">-- Not Mapped --</option>
-                            @foreach (var source in ViewModel.SourceTemplate?.Fields ?? [])
+                            @foreach (var s in ViewModel.SourceFlattened)
                             {
-                                <option value="@source.Name">@source.Name (@source.Type)</option>
+                                <option value="@s.Path">@s.Path (@s.Type)</option>
                             }
                         </select>
                     </div>
                 }
+
             </div>
         </div>
     </div>
