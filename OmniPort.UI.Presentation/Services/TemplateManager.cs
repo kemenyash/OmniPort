@@ -33,13 +33,54 @@ namespace OmniPort.UI.Presentation.Services
 
         public async Task<BasicTemplateDto?> GetBasicTemplateAsync(int templateId)
         {
-            var entity = await dataContext.BasicTemplates
+            var tpl = await dataContext.BasicTemplates
                 .AsNoTracking()
-                .Include(t => t.Fields)
                 .FirstOrDefaultAsync(t => t.Id == templateId);
 
-            return entity is null ? null : _mapper.Map<BasicTemplateDto>(entity);
+            if (tpl is null) return null;
+
+            var allFields = await dataContext.Fields
+                .AsNoTracking()
+                .Where(f => f.TemplateSourceId == templateId)
+                .ToListAsync();
+
+            var roots = allFields
+                .Where(f => f.ParentFieldId == null && !f.IsArrayItem)
+                .ToList();
+
+            var byParent = allFields
+                .Where(f => f.ParentFieldId.HasValue)
+                .GroupBy(f => f.ParentFieldId!.Value)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            TemplateFieldDto ToDto(FieldData f)
+            {
+                var children = byParent.TryGetValue(f.Id, out var kids) ? kids : new List<FieldData>();
+
+                var objChildren = children.Where(c => !c.IsArrayItem).ToList();
+                var arrayItemFields = children.Where(c => c.IsArrayItem).ToList();
+
+                return new TemplateFieldDto(
+                    Id: f.Id,
+                    Name: f.Name,
+                    Type: f.Type,
+                    ItemType: f.ItemType,
+                    Children: objChildren.Select(ToDto).ToList(),
+                    ChildrenItems: arrayItemFields.Select(ToDto).ToList()
+                );
+            }
+
+            var fieldsDto = roots.Select(ToDto).ToList();
+
+            return new BasicTemplateDto(
+                Id: tpl.Id,
+                Name: tpl.Name,
+                SourceType: tpl.SourceType,
+                Fields: fieldsDto
+            );
         }
+
+
 
         public async Task<int> CreateBasicTemplateAsync(CreateBasicTemplateDto dto)
         {

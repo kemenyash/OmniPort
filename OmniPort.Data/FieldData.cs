@@ -38,5 +38,6 @@ namespace OmniPort.Data
 
         [InverseProperty(nameof(ParentField))]
         public ICollection<FieldData> Children { get; set; } = new List<FieldData>();
+
     }
 }

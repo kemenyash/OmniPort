@@ -60,17 +60,32 @@ namespace OmniPort.UI.Presentation.ViewModels
             if (full == null) return;
 
             EditingTemplateId = full.Id;
+
+            TemplateFieldRow ToRow(TemplateFieldDto f)
+            {
+                return new TemplateFieldRow
+                {
+                    Id = f.Id,
+                    Name = f.Name,
+                    Type = f.Type,
+                    ItemType = f.ItemType,
+                    Children = (f.Children ?? Array.Empty<TemplateFieldDto>()).Select(ToRow).ToList(),
+                    ChildrenItems = (f.ChildrenItems ?? Array.Empty<TemplateFieldDto>()).Select(ToRow).ToList()
+                };
+            }
+
             CurrentTemplate = new TemplateEditForm
             {
                 Id = full.Id,
                 Name = full.Name,
                 SourceType = full.SourceType,
-                // Глибоке перетворення ієрархічних полів у UI-модель
                 Fields = full.Fields.Select(ToRow).ToList()
             };
+
             IsModalOpen = true;
             await Task.CompletedTask;
         }
+
 
         public void AddField() =>
             CurrentTemplate.Fields.Add(new TemplateFieldRow { Name = "", Type = FieldDataType.String });
