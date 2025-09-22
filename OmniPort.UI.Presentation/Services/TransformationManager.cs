@@ -17,42 +17,106 @@ public class TransformationManager : ITransformationManager
         dataContext = db;
     }
 
-    public async Task<(ImportProfile Profile, SourceType ImportSourceType, SourceType ConvertSourceType)> GetImportProfileForJoinAsync(int mappingTemplateId)
+    public async Task<(ImportProfile Profile, SourceType ImportSourceType, SourceType ConvertSourceType)>
+        GetImportProfileForJoinAsync(int mappingTemplateId)
     {
         var mapping = await dataContext.MappingTemplates
-            .Include(m => m.SourceTemplate).ThenInclude(t => t.Fields)
-            .Include(m => m.TargetTemplate).ThenInclude(t => t.Fields)
+            .Include(m => m.SourceTemplate)
+            .Include(m => m.TargetTemplate)
             .FirstOrDefaultAsync(m => m.Id == mappingTemplateId);
 
         if (mapping is null)
             throw new InvalidOperationException($"Join mapping {mappingTemplateId} not found.");
 
-        var fields = await dataContext.MappingFields
-            .Include(f => f.TargetField)
-            .Include(f => f.SourceField)
-            .Where(f => f.MappingTemplateId == mappingTemplateId)
+        var sourceFields = await dataContext.Fields
+            .Where(f => f.TemplateSourceId == mapping.SourceTemplateId)
+            .AsNoTracking()
             .ToListAsync();
 
+        var targetFields = await dataContext.Fields
+            .Where(f => f.TemplateSourceId == mapping.TargetTemplateId)
+            .AsNoTracking()
+            .ToListAsync();
+
+        var byId = targetFields.Concat(sourceFields).ToDictionary(f => f.Id);
+
+        string BuildPath(FieldData f)
+        {
+            var parts = new List<string>();
+            var cur = f;
+            while (cur != null!)
+            {
+                var seg = cur.Name;
+
+                if (cur.IsArrayItem)
+                {
+
+                }
+                parts.Add(seg);
+
+                if (cur.ParentFieldId is null) break;
+
+                var parent = byId[cur.ParentFieldId.Value];
+                if (parent.Type == FieldDataType.Array)
+                {
+                    parts.Add(parent.Name + "[]");
+                    cur = parent.ParentFieldId is null ? null! : byId[parent.ParentFieldId.Value];
+                }
+                else
+                {
+                    cur = parent;
+                }
+            }
+
+            parts.Reverse();
+
+            return string.Join('.', parts);
+        }
+
+        static bool IsLeaf(FieldData f) =>
+            f.Type switch
+            {
+                FieldDataType.Object => false,
+                FieldDataType.Array => true,  
+                _ => true,  
+            };
+
+        var targetLeafs = targetFields.Where(IsLeaf).ToList();
 
         var importTemplate = new ImportTemplate
         {
             Id = mapping.TargetTemplateId,
             TemplateName = mapping.TargetTemplate.Name,
             SourceType = mapping.TargetTemplate.SourceType,
-            Fields = mapping.TargetTemplate.Fields?.Select(tf => new TemplateField
+            Fields = targetLeafs.Select(tf => new TemplateField
             {
-                Name = tf.Name,
+                Name = BuildPath(tf),   
                 Type = tf.Type
-            }).ToList() ?? new List<TemplateField>()
+            }).ToList()
         };
 
+        var mf = await dataContext.MappingFields
+            .Where(x => x.MappingTemplateId == mappingTemplateId)
+            .AsNoTracking()
+            .ToListAsync();
 
-        var mappings = fields.Select(f => new FieldMapping
+        var targetById = targetFields.ToDictionary(x => x.Id);
+        var sourceById = sourceFields.ToDictionary(x => x.Id);
+
+        var mappings = new List<FieldMapping>(mf.Count);
+        foreach (var m in mf)
         {
-            SourceField = f.SourceField?.Name ?? string.Empty,
-            TargetField = f.TargetField.Name,
-            TargetType = f.TargetField.Type
-        }).ToList();
+            if (!sourceById.TryGetValue(m.SourceFieldId, out var s) ||
+                !targetById.TryGetValue(m.TargetFieldId, out var t))
+                continue;
+
+            mappings.Add(new FieldMapping
+            {
+                SourceField = BuildPath(s),  
+                TargetField = BuildPath(t),  
+                TargetType = t.Type
+            });
+        }
 
         var profile = new ImportProfile
         {
