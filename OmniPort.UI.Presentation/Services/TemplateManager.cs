@@ -80,8 +80,6 @@ namespace OmniPort.UI.Presentation.Services
             );
         }
 
-
-
         public async Task<int> CreateBasicTemplateAsync(CreateBasicTemplateDto dto)
         {
             var entity = new BasicTemplateData
@@ -280,7 +278,6 @@ namespace OmniPort.UI.Presentation.Services
             await dataContext.SaveChangesAsync();
             return true;
         }
-
 
         private void AddFieldRecursive(int templateId, int? parentId, bool isArrayItem, UpsertTemplateFieldDto f)
         {
