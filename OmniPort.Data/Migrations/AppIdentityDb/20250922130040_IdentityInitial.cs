@@ -1,5 +1,6 @@
-﻿using System;
+﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore.Migrations;
+using System;
 
 #nullable disable
 
@@ -192,6 +193,9 @@ namespace OmniPort.Data.Migrations.AppIdentityDb
                 table: "AspNetUsers",
                 column: "NormalizedUserName",
                 unique: true);
+
+            Seed(migrationBuilder);
+
         }
 
         /// <inheritdoc />
@@ -217,6 +221,80 @@ namespace OmniPort.Data.Migrations.AppIdentityDb
 
             migrationBuilder.DropTable(
                 name: "AspNetUsers");
+        }
+
+
+        private string GetPasswordHash()
+        {
+
+            var hasher = new PasswordHasher<IdentityUser>();
+
+            var user = new IdentityUser
+            {
+                Id = "00000000-0000-0000-0000-000000000002",
+                UserName = "admin",
+                NormalizedUserName = "ADMIN",
+                Email = "admin@local",
+                NormalizedEmail = "ADMIN@LOCAL"
+            };
+
+            var hash = hasher.HashPassword(user, "admin");
+            return hash;
+
+        }
+
+        private void Seed(MigrationBuilder migrationBuilder)
+        {
+            string adminRoleId = "00000000-0000-0000-0000-000000000001";
+            string adminUserId = "00000000-0000-0000-0000-000000000002";
+            string passwordHash = GetPasswordHash();
+
+            var roleConcurrencyStamp = Guid.NewGuid().ToString();
+            var userSecurityStamp = Guid.NewGuid().ToString();
+            var userConcurrencyStamp = Guid.NewGuid().ToString();
+
+            migrationBuilder.Sql($@"
+                                INSERT INTO ""AspNetRoles"" (""Id"", ""Name"", ""NormalizedName"", ""ConcurrencyStamp"")
+                                VALUES ('{adminRoleId}', 'Admin', 'ADMIN', '{roleConcurrencyStamp}');
+                                ");
+
+            migrationBuilder.Sql($@"
+                                INSERT INTO ""AspNetUsers"" (
+                                    ""Id"",
+                                    ""UserName"",
+                                    ""NormalizedUserName"",
+                                    ""Email"",
+                                    ""NormalizedEmail"",
+                                    ""EmailConfirmed"",
+                                    ""PasswordHash"",
+                                    ""SecurityStamp"",
+                                    ""ConcurrencyStamp"",
+                                    ""PhoneNumberConfirmed"",
+                                    ""TwoFactorEnabled"",
+                                    ""LockoutEnabled"",
+                                    ""AccessFailedCount""
+                                )
+                                VALUES (
+                                    '{adminUserId}',
+                                    'admin',
+                                    'ADMIN',
+                                    'admin@local',
+                                    'ADMIN@LOCAL',
+                                    1,
+                                    '{passwordHash}',
+                                    '{userSecurityStamp}',
+                                    '{userConcurrencyStamp}',
+                                    0,
+                                    0,
+                                    0,
+                                    0
+                                );
+                                ");
+
+            migrationBuilder.Sql($@"
+                                INSERT INTO ""AspNetUserRoles"" (""UserId"", ""RoleId"")
+                                VALUES ('{adminUserId}', '{adminRoleId}');
+                                ");
         }
     }
 }
