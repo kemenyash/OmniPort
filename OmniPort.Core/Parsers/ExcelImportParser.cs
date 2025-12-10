@@ -15,41 +15,46 @@ namespace OmniPort.Core.Parsers
             {
                 if (!stream.CanSeek)
                 {
-                    var ms = new MemoryStream();
-                    stream.CopyTo(ms);
-                    ms.Position = 0;
-                    stream = ms;
+                    var memoryStream = new MemoryStream();
+                    stream.CopyTo(memoryStream);
+                    memoryStream.Position = 0;
+                    stream = memoryStream;
                 }
                 else if (stream.Position != 0)
                 {
                     stream.Position = 0;
                 }
 
-                Span<byte> magic = stackalloc byte[4];
-                int read = stream.Read(magic);
+                Span<byte> spanByte = stackalloc byte[4];
+                int read = stream.Read(spanByte);
                 stream.Position = 0;
 
                 bool looksZip = read == 4 &&
-                                magic[0] == (byte)'P' &&
-                                magic[1] == (byte)'K' &&
-                                magic[2] == 3 &&
-                                magic[3] == 4;
+                                spanByte[0] == (byte)'P' &&
+                                spanByte[1] == (byte)'K' &&
+                                spanByte[2] == 3 &&
+                                spanByte[3] == 4;
 
                 if (!looksZip)
+                {
                     throw new InvalidOperationException("Remote content is not a valid XLSX (ZIP header missing).");
+                }
 
                 using var workbook = new XLWorkbook(stream);
 
-                var worksheet = workbook.Worksheets.FirstOrDefault()
-                    ?? throw new InvalidOperationException("Workbook has no worksheets.");
+                var worksheet = workbook.Worksheets.FirstOrDefault() ?? throw new InvalidOperationException("Workbook has no worksheets.");
 
                 var range = worksheet.RangeUsed();
                 if (range is null)
+                {
                     return Enumerable.Empty<IDictionary<string, object?>>();
+                }
 
                 var rows = range.RowsUsed().ToList();
                 if (rows.Count < 2)
+                {
                     return Enumerable.Empty<IDictionary<string, object?>>();
+                }
 
                 var headerRow = rows[0];
                 var headers = headerRow.CellsUsed()
@@ -57,8 +62,12 @@ namespace OmniPort.Core.Parsers
                                        .ToList();
 
                 for (int i = 0; i < headers.Count; i++)
+                {
                     if (string.IsNullOrWhiteSpace(headers[i]))
+                    {
                         headers[i] = $"Column{i + 1}";
+                    }
+                }
 
                 var result = new List<IDictionary<string, object?>>(rows.Count - 1);
 

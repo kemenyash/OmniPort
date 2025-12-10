@@ -13,8 +13,12 @@ namespace OmniPort.Core.Utilities
             if (string.IsNullOrWhiteSpace(url)) return url;
             if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return url;
 
-            var b = new UriBuilder(uri) { Fragment = string.Empty };
-            return b.Uri.ToString();
+            var urlBuilder = new UriBuilder(uri) 
+            {
+                Fragment = string.Empty 
+            };
+
+            return urlBuilder.Uri.ToString();
         }
     }
 }

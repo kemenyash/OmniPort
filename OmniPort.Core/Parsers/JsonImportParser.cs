@@ -9,10 +9,13 @@ namespace OmniPort.Core.Parsers
     {
         public IEnumerable<IDictionary<string, object?>> Parse(Stream stream)
         {
-            using var sr = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
-            var text = sr.ReadToEnd();
+            using var streamReader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+            var text = streamReader.ReadToEnd();
+            
             if (string.IsNullOrWhiteSpace(text))
+            {
                 return Enumerable.Empty<IDictionary<string, object?>>();
+            }
 
             text = text.Trim();
 
@@ -20,12 +23,14 @@ namespace OmniPort.Core.Parsers
             {
                 try
                 {
-                    var arr = JArray.Parse(text);
-                    var rows = new List<IDictionary<string, object?>>(arr.Count);
-                    foreach (var token in arr)
+                    var jsonArray = JArray.Parse(text);
+                    var rows = new List<IDictionary<string, object?>>(jsonArray.Count);
+                    foreach (var token in jsonArray)
                     {
-                        if (token is JObject obj)
-                            rows.Add(obj.ToObject<Dictionary<string, object?>>()!);
+                        if (token is JObject jsonObject)
+                        {
+                            rows.Add(jsonObject.ToObject<Dictionary<string, object?>>()!);
+                        }
                     }
                     return rows;
                 }
@@ -39,10 +44,10 @@ namespace OmniPort.Core.Parsers
             {
                 try
                 {
-                    var obj = JObject.Parse(text);
+                    var jsonObject = JObject.Parse(text);
                     return new[]
                     {
-                        obj.ToObject<Dictionary<string, object?>>()!
+                        jsonObject.ToObject<Dictionary<string, object?>>()!
                     };
                 }
                 catch (JsonException)
@@ -54,14 +59,14 @@ namespace OmniPort.Core.Parsers
             var list = new List<IDictionary<string, object?>>();
             foreach (var line in lines)
             {
-                var l = line?.Trim();
-                if (string.IsNullOrEmpty(l)) continue;
-                if (!l.StartsWith("{")) continue; 
+                var trimedLine = line?.Trim();
+                if (string.IsNullOrEmpty(trimedLine)) continue;
+                if (!trimedLine.StartsWith("{")) continue; 
 
                 try
                 {
-                    var obj = JObject.Parse(l);
-                    list.Add(obj.ToObject<Dictionary<string, object?>>()!);
+                    var jsonObject = JObject.Parse(trimedLine);
+                    list.Add(jsonObject.ToObject<Dictionary<string, object?>>()!);
                 }
                 catch (JsonException)
                 {

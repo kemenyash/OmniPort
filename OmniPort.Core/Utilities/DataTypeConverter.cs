@@ -11,10 +11,8 @@ namespace OmniPort.Core.Utilities
     public static class DataTypeConverter
     {
         private static readonly Regex NumericKeepRegex = new Regex(@"[^0-9\-\+\,\.]", RegexOptions.Compiled);
-
         private static readonly HashSet<string> TrueVals = new(StringComparer.OrdinalIgnoreCase) { "true", "1", "yes", "y", "on", "t" };
         private static readonly HashSet<string> FalseVals = new(StringComparer.OrdinalIgnoreCase) { "false", "0", "no", "n", "off", "f" };
-
         private static readonly string[] CommonDateFormats = new[]
         {
             "dd.MM.yyyy", "dd.MM.yyyy HH:mm", "dd.MM.yyyy HH:mm:ss",
@@ -27,29 +25,28 @@ namespace OmniPort.Core.Utilities
         {
             if (value is null || value is DBNull) return null;
 
-            string s = NormalizeToString(value);
-            if (string.IsNullOrWhiteSpace(s)) return null;
+            string normalString = NormalizeToString(value);
+            if (string.IsNullOrWhiteSpace(normalString)) return null;
 
             try
             {
                 switch (mapping.TargetType)
                 {
                     case FieldDataType.String:
-                        return s;
+                        return normalString;
 
                     case FieldDataType.Integer:
                         {
-                            if (TryCoerceToDouble(value, out var d)) return Convert.ToInt32(Math.Round(d, MidpointRounding.AwayFromZero));
-                            if (TryParseDecimalFromString(s, out var dec)) return Convert.ToInt32(Math.Round(dec, MidpointRounding.AwayFromZero));
+                            if (TryCoerceToDouble(value, out var doubleValue)) return Convert.ToInt32(Math.Round(doubleValue, MidpointRounding.AwayFromZero));
+                            if (TryParseDecimalFromString(normalString, out var decimalValue)) return Convert.ToInt32(Math.Round(decimalValue, MidpointRounding.AwayFromZero));
 
                             throw new FormatException($"Cannot parse integer from '{value}'.");
                         }
 
                     case FieldDataType.Decimal:
                         {
-                            if (TryCoerceToDecimal(value, out var dec)) return dec;
-
-                            if (TryParseDecimalFromString(s, out var dec2)) return dec2;
+                            if (TryCoerceToDecimal(value, out var decimalValue)) return decimalValue;
+                            if (TryParseDecimalFromString(normalString, out var decimalValueFromString)) return decimalValueFromString;
 
                             throw new FormatException($"Cannot parse decimal from '{value}'.");
                         }
@@ -58,41 +55,43 @@ namespace OmniPort.Core.Utilities
                         {
                             if (value is bool b) return b;
 
-                            if (TryCoerceToDouble(value, out var d))
-                                return Math.Abs(d) > double.Epsilon;
-
-                            if (TrueVals.Contains(s)) return true;
-                            if (FalseVals.Contains(s)) return false;
-                            if (TryParseDecimalFromString(s, out var dec))
-                                return dec != 0m;
+                            if (TryCoerceToDouble(value, out var doubleValue)) return Math.Abs(doubleValue) > double.Epsilon;
+                            
+                            if (TrueVals.Contains(normalString)) return true;
+                            if (FalseVals.Contains(normalString)) return false;
+                            
+                            if (TryParseDecimalFromString(normalString, out var decimalValue)) return decimalValue != 0m;
 
                             throw new FormatException($"Cannot parse boolean from '{value}'.");
                         }
 
                     case FieldDataType.DateTime:
                         {
-                            if (value is DateTime dt) return DateTime.SpecifyKind(dt, DateTimeKind.Utc).ToUniversalTime();
+                            if (value is DateTime dateTime) return DateTime.SpecifyKind(dateTime, DateTimeKind.Utc).ToUniversalTime();
 
-                            if (TryCoerceToDouble(value, out var d))
+                            if (TryCoerceToDouble(value, out var doubleValue))
                             {
-                                if (d > 0 && d < 600000)
-                                    return DateTime.FromOADate(d);
+                                if (doubleValue > 0 && doubleValue < 600000) return DateTime.FromOADate(doubleValue);
                             }
 
                             if (!string.IsNullOrWhiteSpace(mapping.DateFormat))
                             {
-                                if (DateTime.TryParseExact(s, mapping.DateFormat, CultureInfo.InvariantCulture,
-                                                           DateTimeStyles.AssumeLocal | DateTimeStyles.AllowWhiteSpaces, out var p))
-                                    return p;
+                                if (DateTime.TryParseExact(normalString, mapping.DateFormat, CultureInfo.InvariantCulture,
+                                                           DateTimeStyles.AssumeLocal | DateTimeStyles.AllowWhiteSpaces, out var parsedDateTime))
+                                {
+                                    return parsedDateTime;
+                                }
                             }
 
-                            if (DateTime.TryParseExact(s, CommonDateFormats, CultureInfo.InvariantCulture,
-                                                       DateTimeStyles.AssumeLocal | DateTimeStyles.AllowWhiteSpaces, out var p2))
-                                return p2;
+                            if (DateTime.TryParseExact(normalString, CommonDateFormats, CultureInfo.InvariantCulture,
+                                                       DateTimeStyles.AssumeLocal | DateTimeStyles.AllowWhiteSpaces, out var parsedExactDateTime))
+                            {
+                                return parsedExactDateTime;
+                            }
 
-                            if (DateTime.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var p3)) return p3;
-                            if (DateTime.TryParse(s, new CultureInfo("uk-UA"), DateTimeStyles.AssumeLocal, out var p4)) return p4;
-                            if (DateTime.TryParse(s, new CultureInfo("en-US"), DateTimeStyles.AssumeLocal, out var p5)) return p5;
+                            if (DateTime.TryParse(normalString, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var parsedInvariantDateTime)) return parsedInvariantDateTime;
+                            if (DateTime.TryParse(normalString, new CultureInfo("uk-UA"), DateTimeStyles.AssumeLocal, out var parsedUkUaDateTime)) return parsedUkUaDateTime;
+                            if (DateTime.TryParse(normalString, new CultureInfo("en-US"), DateTimeStyles.AssumeLocal, out var parsedEnUsDateTime)) return parsedEnUsDateTime;
 
                             throw new FormatException($"Cannot parse DateTime from '{value}'.");
                         }
@@ -109,80 +108,84 @@ namespace OmniPort.Core.Utilities
 
         private static string NormalizeToString(object value)
         {
-            if (value is string s) return s.Trim();
+            if (value is string stringValue) return stringValue.Trim();
 
-            if (value is DateTime dt) return dt.ToString("s", CultureInfo.InvariantCulture);
+            if (value is DateTime dateTimeValue) return dateTimeValue.ToString("s", CultureInfo.InvariantCulture);
 
-            if (value is IFormattable f) return f.ToString(null, CultureInfo.InvariantCulture);
+            if (value is IFormattable formattableValue) return formattableValue.ToString(null, CultureInfo.InvariantCulture);
 
             return value.ToString()?.Trim() ?? string.Empty;
         }
 
-        private static bool TryCoerceToDouble(object value, out double d)
+        private static bool TryCoerceToDouble(object objectParam, out double doubleValue)
         {
-            switch (value)
+            switch (objectParam)
             {
-                case double dv: d = dv; return true;
-                case float fv: d = fv; return true;
-                case decimal m: d = (double)m; return true;
-                case long l: d = l; return true;
-                case int i: d = i; return true;
-                case short sh: d = sh; return true;
-                case byte b: d = b; return true;
-                case string s when TryParseDecimalFromString(s, out var dec): d = (double)dec; return true;
-                default: d = default; return false;
+                case double doubleParam: doubleValue = doubleParam; return true;
+                case float floatParam: doubleValue = floatParam; return true;
+                case decimal decimalParam: doubleValue = (double)decimalParam; return true;
+                case long longParam: doubleValue = longParam; return true;
+                case int intParam: doubleValue = intParam; return true;
+                case short shortParam: doubleValue = shortParam; return true;
+                case byte byteParam: doubleValue = byteParam; return true;
+                case string stringParam when TryParseDecimalFromString(stringParam, out var decimalParam): 
+                    doubleValue = (double)decimalParam; 
+                    return true;
+                default: 
+                    doubleValue = default; 
+                    return false;
             }
         }
 
-        private static bool TryCoerceToDecimal(object value, out decimal dec)
+        private static bool TryCoerceToDecimal(object objectParam, out decimal decimalValue)
         {
-            switch (value)
+            switch (objectParam)
             {
-                case decimal m: dec = m; return true;
-                case double d: dec = (decimal)d; return true;
-                case float f: dec = (decimal)f; return true;
-                case long l: dec = l; return true;
-                case int i: dec = i; return true;
-                case short sh: dec = sh; return true;
-                case byte b: dec = b; return true;
-                case string s: return TryParseDecimalFromString(s, out dec);
-                default: dec = default; return false;
+                case decimal decimalParam: decimalValue = decimalParam; return true;
+                case double doubleParam: decimalValue = (decimal)doubleParam; return true;
+                case float floatParam: decimalValue = (decimal)floatParam; return true;
+                case long longParam: decimalValue = longParam; return true;
+                case int intParam: decimalValue = intParam; return true;
+                case short shortParam: decimalValue = shortParam; return true;
+                case byte byteParam: decimalValue = byteParam; return true;
+                case string stringParam: return TryParseDecimalFromString(stringParam, out decimalValue);
+                default: decimalValue = default; return false;
             }
         }
 
         private static bool TryParseDecimalFromString(string raw, out decimal result)
         {
-            var s = NumericKeepRegex.Replace(raw.Trim(), string.Empty);
+            var preparationString = NumericKeepRegex.Replace(raw.Trim(), string.Empty);
 
-            if (string.IsNullOrWhiteSpace(s))
+            if (string.IsNullOrWhiteSpace(preparationString))
             {
                 result = 0m;
                 return false;
             }
 
-            s = s.Replace(" ", "").Replace("\u00A0", "");
+            preparationString = preparationString.Replace(" ", "").Replace("\u00A0", "");
 
-            if (s.Contains(',') && s.Contains('.'))
+            if (preparationString.Contains(',') && preparationString.Contains('.'))
             {
-                int lastComma = s.LastIndexOf(',');
-                int lastDot = s.LastIndexOf('.');
+                int lastComma = preparationString.LastIndexOf(',');
+                int lastDot = preparationString.LastIndexOf('.');
 
                 if (lastComma > lastDot)
                 {
-                    s = s.Replace(".", "");
-                    s = s.Replace(',', '.'); 
+                    preparationString = preparationString.Replace(".", "");
+                    preparationString = preparationString.Replace(',', '.'); 
                 }
                 else
                 {
-                    s = s.Replace(",", "");
+                    preparationString = preparationString.Replace(",", "");
                 }
             }
-            else if (s.Contains(',') && !s.Contains('.'))
+            else if (preparationString.Contains(',') && !preparationString.Contains('.'))
             {
-                s = s.Replace(',', '.');
+                preparationString = preparationString.Replace(',', '.');
             }
 
-            return decimal.TryParse(s, NumberStyles.Number | NumberStyles.AllowExponent, CultureInfo.InvariantCulture, out result);
+            return decimal.TryParse(preparationString, NumberStyles.Number | NumberStyles.AllowExponent, CultureInfo.InvariantCulture, out result);
         }
     }
 }

@@ -19,10 +19,10 @@ namespace OmniPort.Core.Parsers
 
         public IEnumerable<IDictionary<string, object?>> Parse(Stream stream)
         {
-            var doc = new XmlDocument();
-            doc.Load(stream);
+            var xmlDocument = new XmlDocument();
+            xmlDocument.Load(stream);
 
-            var nodes = doc.GetElementsByTagName(recordNodeName);
+            var nodes = xmlDocument.GetElementsByTagName(recordNodeName);
             foreach (XmlNode node in nodes)
             {
                 var dict = new Dictionary<string, object?>();
