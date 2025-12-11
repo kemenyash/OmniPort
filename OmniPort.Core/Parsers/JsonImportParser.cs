@@ -9,9 +9,9 @@ namespace OmniPort.Core.Parsers
     {
         public IEnumerable<IDictionary<string, object?>> Parse(Stream stream)
         {
-            using var streamReader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
-            var text = streamReader.ReadToEnd();
-            
+            using StreamReader streamReader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+            string text = streamReader.ReadToEnd();
+
             if (string.IsNullOrWhiteSpace(text))
             {
                 return Enumerable.Empty<IDictionary<string, object?>>();
@@ -23,9 +23,9 @@ namespace OmniPort.Core.Parsers
             {
                 try
                 {
-                    var jsonArray = JArray.Parse(text);
-                    var rows = new List<IDictionary<string, object?>>(jsonArray.Count);
-                    foreach (var token in jsonArray)
+                    JArray jsonArray = JArray.Parse(text);
+                    List<IDictionary<string, object?>> rows = new List<IDictionary<string, object?>>(jsonArray.Count);
+                    foreach (JToken token in jsonArray)
                     {
                         if (token is JObject jsonObject)
                         {
@@ -36,7 +36,7 @@ namespace OmniPort.Core.Parsers
                 }
                 catch (JsonException)
                 {
-                    
+
                 }
             }
 
@@ -44,7 +44,7 @@ namespace OmniPort.Core.Parsers
             {
                 try
                 {
-                    var jsonObject = JObject.Parse(text);
+                    JObject jsonObject = JObject.Parse(text);
                     return new[]
                     {
                         jsonObject.ToObject<Dictionary<string, object?>>()!
@@ -55,17 +55,17 @@ namespace OmniPort.Core.Parsers
                 }
             }
 
-            var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
-            var list = new List<IDictionary<string, object?>>();
-            foreach (var line in lines)
+            string[] lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            List<IDictionary<string, object?>> list = new List<IDictionary<string, object?>>();
+            foreach (string line in lines)
             {
-                var trimedLine = line?.Trim();
+                string? trimedLine = line?.Trim();
                 if (string.IsNullOrEmpty(trimedLine)) continue;
-                if (!trimedLine.StartsWith("{")) continue; 
+                if (!trimedLine.StartsWith("{")) continue;
 
                 try
                 {
-                    var jsonObject = JObject.Parse(trimedLine);
+                    JObject jsonObject = JObject.Parse(trimedLine);
                     list.Add(jsonObject.ToObject<Dictionary<string, object?>>()!);
                 }
                 catch (JsonException)

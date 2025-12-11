@@ -4,15 +4,13 @@ using Microsoft.EntityFrameworkCore;
 using OmniPort.Core.Interfaces;
 using OmniPort.Data;
 using OmniPort.Data.Auth;
-using OmniPort.UI;
 using OmniPort.UI.Pages;
-using OmniPort.UI.Pages.Components;
 using OmniPort.UI.Presentation;
 using OmniPort.UI.Presentation.Mapping;
 using OmniPort.UI.Presentation.Services;
 using OmniPort.UI.Presentation.ViewModels;
 
-var builder = WebApplication.CreateBuilder(args);
+WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddDbContext<OmniPortDataContext>(options =>
     options.UseSqlite("Data Source=omniport.db"));
@@ -68,14 +66,14 @@ builder.Services.AddIdentityCore<AppUser>(options =>
 
 builder.Services.AddEndpointsApiExplorer();
 
-var app = builder.Build();
+WebApplication app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
+using (IServiceScope scope = app.Services.CreateScope())
 {
-    var dbContext = scope.ServiceProvider.GetRequiredService<OmniPortDataContext>();
+    OmniPortDataContext dbContext = scope.ServiceProvider.GetRequiredService<OmniPortDataContext>();
     dbContext.Database.Migrate();
 
-    var identityDb = scope.ServiceProvider.GetRequiredService<AppIdentityDbContext>();
+    AppIdentityDbContext identityDb = scope.ServiceProvider.GetRequiredService<AppIdentityDbContext>();
     identityDb.Database.Migrate();
 }
 
@@ -96,19 +94,19 @@ app.MapPost("/auth/login", async (HttpContext http,
                                   SignInManager<AppUser> signInManager,
                                   UserManager<AppUser> userManager) =>
 {
-    var form = await http.Request.ReadFormAsync();
-    var email = form["Email"].ToString();
-    var password = form["Password"].ToString();
+    IFormCollection form = await http.Request.ReadFormAsync();
+    string email = form["Email"].ToString();
+    string password = form["Password"].ToString();
 
-    var user = await userManager.FindByEmailAsync(email);
+    AppUser? user = await userManager.FindByEmailAsync(email);
     if (user is null)
         return Results.Redirect("/login?e=1");
 
-    var result = await signInManager.PasswordSignInAsync(user, password, isPersistent: true, lockoutOnFailure: false);
+    SignInResult result = await signInManager.PasswordSignInAsync(user, password, isPersistent: true, lockoutOnFailure: false);
     if (!result.Succeeded)
         return Results.Redirect("/login?e=1");
 
-    var returnUrl = http.Request.Query["returnUrl"].ToString();
+    string returnUrl = http.Request.Query["returnUrl"].ToString();
     if (!string.IsNullOrWhiteSpace(returnUrl) && Uri.IsWellFormedUriString(returnUrl, UriKind.Relative))
         return Results.Redirect(returnUrl);
 

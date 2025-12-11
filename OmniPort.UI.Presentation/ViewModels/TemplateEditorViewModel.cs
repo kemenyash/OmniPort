@@ -2,10 +2,6 @@
 using OmniPort.Core.Interfaces;
 using OmniPort.Core.Records;
 using OmniPort.UI.Presentation.Models;
-using System.Collections.Generic;
-using System.Linq;
-using System.Security.Cryptography.Xml;
-using System.Threading.Tasks;
 
 namespace OmniPort.UI.Presentation.ViewModels
 {
@@ -35,7 +31,7 @@ namespace OmniPort.UI.Presentation.ViewModels
             _ = LoadTemplates();
         }
 
-        
+
         public async Task LoadTemplates()
         {
             if (!sync.Templates.Any())
@@ -61,7 +57,7 @@ namespace OmniPort.UI.Presentation.ViewModels
         }
         public async Task StartEdit(int id)
         {
-            var full = sync.BasicTemplatesFull.FirstOrDefault(x => x.Id == id);
+            BasicTemplateDto? full = sync.BasicTemplatesFull.FirstOrDefault(x => x.Id == id);
             if (full == null) return;
 
             EditingTemplateId = full.Id;
@@ -109,7 +105,7 @@ namespace OmniPort.UI.Presentation.ViewModels
         {
             if (EditingTemplateId is null)
             {
-                var create = new CreateBasicTemplateDto(
+                CreateBasicTemplateDto create = new CreateBasicTemplateDto(
                     CurrentTemplate.Name,
                     CurrentTemplate.SourceType,
                     CurrentTemplate.Fields.Select(ToCreate).ToList()
@@ -118,7 +114,7 @@ namespace OmniPort.UI.Presentation.ViewModels
             }
             else
             {
-                var update = new UpdateBasicTemplateDto(
+                UpdateBasicTemplateDto update = new UpdateBasicTemplateDto(
                     EditingTemplateId.Value,
                     CurrentTemplate.Name,
                     CurrentTemplate.SourceType,
@@ -133,7 +129,7 @@ namespace OmniPort.UI.Presentation.ViewModels
         {
             await sync.DeleteBasicTemplate(id);
         }
-        
+
         private void OnChanged()
         {
             Templates = sync.Templates.ToList();

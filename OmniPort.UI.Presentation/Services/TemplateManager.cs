@@ -2,471 +2,349 @@
 using AutoMapper.QueryableExtensions;
 using Microsoft.EntityFrameworkCore;
 using OmniPort.Core.Interfaces;
-using OmniPort.Core.Enums;
 using OmniPort.Core.Records;
 using OmniPort.Data;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using OmniPort.UI.Presentation.Helpers;
 
 namespace OmniPort.UI.Presentation.Services
 {
     public class TemplateManager : ITemplateManager
     {
         private readonly OmniPortDataContext dataContext;
-        private readonly IMapper _mapper;
+        private readonly IMapper mapper;
+        private readonly TemplateManagerHelpers templateManagerHelpers;
 
-        public TemplateManager(OmniPortDataContext db, IMapper mapper)
+        public TemplateManager(OmniPortDataContext dataContext, IMapper mapper)
         {
-            dataContext = db;
-            _mapper = mapper;
+            this.dataContext = dataContext;
+            this.mapper = mapper;
+            this.templateManagerHelpers = new TemplateManagerHelpers(dataContext);
         }
 
-        public async Task<IReadOnlyList<TemplateSummaryDto>> GetBasicTemplatesSummaryAsync()
+        public async Task<IReadOnlyList<TemplateSummaryDto>> GetBasicTemplatesSummary()
         {
-            return await dataContext.BasicTemplates
+            List<TemplateSummaryDto> basicTemplates = await dataContext.BasicTemplates
                 .AsNoTracking()
-                .ProjectTo<TemplateSummaryDto>(_mapper.ConfigurationProvider)
+                .ProjectTo<TemplateSummaryDto>(mapper.ConfigurationProvider)
                 .ToListAsync();
+
+            return basicTemplates;
         }
-
-        public async Task<BasicTemplateDto?> GetBasicTemplateAsync(int templateId)
+        public async Task<BasicTemplateDto?> GetBasicTemplate(int templateId)
         {
-            var tpl = await dataContext.BasicTemplates
-                .AsNoTracking()
-                .FirstOrDefaultAsync(t => t.Id == templateId);
+            BasicTemplateData? basicTemplateEntity = await dataContext.BasicTemplates
+                                                    .AsNoTracking()
+                                                    .FirstOrDefaultAsync(templateEntity => templateEntity.Id == templateId);
 
-            if (tpl is null) return null;
-
-            var allFields = await dataContext.Fields
-                .AsNoTracking()
-                .Where(f => f.TemplateSourceId == templateId)
-                .ToListAsync();
-
-            var roots = allFields
-                .Where(f => f.ParentFieldId == null && !f.IsArrayItem)
-                .ToList();
-
-            var byParent = allFields
-                .Where(f => f.ParentFieldId.HasValue)
-                .GroupBy(f => f.ParentFieldId!.Value)
-                .ToDictionary(g => g.Key, g => g.ToList());
-
-            TemplateFieldDto ToDto(FieldData f)
+            if (basicTemplateEntity is null)
             {
-                var children = byParent.TryGetValue(f.Id, out var kids) ? kids : new List<FieldData>();
-
-                var objChildren = children.Where(c => !c.IsArrayItem).ToList();
-                var arrayItemFields = children.Where(c => c.IsArrayItem).ToList();
-
-                return new TemplateFieldDto(
-                    Id: f.Id,
-                    Name: f.Name,
-                    Type: f.Type,
-                    ItemType: f.ItemType,
-                    Children: objChildren.Select(ToDto).ToList(),
-                    ChildrenItems: arrayItemFields.Select(ToDto).ToList()
-                );
+                return null;
             }
 
-            var fieldsDto = roots.Select(ToDto).ToList();
+            List<FieldData> allFieldEntities = await dataContext.Fields
+                                .AsNoTracking()
+                                .Where(fieldEntity => fieldEntity.TemplateSourceId == templateId)
+                                .ToListAsync();
+
+            List<FieldData> rootFieldEntities = allFieldEntities
+                                    .Where(fieldEntity => fieldEntity.ParentFieldId == null && !fieldEntity.IsArrayItem)
+                                    .ToList();
+
+            Dictionary<int, List<FieldData>> childrenByParent = allFieldEntities.Where(fieldEntity => fieldEntity.ParentFieldId.HasValue)
+                    .GroupBy(fieldEntity => fieldEntity.ParentFieldId!.Value)
+                    .ToDictionary(group => group.Key, group => group.ToList());
+
+            List<TemplateFieldDto> templateFieldDtos =
+                rootFieldEntities
+                    .Select(fieldEntity => ConvertFieldToDto(fieldEntity, childrenByParent))
+                    .ToList();
 
             return new BasicTemplateDto(
-                Id: tpl.Id,
-                Name: tpl.Name,
-                SourceType: tpl.SourceType,
-                Fields: fieldsDto
+                Id: basicTemplateEntity.Id,
+                Name: basicTemplateEntity.Name,
+                SourceType: basicTemplateEntity.SourceType,
+                Fields: templateFieldDtos
             );
         }
-
-        public async Task<int> CreateBasicTemplateAsync(CreateBasicTemplateDto dto)
+        public async Task<int> CreateBasicTemplate(CreateBasicTemplateDto dto)
         {
-            var entity = new BasicTemplateData
+            BasicTemplateData newBasicTemplateEntity = new BasicTemplateData
             {
                 Name = dto.Name,
                 SourceType = dto.SourceType
             };
-            dataContext.BasicTemplates.Add(entity);
-            await dataContext.SaveChangesAsync(); 
 
-            foreach (var f in dto.Fields)
-                AddFieldRecursive(entity.Id, parentId: null, isArrayItem: false, f);
+            dataContext.BasicTemplates.Add(newBasicTemplateEntity);
+            await dataContext.SaveChangesAsync();
+
+            foreach (CreateTemplateFieldDto field in dto.Fields)
+            {
+                templateManagerHelpers.AddFieldRecursive(
+                    newBasicTemplateEntity.Id,
+                    parentId: null,
+                    isArrayItem: false,
+                    fieldDto: field);
+            }
 
             await dataContext.SaveChangesAsync();
-            return entity.Id;
+            return newBasicTemplateEntity.Id;
         }
-
-        public async Task<bool> UpdateBasicTemplateAsync(UpdateBasicTemplateDto dto)
+        public async Task<bool> UpdateBasicTemplate(UpdateBasicTemplateDto dto)
         {
-            var entity = await dataContext.BasicTemplates
-                .Include(t => t.Fields)
-                .FirstOrDefaultAsync(t => t.Id == dto.Id);
-            if (entity is null) return false;
+            BasicTemplateData? existingTemplateEntity = await dataContext.BasicTemplates
+                                        .Include(template => template.Fields)
+                                        .FirstOrDefaultAsync(template => template.Id == dto.Id);
 
-            entity.Name = dto.Name;
-            entity.SourceType = dto.SourceType;
+            if (existingTemplateEntity is null)
+            {
+                return false;
+            }
 
-            var roots = entity.Fields.Where(x => x.ParentFieldId == null && !x.IsArrayItem).ToList();
-            UpsertChildren(entity.Id, parentId: null, isArrayItem: false, dto.Fields, roots);
+            existingTemplateEntity.Name = dto.Name;
+            existingTemplateEntity.SourceType = dto.SourceType;
+
+            List<FieldData> existingRootFields = existingTemplateEntity.Fields
+                                    .Where(field => field.ParentFieldId == null && !field.IsArrayItem)
+                                    .ToList();
+
+            templateManagerHelpers.UpsertChildren(
+                templateId: existingTemplateEntity.Id,
+                parentId: null,
+                isArrayItem: false,
+                incomingFields: dto.Fields,
+                existingSiblingFields: existingRootFields
+            );
 
             await dataContext.SaveChangesAsync();
             return true;
         }
-
-        public async Task<bool> DeleteBasicTemplateAsync(int templateId)
+        public async Task<bool> DeleteBasicTemplate(int templateId)
         {
-            var e = await dataContext.BasicTemplates.FindAsync(templateId);
-            if (e is null) return false;
+            BasicTemplateData? templateEntity = await dataContext.BasicTemplates.FindAsync(templateId);
 
-            dataContext.BasicTemplates.Remove(e);
+            if (templateEntity is null)
+            {
+                return false;
+            }
+
+            dataContext.BasicTemplates.Remove(templateEntity);
             await dataContext.SaveChangesAsync();
             return true;
         }
 
-        public async Task<IReadOnlyList<JoinedTemplateSummaryDto>> GetJoinedTemplatesAsync()
+        public async Task<IReadOnlyList<JoinedTemplateSummaryDto>> GetJoinedTemplates()
         {
-            return await dataContext.MappingTemplates
-                .AsNoTracking()
-                .Include(m => m.SourceTemplate)
-                .Include(m => m.TargetTemplate)
-                .ProjectTo<JoinedTemplateSummaryDto>(_mapper.ConfigurationProvider)
-                .ToListAsync();
+            List<JoinedTemplateSummaryDto> joindTemplates = await dataContext.MappingTemplates
+                                .AsNoTracking()
+                                .Include(mapping => mapping.SourceTemplate)
+                                .Include(mapping => mapping.TargetTemplate)
+                                .ProjectTo<JoinedTemplateSummaryDto>(mapper.ConfigurationProvider)
+                                .ToListAsync();
+
+            return joindTemplates;
         }
 
-        public async Task<MappingTemplateDto?> GetMappingTemplateAsync(int mappingTemplateId)
+        public async Task<MappingTemplateDto?> GetMappingTemplate(int mappingTemplateId)
         {
-            var e = await dataContext.MappingTemplates
-                .AsNoTracking()
-                .Include(m => m.SourceTemplate)
-                .Include(m => m.TargetTemplate)
-                .Include(m => m.MappingFields).ThenInclude(f => f.SourceField)
-                .Include(m => m.MappingFields).ThenInclude(f => f.TargetField)
-                .FirstOrDefaultAsync(m => m.Id == mappingTemplateId);
+            MappingTemplateData? mappingTemplateEntity = await dataContext.MappingTemplates
+                    .AsNoTracking()
+                    .Include(mapping => mapping.SourceTemplate)
+                    .Include(mapping => mapping.TargetTemplate)
+                    .Include(mapping => mapping.MappingFields).ThenInclude(field => field.SourceField)
+                    .Include(mapping => mapping.MappingFields).ThenInclude(field => field.TargetField)
+                    .FirstOrDefaultAsync(mapping => mapping.Id == mappingTemplateId);
 
-            return e is null ? null : _mapper.Map<MappingTemplateDto>(e);
+            if (mappingTemplateEntity is null)
+            {
+                return null;
+            }
+
+            return mapper.Map<MappingTemplateDto>(mappingTemplateEntity);
         }
-
-        public async Task<int> CreateMappingTemplateAsync(CreateMappingTemplateDto dto)
+        public async Task<int> CreateMappingTemplate(CreateMappingTemplateDto dto)
         {
-            var e = new MappingTemplateData
+            MappingTemplateData mappingTemplateEntity = new MappingTemplateData
             {
                 Name = dto.Name,
                 SourceTemplateId = dto.SourceTemplateId,
                 TargetTemplateId = dto.TargetTemplateId
             };
-            dataContext.MappingTemplates.Add(e);
+
+            dataContext.MappingTemplates.Add(mappingTemplateEntity);
             await dataContext.SaveChangesAsync();
 
-            await RebuildMappingFieldsFromPathsAsync(e.Id, dto.SourceTemplateId, dto.TargetTemplateId, dto.Mappings);
+            await templateManagerHelpers.RebuildMappingFieldsFromPaths(
+                mappingTemplateEntity.Id,
+                dto.SourceTemplateId,
+                dto.TargetTemplateId,
+                dto.Mappings
+            );
 
-            return e.Id;
+            return mappingTemplateEntity.Id;
         }
-
-        public async Task<bool> UpdateMappingTemplateAsync(UpdateMappingTemplateDto dto)
+        public async Task<bool> UpdateMappingTemplate(UpdateMappingTemplateDto dto)
         {
-            var e = await dataContext.MappingTemplates
-                .Include(m => m.MappingFields)
-                .FirstOrDefaultAsync(m => m.Id == dto.Id);
+            MappingTemplateData? existingMappingTemplate = await dataContext.MappingTemplates
+                    .Include(mapping => mapping.MappingFields)
+                    .FirstOrDefaultAsync(mapping => mapping.Id == dto.Id);
 
-            if (e is null) return false;
-
-            e.Name = dto.Name;
-            e.SourceTemplateId = dto.SourceTemplateId;
-            e.TargetTemplateId = dto.TargetTemplateId;
-
-            dataContext.MappingFields.RemoveRange(e.MappingFields);
-            await dataContext.SaveChangesAsync();
-
-            await RebuildMappingFieldsFromPathsAsync(e.Id, dto.SourceTemplateId, dto.TargetTemplateId, dto.Mappings);
-
-            return true;
-        }
-
-        public async Task<bool> DeleteMappingTemplateAsync(int mappingTemplateId)
-        {
-            var e = await dataContext.MappingTemplates.FindAsync(mappingTemplateId);
-            if (e is null) return false;
-
-            dataContext.MappingTemplates.Remove(e);
-            await dataContext.SaveChangesAsync();
-            return true;
-        }
-
-        public async Task<IReadOnlyList<FileConversionHistoryDto>> GetFileConversionHistoryAsync()
-        {
-            return await dataContext.FileConversionHistory
-                .AsNoTracking()
-                .Include(h => h.MappingTemplate)
-                .ProjectTo<FileConversionHistoryDto>(_mapper.ConfigurationProvider)
-                .ToListAsync();
-        }
-
-        public async Task<IReadOnlyList<UrlConversionHistoryDto>> GetUrlConversionHistoryAsync()
-        {
-            return await dataContext.UrlConversionHistory
-                .AsNoTracking()
-                .Include(h => h.MappingTemplate)
-                .ProjectTo<UrlConversionHistoryDto>(_mapper.ConfigurationProvider)
-                .ToListAsync();
-        }
-
-        public async Task AddFileConversionAsync(FileConversionHistoryDto dto)
-        {
-            var e = new FileConversionHistoryData
+            if (existingMappingTemplate is null)
             {
-                ConvertedAt = dto.ConvertedAt,
-                FileName = dto.FileName,
-                OutputUrl = dto.OutputLink,
-                MappingTemplateId = dto.MappingTemplateId
-            };
-            dataContext.FileConversionHistory.Add(e);
+                return false;
+            }
+
+            existingMappingTemplate.Name = dto.Name;
+            existingMappingTemplate.SourceTemplateId = dto.SourceTemplateId;
+            existingMappingTemplate.TargetTemplateId = dto.TargetTemplateId;
+
+            dataContext.MappingFields.RemoveRange(existingMappingTemplate.MappingFields);
             await dataContext.SaveChangesAsync();
+
+            await templateManagerHelpers.RebuildMappingFieldsFromPaths(
+                existingMappingTemplate.Id,
+                dto.SourceTemplateId,
+                dto.TargetTemplateId,
+                dto.Mappings
+            );
+
+            return true;
+        }
+        public async Task<bool> DeleteMappingTemplate(int mappingTemplateId)
+        {
+            MappingTemplateData? mappingTemplateEntity = await dataContext.MappingTemplates.FindAsync(mappingTemplateId);
+
+            if (mappingTemplateEntity is null)
+            {
+                return false;
+            }
+
+            dataContext.MappingTemplates.Remove(mappingTemplateEntity);
+            await dataContext.SaveChangesAsync();
+            return true;
         }
 
-        public async Task AddUrlConversionAsync(UrlConversionHistoryDto dto)
+        public async Task<IReadOnlyList<UrlConversionHistoryDto>> GetUrlConversionHistory()
         {
-            var e = new UrlConversionHistoryData
+            List<UrlConversionHistoryDto> urlConversionHistory = await dataContext.UrlConversionHistory
+                .AsNoTracking()
+                .Include(history => history.MappingTemplate)
+                .ProjectTo<UrlConversionHistoryDto>(mapper.ConfigurationProvider)
+                .ToListAsync();
+
+            return urlConversionHistory;
+        }
+        public async Task AddUrlConversion(UrlConversionHistoryDto dto)
+        {
+            UrlConversionHistoryData urlConversionEntity = new UrlConversionHistoryData
             {
                 ConvertedAt = dto.ConvertedAt,
                 InputUrl = dto.InputUrl,
                 OutputUrl = dto.OutputLink,
                 MappingTemplateId = dto.MappingTemplateId
             };
-            dataContext.UrlConversionHistory.Add(e);
+
+            dataContext.UrlConversionHistory.Add(urlConversionEntity);
             await dataContext.SaveChangesAsync();
         }
-
-        public async Task<IReadOnlyList<WatchedUrlDto>> GetWatchedUrlsAsync()
+        public async Task AddFileConversion(FileConversionHistoryDto dto)
         {
-            return await dataContext.UrlFileGetting
+            FileConversionHistoryData fileConversionEntity = new FileConversionHistoryData
+            {
+                ConvertedAt = dto.ConvertedAt,
+                FileName = dto.FileName,
+                OutputUrl = dto.OutputLink,
+                MappingTemplateId = dto.MappingTemplateId
+            };
+
+            dataContext.FileConversionHistory.Add(fileConversionEntity);
+            await dataContext.SaveChangesAsync();
+        }
+        public async Task<IReadOnlyList<FileConversionHistoryDto>> GetFileConversionHistory()
+        {
+            List<FileConversionHistoryDto> fileConversations = await dataContext.FileConversionHistory
                 .AsNoTracking()
-                .ProjectTo<WatchedUrlDto>(_mapper.ConfigurationProvider)
+                .Include(history => history.MappingTemplate)
+                .ProjectTo<FileConversionHistoryDto>(mapper.ConfigurationProvider)
                 .ToListAsync();
+
+            return fileConversations;
         }
 
-        public async Task<int> AddWatchedUrlAsync(string url, int intervalMinutes, int mappingTemplateId)
+        public async Task<IReadOnlyList<WatchedUrlDto>> GetWatchedUrls()
         {
-            var existing = await dataContext.UrlFileGetting
-                .FirstOrDefaultAsync(x => x.Url == url && x.MappingTemplateId == mappingTemplateId);
+            List<WatchedUrlDto> urls = await dataContext.UrlFileGetting
+                .AsNoTracking()
+                .ProjectTo<WatchedUrlDto>(mapper.ConfigurationProvider)
+                .ToListAsync();
 
-            if (existing is not null)
+            return urls;
+        }
+        public async Task<int> AddWatchedUrl(string url, int intervalMinutes, int mappingTemplateId)
+        {
+            UrlFileGettingData? existingWatchedUrl = await dataContext.UrlFileGetting.FirstOrDefaultAsync(watchedUrlEntity =>
+                            watchedUrlEntity.Url == url &&
+                            watchedUrlEntity.MappingTemplateId == mappingTemplateId);
+
+            if (existingWatchedUrl is not null)
             {
-                existing.CheckIntervalMinutes = intervalMinutes;
+                existingWatchedUrl.CheckIntervalMinutes = intervalMinutes;
                 await dataContext.SaveChangesAsync();
-                return existing.Id;
+                return existingWatchedUrl.Id;
             }
 
-            var e = new UrlFileGettingData
+            UrlFileGettingData newWatchedUrl = new UrlFileGettingData
             {
                 Url = url,
                 CheckIntervalMinutes = intervalMinutes,
                 MappingTemplateId = mappingTemplateId
             };
 
-            dataContext.UrlFileGetting.Add(e);
+            dataContext.UrlFileGetting.Add(newWatchedUrl);
             await dataContext.SaveChangesAsync();
-            return e.Id;
+            return newWatchedUrl.Id;
         }
-
-        public async Task<bool> DeleteWatchedUrlAsync(int watchedUrlId)
+        public async Task<bool> DeleteWatchedUrl(int watchedUrlId)
         {
-            var e = await dataContext.UrlFileGetting.FindAsync(watchedUrlId);
-            if (e is null) return false;
+            UrlFileGettingData? watchedUrlEntity = await dataContext.UrlFileGetting.FindAsync(watchedUrlId);
 
-            dataContext.UrlFileGetting.Remove(e);
+            if (watchedUrlEntity is null)
+            {
+                return false;
+            }
+
+            dataContext.UrlFileGetting.Remove(watchedUrlEntity);
             await dataContext.SaveChangesAsync();
             return true;
         }
 
-        private void AddFieldRecursive(int templateId, int? parentId, bool isArrayItem, UpsertTemplateFieldDto f)
+        private TemplateFieldDto ConvertFieldToDto(
+            FieldData fieldEntity,
+            Dictionary<int, List<FieldData>> childrenByParent)
         {
-            var entity = new FieldData
-            {
-                TemplateSourceId = templateId,
-                ParentFieldId = parentId,
-                IsArrayItem = isArrayItem,
-                Name = f.Name,
-                Type = f.Type,
-                ItemType = f.ItemType
-            };
-            dataContext.Fields.Add(entity);
-            dataContext.SaveChanges(); 
+            List<FieldData> directChildren = childrenByParent.TryGetValue(fieldEntity.Id, out List<FieldData>? foundChildren)
+                    ? foundChildren
+                    : new List<FieldData>();
 
-            if (f.Type == FieldDataType.Object)
-            {
-                foreach (var c in f.Children ?? Enumerable.Empty<UpsertTemplateFieldDto>())
-                    AddFieldRecursive(templateId, entity.Id, false, c);
-            }
-            else if (f.Type == FieldDataType.Array && f.ItemType == FieldDataType.Object)
-            {
-                foreach (var c in f.ChildrenItems ?? Enumerable.Empty<UpsertTemplateFieldDto>())
-                    AddFieldRecursive(templateId, entity.Id, true, c);
-            }
-        }
+            List<FieldData> objectChildren = directChildren
+                .Where(child => !child.IsArrayItem)
+                .ToList();
 
-        private void AddFieldRecursive(int templateId, int? parentId, bool isArrayItem, CreateTemplateFieldDto f)
-        {
-            var up = ToUpsert(f);
-            AddFieldRecursive(templateId, parentId, isArrayItem, up);
-        }
+            List<FieldData> arrayChildren = directChildren
+                .Where(child => child.IsArrayItem)
+                .ToList();
 
-        private static UpsertTemplateFieldDto ToUpsert(CreateTemplateFieldDto f) =>
-            new(
-                Id: null,
-                Name: f.Name,
-                Type: f.Type,
-                ItemType: f.ItemType,
-                Children: (f.Children ?? new List<CreateTemplateFieldDto>()).Select(ToUpsert).ToList(),
-                ChildrenItems: (f.ChildrenItems ?? new List<CreateTemplateFieldDto>()).Select(ToUpsert).ToList()
+            return new TemplateFieldDto(
+                Id: fieldEntity.Id,
+                Name: fieldEntity.Name,
+                Type: fieldEntity.Type,
+                ItemType: fieldEntity.ItemType,
+                Children: objectChildren
+                    .Select(child => ConvertFieldToDto(child, childrenByParent))
+                    .ToList(),
+                ChildrenItems: arrayChildren
+                    .Select(child => ConvertFieldToDto(child, childrenByParent))
+                    .ToList()
             );
-
-        private void UpsertChildren(int templateId, int? parentId, bool isArrayItem,
-            IEnumerable<UpsertTemplateFieldDto> incoming, List<FieldData> existingSiblings)
-        {
-            var byName = existingSiblings.ToDictionary(x => x.Name, StringComparer.OrdinalIgnoreCase);
-            var seen = new HashSet<int>();
-
-            foreach (var f in incoming)
-            {
-                if (byName.TryGetValue(f.Name, out var ex))
-                {
-                    ex.Type = f.Type;
-                    ex.ItemType = f.Type == FieldDataType.Array ? f.ItemType : null;
-                    seen.Add(ex.Id);
-
-                    if (f.Type == FieldDataType.Object)
-                    {
-                        var children = ex.Children.Where(c => !c.IsArrayItem).ToList();
-                        UpsertChildren(templateId, ex.Id, false, f.Children ?? Enumerable.Empty<UpsertTemplateFieldDto>(), children);
-                    }
-                    else if (f.Type == FieldDataType.Array && f.ItemType == FieldDataType.Object)
-                    {
-                        var itemChildren = ex.Children.Where(c => c.IsArrayItem).ToList();
-                        UpsertChildren(templateId, ex.Id, true, f.ChildrenItems ?? Enumerable.Empty<UpsertTemplateFieldDto>(), itemChildren);
-                    }
-                    else
-                    {
-                        var toRemove = ex.Children.ToList();
-                        if (toRemove.Count > 0) dataContext.Fields.RemoveRange(toRemove);
-                    }
-                }
-                else
-                {
-                    var node = new FieldData
-                    {
-                        TemplateSourceId = templateId,
-                        ParentFieldId = parentId,
-                        IsArrayItem = isArrayItem,
-                        Name = f.Name,
-                        Type = f.Type,
-                        ItemType = f.Type == FieldDataType.Array ? f.ItemType : null
-                    };
-                    dataContext.Fields.Add(node);
-                    dataContext.SaveChanges(); 
-
-                    if (f.Type == FieldDataType.Object)
-                    {
-                        UpsertChildren(templateId, node.Id, false, f.Children ?? Enumerable.Empty<UpsertTemplateFieldDto>(), new List<FieldData>());
-                    }
-                    else if (f.Type == FieldDataType.Array && f.ItemType == FieldDataType.Object)
-                    {
-                        UpsertChildren(templateId, node.Id, true, f.ChildrenItems ?? Enumerable.Empty<UpsertTemplateFieldDto>(), new List<FieldData>());
-                    }
-
-                    seen.Add(node.Id);
-                }
-            }
-
-            var toDelete = existingSiblings.Where(x => !seen.Contains(x.Id)).ToList();
-            if (toDelete.Count > 0)
-                dataContext.Fields.RemoveRange(toDelete);
-        }
-
-        private async Task RebuildMappingFieldsFromPathsAsync(int mappingTemplateId, int sourceTemplateId, int targetTemplateId, IEnumerable<MappingEntryDto> mappings)
-        {
-            var sourceFields = await dataContext.Fields
-                .Where(f => f.TemplateSourceId == sourceTemplateId)
-                .AsNoTracking().ToListAsync();
-
-            var targetFields = await dataContext.Fields
-                .Where(f => f.TemplateSourceId == targetTemplateId)
-                .AsNoTracking().ToListAsync();
-
-            var sourceMap = BuildPathToIdMap(sourceFields);
-            var targetMap = BuildPathToIdMap(targetFields);
-
-            var toAdd = new List<MappingFieldData>();
-            foreach (var m in mappings ?? Enumerable.Empty<MappingEntryDto>())
-            {
-                if (string.IsNullOrWhiteSpace(m.TargetPath)) continue;
-                if (!targetMap.TryGetValue(m.TargetPath, out var targetId)) continue;
-                if (string.IsNullOrWhiteSpace(m.SourcePath)) continue;
-                if (!sourceMap.TryGetValue(m.SourcePath!, out var sourceId)) continue;
-
-                toAdd.Add(new MappingFieldData
-                {
-                    MappingTemplateId = mappingTemplateId,
-                    SourceFieldId = sourceId,
-                    TargetFieldId = targetId
-                });
-            }
-
-            if (toAdd.Count > 0)
-            {
-                dataContext.MappingFields.AddRange(toAdd);
-                await dataContext.SaveChangesAsync();
-            }
-        }
-
-        private static Dictionary<string, int> BuildPathToIdMap(List<FieldData> all)
-        {
-            var lookupChildren = all.GroupBy(x => x.ParentFieldId ?? -1)
-                                    .ToDictionary(g => g.Key, g => g.ToList());
-
-            var result = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-
-            void Walk(FieldData node, string prefix)
-            {
-                string name = string.IsNullOrEmpty(prefix) ? node.Name : $"{prefix}.{node.Name}";
-
-                if (node.Type == FieldDataType.Object)
-                {
-                    result[name] = node.Id;
-
-                    if (lookupChildren.TryGetValue(node.Id, out var kids))
-                    {
-                        foreach (var c in kids.Where(k => !k.IsArrayItem))
-                            Walk(c, name);
-                    }
-                }
-                else if (node.Type == FieldDataType.Array)
-                {
-                    var arrBase = $"{name}[]";
-                    result[arrBase] = node.Id; 
-
-                    if (node.ItemType == FieldDataType.Object)
-                    {
-                        if (lookupChildren.TryGetValue(node.Id, out var kids))
-                        {
-                            foreach (var c in kids.Where(k => k.IsArrayItem))
-                                Walk(c, arrBase);
-                        }
-                    }
-                }
-                else
-                {
-                    result[name] = node.Id;
-                }
-            }
-
-            if (lookupChildren.TryGetValue(-1, out var roots))
-            {
-                foreach (var r in roots.Where(x => !x.IsArrayItem))
-                    Walk(r, "");
-            }
-
-            return result;
         }
     }
 }

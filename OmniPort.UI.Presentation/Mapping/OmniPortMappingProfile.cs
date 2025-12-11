@@ -1,9 +1,7 @@
 ﻿using AutoMapper;
-using OmniPort.Core.Models;
 using OmniPort.Core.Records;
 using OmniPort.Data;
 using OmniPort.UI.Presentation.Models;
-using System.Linq;
 
 namespace OmniPort.UI.Presentation.Mapping
 {

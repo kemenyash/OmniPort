@@ -1,26 +1,21 @@
 ﻿using OmniPort.Core.Enums;
 using OmniPort.Core.Records;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace OmniPort.UI.Presentation
+namespace OmniPort.UI.Presentation.Helpers
 {
     public static class FieldPathHelper
     {
         public static IReadOnlyList<(string Path, FieldDataType Type)> Flatten(TemplateFieldDto templateField, string prefix = "")
         {
-            var list = new List<(string, FieldDataType)>();
-            var name = string.IsNullOrEmpty(prefix) ? templateField.Name : $"{prefix}.{templateField.Name}";
+            List<(string, FieldDataType)> list = new List<(string, FieldDataType)>();
+            string name = string.IsNullOrEmpty(prefix) ? templateField.Name : $"{prefix}.{templateField.Name}";
 
             switch (templateField.Type)
             {
                 case FieldDataType.Object:
                     if (templateField.Children?.Count > 0)
                     {
-                        foreach (var child in templateField.Children)
+                        foreach (TemplateFieldDto child in templateField.Children)
                         {
                             list.AddRange(Flatten(child, name));
                         }
@@ -32,12 +27,12 @@ namespace OmniPort.UI.Presentation
                     break;
 
                 case FieldDataType.Array:
-                    var arrBase = $"{name}[]";
+                    string arrBase = $"{name}[]";
                     if (templateField.ItemType == FieldDataType.Object)
                     {
                         if (templateField.ChildrenItems?.Count > 0)
                         {
-                            foreach (var child in templateField.ChildrenItems)
+                            foreach (TemplateFieldDto child in templateField.ChildrenItems)
                             {
                                 list.AddRange(Flatten(child, arrBase));
                             }
@@ -62,8 +57,8 @@ namespace OmniPort.UI.Presentation
 
         public static IReadOnlyList<(string Path, FieldDataType Type)> FlattenMany(IEnumerable<TemplateFieldDto> fields)
         {
-            var result = new List<(string, FieldDataType)>();
-            foreach (var field in fields)
+            List<(string, FieldDataType)> result = new List<(string, FieldDataType)>();
+            foreach (TemplateFieldDto field in fields)
             {
                 result.AddRange(Flatten(field));
             }

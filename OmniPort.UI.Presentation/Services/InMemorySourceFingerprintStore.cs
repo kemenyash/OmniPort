@@ -1,6 +1,5 @@
 ﻿using OmniPort.Core.Interfaces;
 using System.Collections.Concurrent;
-using System.Threading;
 
 namespace OmniPort.UI.Presentation.Services
 {
@@ -15,14 +14,14 @@ namespace OmniPort.UI.Presentation.Services
 
         private static string Key(string url, int? mappingTemplateId)
         {
-            var key = $"{url}|{mappingTemplateId?.ToString() ?? "-"}";
+            string key = $"{url}|{mappingTemplateId?.ToString() ?? "-"}";
             return key;
         }
-           
+
 
         public Task<string?> GetHash(string url, int? mappingTemplateId = null, CancellationToken ct = default)
         {
-            map.TryGetValue(Key(url, mappingTemplateId), out var hash);
+            map.TryGetValue(Key(url, mappingTemplateId), out string? hash);
             return Task.FromResult(hash);
         }
 

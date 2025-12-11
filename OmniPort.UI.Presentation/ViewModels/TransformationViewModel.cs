@@ -24,7 +24,7 @@ namespace OmniPort.UI.Presentation.ViewModels
         public List<FileConversionHistoryDto> FileConversions { get; private set; }
         public List<UrlConversionHistoryDto> UrlConversions { get; private set; }
         public List<WatchedUrlDto> WatchedUrls { get; private set; }
-            
+
 
         public TransformationViewModel(IAppSyncContext sync, ITransformationExecutionService executor)
         {
@@ -64,14 +64,14 @@ namespace OmniPort.UI.Presentation.ViewModels
 
         public string GetButtonClass(UploadMode mode)
         {
-           return InputMode == mode
-                ? "bg-blue-600 text-white px-3 py-1 rounded"
-                : "bg-gray-200 text-gray-700 px-3 py-1 rounded";
+            return InputMode == mode
+                 ? "bg-blue-600 text-white px-3 py-1 rounded"
+                 : "bg-gray-200 text-gray-700 px-3 py-1 rounded";
         }
 
         public Task OnFileChange(InputFileChangeEventArgs eventArgs)
         {
-            var file = eventArgs.File;
+            IBrowserFile file = eventArgs.File;
             SetUploadedFile(file);
             return Task.CompletedTask;
         }
@@ -92,9 +92,9 @@ namespace OmniPort.UI.Presentation.ViewModels
 
         public async Task AddToWatchlistFromForm()
         {
-            var templateId = FormModel.SelectedMappingTemplateId;
-            var url = (FormModel.FileUrl ?? string.Empty).Trim();
-            var interval = FormModel.IntervalMinutes.GetValueOrDefault(15);
+            int templateId = FormModel.SelectedMappingTemplateId;
+            string url = (FormModel.FileUrl ?? string.Empty).Trim();
+            int interval = FormModel.IntervalMinutes.GetValueOrDefault(15);
 
             if (templateId == 0 || string.IsNullOrWhiteSpace(url) || interval <= 0)
             {
@@ -128,12 +128,12 @@ namespace OmniPort.UI.Presentation.ViewModels
                 return;
             }
 
-            var selected = JoinedTemplates.FirstOrDefault(x => x.Id == FormModel.SelectedMappingTemplateId);
+            JoinedTemplateSummaryDto? selected = JoinedTemplates.FirstOrDefault(x => x.Id == FormModel.SelectedMappingTemplateId);
             if (selected is null) return;
 
-            var extension = FileToFormatConverter.ToExtension(selected.OutputFormat);
+            string extension = FileToFormatConverter.ToExtension(selected.OutputFormat);
 
-            var outputUrl = await executor.TransformUploadedFileAsync(
+            string outputUrl = await executor.TransformUploadedFileAsync(
                 templateId: FormModel.SelectedMappingTemplateId,
                 file: uploadObject,
                 outputExtension: extension
@@ -155,12 +155,12 @@ namespace OmniPort.UI.Presentation.ViewModels
                 string.IsNullOrWhiteSpace(FormModel.FileUrl))
                 return;
 
-            var selected = JoinedTemplates.FirstOrDefault(x => x.Id == FormModel.SelectedMappingTemplateId);
+            JoinedTemplateSummaryDto? selected = JoinedTemplates.FirstOrDefault(x => x.Id == FormModel.SelectedMappingTemplateId);
             if (selected is null) return;
 
-            var extension = FileToFormatConverter.ToExtension(selected.OutputFormat);
+            string extension = FileToFormatConverter.ToExtension(selected.OutputFormat);
 
-            var outputUrl = await executor.TransformFromUrlAsync(
+            string outputUrl = await executor.TransformFromUrlAsync(
                 templateId: FormModel.SelectedMappingTemplateId,
                 url: FormModel.FileUrl!,
                 outputExtension: extension
@@ -204,10 +204,10 @@ namespace OmniPort.UI.Presentation.ViewModels
 
         private bool CanRunTransformation()
         {
-           return FormModel.SelectedMappingTemplateId != 0 &&
-            (InputMode == UploadMode.Upload
-                ? !string.IsNullOrWhiteSpace(FormModel.UploadedFileName)
-                : !string.IsNullOrWhiteSpace(FormModel.FileUrl));
+            return FormModel.SelectedMappingTemplateId != 0 &&
+             (InputMode == UploadMode.Upload
+                 ? !string.IsNullOrWhiteSpace(FormModel.UploadedFileName)
+                 : !string.IsNullOrWhiteSpace(FormModel.FileUrl));
         }
     }
 }

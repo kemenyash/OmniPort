@@ -1,9 +1,5 @@
 ﻿using ClosedXML.Excel;
 using OmniPort.Core.Interfaces;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.IO;
 
 namespace OmniPort.Core.Parsers
 {
@@ -15,7 +11,7 @@ namespace OmniPort.Core.Parsers
             {
                 if (!stream.CanSeek)
                 {
-                    var memoryStream = new MemoryStream();
+                    MemoryStream memoryStream = new MemoryStream();
                     stream.CopyTo(memoryStream);
                     memoryStream.Position = 0;
                     stream = memoryStream;
@@ -40,24 +36,24 @@ namespace OmniPort.Core.Parsers
                     throw new InvalidOperationException("Remote content is not a valid XLSX (ZIP header missing).");
                 }
 
-                using var workbook = new XLWorkbook(stream);
+                using XLWorkbook workbook = new XLWorkbook(stream);
 
-                var worksheet = workbook.Worksheets.FirstOrDefault() ?? throw new InvalidOperationException("Workbook has no worksheets.");
+                IXLWorksheet worksheet = workbook.Worksheets.FirstOrDefault() ?? throw new InvalidOperationException("Workbook has no worksheets.");
 
-                var range = worksheet.RangeUsed();
+                IXLRange? range = worksheet.RangeUsed();
                 if (range is null)
                 {
                     return Enumerable.Empty<IDictionary<string, object?>>();
                 }
 
-                var rows = range.RowsUsed().ToList();
+                List<IXLRangeRow> rows = range.RowsUsed().ToList();
                 if (rows.Count < 2)
                 {
                     return Enumerable.Empty<IDictionary<string, object?>>();
                 }
 
-                var headerRow = rows[0];
-                var headers = headerRow.CellsUsed()
+                IXLRangeRow headerRow = rows[0];
+                List<string> headers = headerRow.CellsUsed()
                                        .Select(c => c.GetString())
                                        .ToList();
 
@@ -69,16 +65,16 @@ namespace OmniPort.Core.Parsers
                     }
                 }
 
-                var result = new List<IDictionary<string, object?>>(rows.Count - 1);
+                List<IDictionary<string, object?>> result = new List<IDictionary<string, object?>>(rows.Count - 1);
 
                 for (int i = 1; i < rows.Count; i++)
                 {
-                    var row = rows[i];
-                    var dict = new Dictionary<string, object?>(headers.Count, StringComparer.OrdinalIgnoreCase);
+                    IXLRangeRow row = rows[i];
+                    Dictionary<string, object?> dict = new Dictionary<string, object?>(headers.Count, StringComparer.OrdinalIgnoreCase);
 
                     for (int j = 0; j < headers.Count; j++)
                     {
-                        var header = headers[j];
+                        string header = headers[j];
                         dict[header] = row.Cell(j + 1).Value;
                     }
 

@@ -1,9 +1,6 @@
 ﻿using OmniPort.Core.Enums;
 using OmniPort.Core.Models;
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace OmniPort.Core.Utilities
@@ -37,16 +34,16 @@ namespace OmniPort.Core.Utilities
 
                     case FieldDataType.Integer:
                         {
-                            if (TryCoerceToDouble(value, out var doubleValue)) return Convert.ToInt32(Math.Round(doubleValue, MidpointRounding.AwayFromZero));
-                            if (TryParseDecimalFromString(normalString, out var decimalValue)) return Convert.ToInt32(Math.Round(decimalValue, MidpointRounding.AwayFromZero));
+                            if (TryCoerceToDouble(value, out double doubleValue)) return Convert.ToInt32(Math.Round(doubleValue, MidpointRounding.AwayFromZero));
+                            if (TryParseDecimalFromString(normalString, out decimal decimalValue)) return Convert.ToInt32(Math.Round(decimalValue, MidpointRounding.AwayFromZero));
 
                             throw new FormatException($"Cannot parse integer from '{value}'.");
                         }
 
                     case FieldDataType.Decimal:
                         {
-                            if (TryCoerceToDecimal(value, out var decimalValue)) return decimalValue;
-                            if (TryParseDecimalFromString(normalString, out var decimalValueFromString)) return decimalValueFromString;
+                            if (TryCoerceToDecimal(value, out decimal decimalValue)) return decimalValue;
+                            if (TryParseDecimalFromString(normalString, out decimal decimalValueFromString)) return decimalValueFromString;
 
                             throw new FormatException($"Cannot parse decimal from '{value}'.");
                         }
@@ -55,12 +52,12 @@ namespace OmniPort.Core.Utilities
                         {
                             if (value is bool b) return b;
 
-                            if (TryCoerceToDouble(value, out var doubleValue)) return Math.Abs(doubleValue) > double.Epsilon;
-                            
+                            if (TryCoerceToDouble(value, out double doubleValue)) return Math.Abs(doubleValue) > double.Epsilon;
+
                             if (TrueVals.Contains(normalString)) return true;
                             if (FalseVals.Contains(normalString)) return false;
-                            
-                            if (TryParseDecimalFromString(normalString, out var decimalValue)) return decimalValue != 0m;
+
+                            if (TryParseDecimalFromString(normalString, out decimal decimalValue)) return decimalValue != 0m;
 
                             throw new FormatException($"Cannot parse boolean from '{value}'.");
                         }
@@ -69,7 +66,7 @@ namespace OmniPort.Core.Utilities
                         {
                             if (value is DateTime dateTime) return DateTime.SpecifyKind(dateTime, DateTimeKind.Utc).ToUniversalTime();
 
-                            if (TryCoerceToDouble(value, out var doubleValue))
+                            if (TryCoerceToDouble(value, out double doubleValue))
                             {
                                 if (doubleValue > 0 && doubleValue < 600000) return DateTime.FromOADate(doubleValue);
                             }
@@ -77,21 +74,21 @@ namespace OmniPort.Core.Utilities
                             if (!string.IsNullOrWhiteSpace(mapping.DateFormat))
                             {
                                 if (DateTime.TryParseExact(normalString, mapping.DateFormat, CultureInfo.InvariantCulture,
-                                                           DateTimeStyles.AssumeLocal | DateTimeStyles.AllowWhiteSpaces, out var parsedDateTime))
+                                                           DateTimeStyles.AssumeLocal | DateTimeStyles.AllowWhiteSpaces, out DateTime parsedDateTime))
                                 {
                                     return parsedDateTime;
                                 }
                             }
 
                             if (DateTime.TryParseExact(normalString, CommonDateFormats, CultureInfo.InvariantCulture,
-                                                       DateTimeStyles.AssumeLocal | DateTimeStyles.AllowWhiteSpaces, out var parsedExactDateTime))
+                                                       DateTimeStyles.AssumeLocal | DateTimeStyles.AllowWhiteSpaces, out DateTime parsedExactDateTime))
                             {
                                 return parsedExactDateTime;
                             }
 
-                            if (DateTime.TryParse(normalString, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var parsedInvariantDateTime)) return parsedInvariantDateTime;
-                            if (DateTime.TryParse(normalString, new CultureInfo("uk-UA"), DateTimeStyles.AssumeLocal, out var parsedUkUaDateTime)) return parsedUkUaDateTime;
-                            if (DateTime.TryParse(normalString, new CultureInfo("en-US"), DateTimeStyles.AssumeLocal, out var parsedEnUsDateTime)) return parsedEnUsDateTime;
+                            if (DateTime.TryParse(normalString, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out DateTime parsedInvariantDateTime)) return parsedInvariantDateTime;
+                            if (DateTime.TryParse(normalString, new CultureInfo("uk-UA"), DateTimeStyles.AssumeLocal, out DateTime parsedUkUaDateTime)) return parsedUkUaDateTime;
+                            if (DateTime.TryParse(normalString, new CultureInfo("en-US"), DateTimeStyles.AssumeLocal, out DateTime parsedEnUsDateTime)) return parsedEnUsDateTime;
 
                             throw new FormatException($"Cannot parse DateTime from '{value}'.");
                         }
@@ -128,11 +125,11 @@ namespace OmniPort.Core.Utilities
                 case int intParam: doubleValue = intParam; return true;
                 case short shortParam: doubleValue = shortParam; return true;
                 case byte byteParam: doubleValue = byteParam; return true;
-                case string stringParam when TryParseDecimalFromString(stringParam, out var decimalParam): 
-                    doubleValue = (double)decimalParam; 
+                case string stringParam when TryParseDecimalFromString(stringParam, out decimal decimalParam):
+                    doubleValue = (double)decimalParam;
                     return true;
-                default: 
-                    doubleValue = default; 
+                default:
+                    doubleValue = default;
                     return false;
             }
         }
@@ -155,7 +152,7 @@ namespace OmniPort.Core.Utilities
 
         private static bool TryParseDecimalFromString(string raw, out decimal result)
         {
-            var preparationString = NumericKeepRegex.Replace(raw.Trim(), string.Empty);
+            string preparationString = NumericKeepRegex.Replace(raw.Trim(), string.Empty);
 
             if (string.IsNullOrWhiteSpace(preparationString))
             {
@@ -173,7 +170,7 @@ namespace OmniPort.Core.Utilities
                 if (lastComma > lastDot)
                 {
                     preparationString = preparationString.Replace(".", "");
-                    preparationString = preparationString.Replace(',', '.'); 
+                    preparationString = preparationString.Replace(',', '.');
                 }
                 else
                 {

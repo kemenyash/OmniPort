@@ -1,9 +1,4 @@
 ﻿using OmniPort.Core.Parsers;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Parsing.Tests
 {
@@ -12,13 +7,13 @@ namespace Parsing.Tests
         [Fact]
         public void Should_Parse_Excel_File()
         {
-            var path = Path.Combine(AppContext.BaseDirectory, "TestData", "sample.xlsx");
+            string path = Path.Combine(AppContext.BaseDirectory, "TestData", "sample.xlsx");
             Assert.True(File.Exists(path), $"Файл не знайдено: {path}");
 
-            using var stream = File.OpenRead(path);
-            var parser = new ExcelImportParser();
+            using FileStream stream = File.OpenRead(path);
+            ExcelImportParser parser = new ExcelImportParser();
 
-            var records = parser.Parse(stream).ToList();
+            List<IDictionary<string, object?>> records = parser.Parse(stream).ToList();
             Assert.NotEmpty(records);
 
             string? actualName = records[0]["Name"]?.ToString()?.Trim();

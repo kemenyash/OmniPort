@@ -1,11 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using OmniPort.Core.Interfaces;
 using OmniPort.Core.Records;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace OmniPort.UI.Presentation
 {
@@ -41,25 +36,25 @@ namespace OmniPort.UI.Presentation
             await gate.WaitAsync(ct);
             try
             {
-                using var scope = serviceProvider.CreateScope();
-                var templateManager = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
+                using IServiceScope scope = serviceProvider.CreateScope();
+                ITemplateManager templateManager = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
 
-                templates = (await templateManager.GetBasicTemplatesSummaryAsync()).ToList() ?? new List<TemplateSummaryDto>();
+                templates = (await templateManager.GetBasicTemplatesSummary()).ToList() ?? new List<TemplateSummaryDto>();
                 basicTemplatesFull = new List<BasicTemplateDto>();
-                
-                foreach (var template in templates)
+
+                foreach (TemplateSummaryDto template in templates)
                 {
-                    var basicTemplate = await templateManager.GetBasicTemplateAsync(template.Id);
+                    BasicTemplateDto? basicTemplate = await templateManager.GetBasicTemplate(template.Id);
                     if (basicTemplate != null)
                     {
                         basicTemplatesFull.Add(basicTemplate);
                     }
                 }
 
-                joinedTemplates = (await templateManager.GetJoinedTemplatesAsync()).ToList() ?? new List<JoinedTemplateSummaryDto>();
-                fileConversionsHistory = (await templateManager.GetFileConversionHistoryAsync()).OrderByDescending(x => x.ConvertedAt).ToList() ?? new List<FileConversionHistoryDto>();
-                urlConvertsionsHistory = (await templateManager.GetUrlConversionHistoryAsync()).OrderByDescending(x => x.ConvertedAt).ToList() ?? new List<UrlConversionHistoryDto>();
-                watchedUrls = (await templateManager.GetWatchedUrlsAsync()).ToList();
+                joinedTemplates = (await templateManager.GetJoinedTemplates()).ToList() ?? new List<JoinedTemplateSummaryDto>();
+                fileConversionsHistory = (await templateManager.GetFileConversionHistory()).OrderByDescending(x => x.ConvertedAt).ToList() ?? new List<FileConversionHistoryDto>();
+                urlConvertsionsHistory = (await templateManager.GetUrlConversionHistory()).OrderByDescending(x => x.ConvertedAt).ToList() ?? new List<UrlConversionHistoryDto>();
+                watchedUrls = (await templateManager.GetWatchedUrls()).ToList();
             }
             finally
             {
@@ -77,23 +72,23 @@ namespace OmniPort.UI.Presentation
             await gate.WaitAsync(ct);
             try
             {
-                using var scope = serviceProvider.CreateScope();
-                var templateManager = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
-                await templateManager.CreateBasicTemplateAsync(basicTemplateCreation);
+                using IServiceScope scope = serviceProvider.CreateScope();
+                ITemplateManager templateManager = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
+                await templateManager.CreateBasicTemplate(basicTemplateCreation);
 
-                var summaries = (await templateManager.GetBasicTemplatesSummaryAsync()).ToList();
-                var newFull = new List<BasicTemplateDto>();
-                foreach (var s in summaries)
+                List<TemplateSummaryDto> summaries = (await templateManager.GetBasicTemplatesSummary()).ToList();
+                List<BasicTemplateDto> newFull = new List<BasicTemplateDto>();
+                foreach (TemplateSummaryDto? s in summaries)
                 {
-                    var one = await templateManager.GetBasicTemplateAsync(s.Id);
+                    BasicTemplateDto? one = await templateManager.GetBasicTemplate(s.Id);
                     if (one != null) newFull.Add(one);
                 }
                 templates = summaries;
                 basicTemplatesFull = newFull;
             }
-            finally 
-            { 
-                gate.Release(); 
+            finally
+            {
+                gate.Release();
             }
 
             Changed?.Invoke();
@@ -103,14 +98,14 @@ namespace OmniPort.UI.Presentation
             await gate.WaitAsync(ct);
             try
             {
-                using var scope = serviceProvider.CreateScope();
-                var templateManager = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
-                await templateManager.UpdateBasicTemplateAsync(basicTemplateUpdating);
+                using IServiceScope scope = serviceProvider.CreateScope();
+                ITemplateManager templateManager = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
+                await templateManager.UpdateBasicTemplate(basicTemplateUpdating);
 
-                var updated = await templateManager.GetBasicTemplateAsync(basicTemplateUpdating.Id);
+                BasicTemplateDto? updated = await templateManager.GetBasicTemplate(basicTemplateUpdating.Id);
                 if (updated != null)
                 {
-                    var index = basicTemplatesFull.FindIndex(x => x.Id == basicTemplateUpdating.Id);
+                    int index = basicTemplatesFull.FindIndex(x => x.Id == basicTemplateUpdating.Id);
                     if (index >= 0)
                     {
                         basicTemplatesFull[index] = updated;
@@ -120,13 +115,13 @@ namespace OmniPort.UI.Presentation
                         basicTemplatesFull.Add(updated);
                     }
                 }
-                
-                var summaries = (await templateManager.GetBasicTemplatesSummaryAsync()).ToList();
+
+                List<TemplateSummaryDto> summaries = (await templateManager.GetBasicTemplatesSummary()).ToList();
                 templates = summaries;
             }
-            finally 
-            { 
-                gate.Release(); 
+            finally
+            {
+                gate.Release();
             }
 
             Changed?.Invoke();
@@ -136,20 +131,20 @@ namespace OmniPort.UI.Presentation
             await gate.WaitAsync(ct);
             try
             {
-                using var scope = serviceProvider.CreateScope();
-                var templateManager = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
-                await templateManager.DeleteBasicTemplateAsync(id);
+                using IServiceScope scope = serviceProvider.CreateScope();
+                ITemplateManager templateManager = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
+                await templateManager.DeleteBasicTemplate(id);
 
                 basicTemplatesFull.RemoveAll(x => x.Id == id);
-                templates = (await templateManager.GetBasicTemplatesSummaryAsync()).ToList();
+                templates = (await templateManager.GetBasicTemplatesSummary()).ToList();
 
-                joinedTemplates = (await templateManager.GetJoinedTemplatesAsync()).ToList();
-                fileConversionsHistory = (await templateManager.GetFileConversionHistoryAsync()).OrderByDescending(x => x.ConvertedAt).ToList();
-                urlConvertsionsHistory = (await templateManager.GetUrlConversionHistoryAsync()).OrderByDescending(x => x.ConvertedAt).ToList();
+                joinedTemplates = (await templateManager.GetJoinedTemplates()).ToList();
+                fileConversionsHistory = (await templateManager.GetFileConversionHistory()).OrderByDescending(x => x.ConvertedAt).ToList();
+                urlConvertsionsHistory = (await templateManager.GetUrlConversionHistory()).OrderByDescending(x => x.ConvertedAt).ToList();
             }
-            finally 
-            { 
-                gate.Release(); 
+            finally
+            {
+                gate.Release();
             }
 
             Changed?.Invoke();
@@ -158,18 +153,18 @@ namespace OmniPort.UI.Presentation
         public async Task CreateMappingTemplate(CreateMappingTemplateDto mapingTemplateCreating, CancellationToken ct = default)
         {
             await gate.WaitAsync(ct);
-            
+
             try
             {
-                using var scope = serviceProvider.CreateScope();
-                var templateManager = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
-                await templateManager.CreateMappingTemplateAsync(mapingTemplateCreating);
+                using IServiceScope scope = serviceProvider.CreateScope();
+                ITemplateManager templateManager = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
+                await templateManager.CreateMappingTemplate(mapingTemplateCreating);
 
-                joinedTemplates = (await templateManager.GetJoinedTemplatesAsync()).ToList();
+                joinedTemplates = (await templateManager.GetJoinedTemplates()).ToList();
             }
-            finally 
+            finally
             {
-                gate.Release(); 
+                gate.Release();
             }
 
             Changed?.Invoke();
@@ -180,15 +175,15 @@ namespace OmniPort.UI.Presentation
 
             try
             {
-                using var scope = serviceProvider.CreateScope();
-                var templateManager = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
-                await templateManager.DeleteMappingTemplateAsync(mappingId);
+                using IServiceScope scope = serviceProvider.CreateScope();
+                ITemplateManager templateManager = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
+                await templateManager.DeleteMappingTemplate(mappingId);
 
-                joinedTemplates = (await templateManager.GetJoinedTemplatesAsync()).ToList();
+                joinedTemplates = (await templateManager.GetJoinedTemplates()).ToList();
             }
-            finally 
-            { 
-                gate.Release(); 
+            finally
+            {
+                gate.Release();
             }
 
             Changed?.Invoke();
@@ -199,14 +194,14 @@ namespace OmniPort.UI.Presentation
             await gate.WaitAsync(ct);
             try
             {
-                using var scope = serviceProvider.CreateScope();
-                var templateManager = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
-                await templateManager.AddFileConversionAsync(fileConversionHistory);
-                fileConversionsHistory = (await templateManager.GetFileConversionHistoryAsync()).OrderByDescending(x => x.ConvertedAt).ToList();
+                using IServiceScope scope = serviceProvider.CreateScope();
+                ITemplateManager templateManager = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
+                await templateManager.AddFileConversion(fileConversionHistory);
+                fileConversionsHistory = (await templateManager.GetFileConversionHistory()).OrderByDescending(x => x.ConvertedAt).ToList();
             }
-            finally 
-            { 
-                gate.Release(); 
+            finally
+            {
+                gate.Release();
             }
 
             Changed?.Invoke();
@@ -214,17 +209,17 @@ namespace OmniPort.UI.Presentation
         public async Task AddUrlConversion(UrlConversionHistoryDto urlConversionHistory, CancellationToken ct = default)
         {
             await gate.WaitAsync(ct);
-            
+
             try
             {
-                using var scope = serviceProvider.CreateScope();
-                var tm = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
-                await tm.AddUrlConversionAsync(urlConversionHistory);
-                urlConvertsionsHistory = (await tm.GetUrlConversionHistoryAsync()).OrderByDescending(x => x.ConvertedAt).ToList();
+                using IServiceScope scope = serviceProvider.CreateScope();
+                ITemplateManager tm = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
+                await tm.AddUrlConversion(urlConversionHistory);
+                urlConvertsionsHistory = (await tm.GetUrlConversionHistory()).OrderByDescending(x => x.ConvertedAt).ToList();
             }
-            finally 
-            { 
-                gate.Release(); 
+            finally
+            {
+                gate.Release();
             }
 
             Changed?.Invoke();
@@ -235,14 +230,14 @@ namespace OmniPort.UI.Presentation
             await gate.WaitAsync(ct);
             try
             {
-                using var scope = serviceProvider.CreateScope();
-                var templateManager = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
-                await templateManager.AddWatchedUrlAsync(watchedUrlAdding.Url, watchedUrlAdding.IntervalMinutes, watchedUrlAdding.MappingTemplateId);
-                watchedUrls = (await templateManager.GetWatchedUrlsAsync()).ToList();
+                using IServiceScope scope = serviceProvider.CreateScope();
+                ITemplateManager templateManager = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
+                await templateManager.AddWatchedUrl(watchedUrlAdding.Url, watchedUrlAdding.IntervalMinutes, watchedUrlAdding.MappingTemplateId);
+                watchedUrls = (await templateManager.GetWatchedUrls()).ToList();
             }
-            finally 
-            { 
-                gate.Release(); 
+            finally
+            {
+                gate.Release();
             }
 
             Changed?.Invoke();

@@ -1,33 +1,28 @@
 ﻿using OmniPort.Core.Records;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace OmniPort.Core.Interfaces
 {
     public interface ITemplateManager
     {
-        Task<IReadOnlyList<TemplateSummaryDto>> GetBasicTemplatesSummaryAsync();
-        Task<BasicTemplateDto?> GetBasicTemplateAsync(int templateId);
-        Task<int> CreateBasicTemplateAsync(CreateBasicTemplateDto dto);
-        Task<bool> UpdateBasicTemplateAsync(UpdateBasicTemplateDto dto);
-        Task<bool> DeleteBasicTemplateAsync(int templateId);
+        Task<IReadOnlyList<TemplateSummaryDto>> GetBasicTemplatesSummary();
+        Task<BasicTemplateDto?> GetBasicTemplate(int templateId);
+        Task<int> CreateBasicTemplate(CreateBasicTemplateDto dto);
+        Task<bool> UpdateBasicTemplate(UpdateBasicTemplateDto dto);
+        Task<bool> DeleteBasicTemplate(int templateId);
 
-        Task<IReadOnlyList<JoinedTemplateSummaryDto>> GetJoinedTemplatesAsync();
-        Task<MappingTemplateDto?> GetMappingTemplateAsync(int mappingTemplateId);
-        Task<int> CreateMappingTemplateAsync(CreateMappingTemplateDto dto);
-        Task<bool> UpdateMappingTemplateAsync(UpdateMappingTemplateDto dto);
-        Task<bool> DeleteMappingTemplateAsync(int mappingTemplateId);
+        Task<IReadOnlyList<JoinedTemplateSummaryDto>> GetJoinedTemplates();
+        Task<MappingTemplateDto?> GetMappingTemplate(int mappingTemplateId);
+        Task<int> CreateMappingTemplate(CreateMappingTemplateDto dto);
+        Task<bool> UpdateMappingTemplate(UpdateMappingTemplateDto dto);
+        Task<bool> DeleteMappingTemplate(int mappingTemplateId);
 
-        Task<IReadOnlyList<FileConversionHistoryDto>> GetFileConversionHistoryAsync();
-        Task<IReadOnlyList<UrlConversionHistoryDto>> GetUrlConversionHistoryAsync();
-        Task AddFileConversionAsync(FileConversionHistoryDto dto);
-        Task AddUrlConversionAsync(UrlConversionHistoryDto dto);
+        Task<IReadOnlyList<FileConversionHistoryDto>> GetFileConversionHistory();
+        Task<IReadOnlyList<UrlConversionHistoryDto>> GetUrlConversionHistory();
+        Task AddFileConversion(FileConversionHistoryDto dto);
+        Task AddUrlConversion(UrlConversionHistoryDto dto);
 
-        Task<IReadOnlyList<WatchedUrlDto>> GetWatchedUrlsAsync();
-        Task<int> AddWatchedUrlAsync(string url, int intervalMinutes, int mappingTemplateId);
-        Task<bool> DeleteWatchedUrlAsync(int watchedUrlId);
+        Task<IReadOnlyList<WatchedUrlDto>> GetWatchedUrls();
+        Task<int> AddWatchedUrl(string url, int intervalMinutes, int mappingTemplateId);
+        Task<bool> DeleteWatchedUrl(int watchedUrlId);
     }
 }

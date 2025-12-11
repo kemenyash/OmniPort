@@ -1,6 +1,5 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore.Migrations;
-using System;
 
 #nullable disable
 
@@ -227,9 +226,9 @@ namespace OmniPort.Data.Migrations.AppIdentityDb
         private string GetPasswordHash()
         {
 
-            var hasher = new PasswordHasher<IdentityUser>();
+            PasswordHasher<IdentityUser> hasher = new PasswordHasher<IdentityUser>();
 
-            var user = new IdentityUser
+            IdentityUser user = new IdentityUser
             {
                 Id = "00000000-0000-0000-0000-000000000002",
                 UserName = "admin",
@@ -238,7 +237,7 @@ namespace OmniPort.Data.Migrations.AppIdentityDb
                 NormalizedEmail = "ADMIN@LOCAL"
             };
 
-            var hash = hasher.HashPassword(user, "admin");
+            string hash = hasher.HashPassword(user, "admin");
             return hash;
 
         }
@@ -249,9 +248,9 @@ namespace OmniPort.Data.Migrations.AppIdentityDb
             string adminUserId = "00000000-0000-0000-0000-000000000002";
             string passwordHash = GetPasswordHash();
 
-            var roleConcurrencyStamp = Guid.NewGuid().ToString();
-            var userSecurityStamp = Guid.NewGuid().ToString();
-            var userConcurrencyStamp = Guid.NewGuid().ToString();
+            string roleConcurrencyStamp = Guid.NewGuid().ToString();
+            string userSecurityStamp = Guid.NewGuid().ToString();
+            string userConcurrencyStamp = Guid.NewGuid().ToString();
 
             migrationBuilder.Sql($@"
                                 INSERT INTO ""AspNetRoles"" (""Id"", ""Name"", ""NormalizedName"", ""ConcurrencyStamp"")

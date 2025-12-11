@@ -39,8 +39,8 @@
     );
 
     public record MappingEntryDto(
-    string TargetPath,     
-    string? SourcePath     
+    string TargetPath,
+    string? SourcePath
     );
 
     public record MappingTemplateDto(
@@ -57,7 +57,7 @@
         int Id,
         string SourceTemplate,
         string TargetTemplate,
-        SourceType OutputFormat 
+        SourceType OutputFormat
     )
     {
         public string FullName => $"{SourceTemplate} → {TargetTemplate}";
@@ -84,7 +84,7 @@
     public record WatchedUrlDto(
         int Id,
         string Url,
-        int IntervalMinutes, 
+        int IntervalMinutes,
         int MappingTemplateId,
         string MappingTemplateName
     );
