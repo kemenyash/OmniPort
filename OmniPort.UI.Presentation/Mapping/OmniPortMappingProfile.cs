@@ -1,10 +1,7 @@
 ﻿using AutoMapper;
-using OmniPort.Core.Models;
 using OmniPort.Core.Records;
 using OmniPort.Data;
 using OmniPort.UI.Presentation.Models;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace OmniPort.UI.Presentation.Mapping
 {
@@ -12,38 +9,34 @@ namespace OmniPort.UI.Presentation.Mapping
     {
         public OmniPortMappingProfile()
         {
-            // ----------- Entity -> DTO -----------
+            CreateMap<FieldData, TemplateFieldDto>()
+                .ForCtorParam("Children", opt => opt.MapFrom(s => s.Children.Where(c => !c.IsArrayItem)))
+                .ForCtorParam("ChildrenItems", opt => opt.MapFrom(s => s.Children.Where(c => c.IsArrayItem)))
+                .ForCtorParam("ItemType", opt => opt.MapFrom(s => s.ItemType));
 
-            // Field
-            CreateMap<FieldData, TemplateFieldDto>();
-
-            // Basic Template
             CreateMap<BasicTemplateData, BasicTemplateDto>()
-                .ForCtorParam("Fields", opt => opt.MapFrom(s => s.Fields));
+                .ForCtorParam("Fields", opt => opt.MapFrom(s => s.Fields.Where(f => f.ParentFieldId == null && !f.IsArrayItem)));
 
             CreateMap<BasicTemplateData, TemplateSummaryDto>()
-                .ForCtorParam("FieldsCount", opt => opt.MapFrom(s => s.Fields.Count));
+                .ForCtorParam("FieldsCount", opt => opt.MapFrom(s =>
+                    s.Fields.Count(f => f.ParentFieldId == null && !f.IsArrayItem)));
 
-            // Mapping Field (enriched with names/types)
             CreateMap<MappingFieldData, MappingFieldDto>()
                 .ForCtorParam("SourceFieldName", opt => opt.MapFrom(s => s.SourceField.Name))
                 .ForCtorParam("SourceFieldType", opt => opt.MapFrom(s => s.SourceField.Type))
                 .ForCtorParam("TargetFieldName", opt => opt.MapFrom(s => s.TargetField.Name))
                 .ForCtorParam("TargetFieldType", opt => opt.MapFrom(s => s.TargetField.Type));
 
-            // Mapping Template
             CreateMap<MappingTemplateData, MappingTemplateDto>()
                 .ForCtorParam("SourceTemplateName", opt => opt.MapFrom(s => s.SourceTemplate.Name))
                 .ForCtorParam("TargetTemplateName", opt => opt.MapFrom(s => s.TargetTemplate.Name))
                 .ForCtorParam("Fields", opt => opt.MapFrom(s => s.MappingFields));
 
-            // Joined summary (for selectors)
             CreateMap<MappingTemplateData, JoinedTemplateSummaryDto>()
                 .ForCtorParam("SourceTemplate", opt => opt.MapFrom(s => s.SourceTemplate.Name))
                 .ForCtorParam("TargetTemplate", opt => opt.MapFrom(s => s.TargetTemplate.Name))
                 .ForCtorParam("OutputFormat", opt => opt.MapFrom(s => s.TargetTemplate.SourceType));
 
-            // History
             CreateMap<FileConversionHistoryData, FileConversionHistoryDto>()
                 .ForCtorParam("OutputLink", opt => opt.MapFrom(s => s.OutputUrl))
                 .ForCtorParam("MappingTemplateName", opt => opt.MapFrom(s => s.MappingTemplate.Name));
@@ -59,61 +52,68 @@ namespace OmniPort.UI.Presentation.Mapping
                 .ForCtorParam("IntervalMinutes", opt => opt.MapFrom(s => s.CheckIntervalMinutes));
 
 
-            // ----------- DTO(Create/Update/Form) -> Entity -----------
-
-            // CreateBasicTemplateDto -> BasicTemplateData
             CreateMap<CreateBasicTemplateDto, BasicTemplateData>()
                 .ForMember(d => d.Id, opt => opt.Ignore())
-                .ForMember(d => d.Fields, opt => opt.MapFrom(s => s.Fields))
+                .ForMember(d => d.Fields, opt => opt.Ignore())
+                .ForMember(d => d.AsSourceMappings, opt => opt.Ignore())
+                .ForMember(d => d.AsTargetMappings, opt => opt.Ignore());
+
+            CreateMap<UpdateBasicTemplateDto, BasicTemplateData>()
+                .ForMember(d => d.Fields, opt => opt.Ignore())
                 .ForMember(d => d.AsSourceMappings, opt => opt.Ignore())
                 .ForMember(d => d.AsTargetMappings, opt => opt.Ignore());
 
             CreateMap<CreateTemplateFieldDto, FieldData>()
                 .ForMember(d => d.Id, opt => opt.Ignore())
-                .ForMember(d => d.TemplateSourceId, opt => opt.Ignore()) 
-                .ForMember(d => d.TemplateSource, opt => opt.Ignore());
+                .ForMember(d => d.TemplateSourceId, opt => opt.Ignore())
+                .ForMember(d => d.TemplateSource, opt => opt.Ignore())
+                .ForMember(d => d.ParentFieldId, opt => opt.Ignore())
+                .ForMember(d => d.IsArrayItem, opt => opt.Ignore())
+                .ForMember(d => d.Children, opt => opt.Ignore());
 
-            // UpdateBasicTemplateDto
             CreateMap<UpsertTemplateFieldDto, FieldData>()
                 .ForMember(d => d.TemplateSourceId, opt => opt.Ignore())
-                .ForMember(d => d.TemplateSource, opt => opt.Ignore());
+                .ForMember(d => d.TemplateSource, opt => opt.Ignore())
+                .ForMember(d => d.ParentFieldId, opt => opt.Ignore())
+                .ForMember(d => d.IsArrayItem, opt => opt.Ignore())
+                .ForMember(d => d.Children, opt => opt.Ignore());
 
-            // CreateMappingTemplateDto -> MappingTemplateData
             CreateMap<CreateMappingTemplateDto, MappingTemplateData>()
                 .ForMember(d => d.Id, opt => opt.Ignore())
-                .ForMember(d => d.MappingFields, opt => opt.Ignore()) 
                 .ForMember(d => d.SourceTemplate, opt => opt.Ignore())
                 .ForMember(d => d.TargetTemplate, opt => opt.Ignore())
                 .ForMember(d => d.FileConversions, opt => opt.Ignore())
-                .ForMember(d => d.UrlConversions, opt => opt.Ignore());
+                .ForMember(d => d.UrlConversions, opt => opt.Ignore())
+                .ForMember(d => d.MappingFields, opt => opt.Ignore());
 
-            // UpdateMappingTemplateDto -> MappingTemplateData
             CreateMap<UpdateMappingTemplateDto, MappingTemplateData>()
-                .ForMember(d => d.MappingFields, opt => opt.Ignore())
                 .ForMember(d => d.SourceTemplate, opt => opt.Ignore())
                 .ForMember(d => d.TargetTemplate, opt => opt.Ignore())
                 .ForMember(d => d.FileConversions, opt => opt.Ignore())
-                .ForMember(d => d.UrlConversions, opt => opt.Ignore());
+                .ForMember(d => d.UrlConversions, opt => opt.Ignore())
+                .ForMember(d => d.MappingFields, opt => opt.Ignore());
 
-            // Forms
             CreateMap<TemplateEditForm, BasicTemplateData>()
                 .ForMember(d => d.Id, opt => opt.MapFrom(s => s.Id ?? 0))
-                .ForMember(d => d.Fields, opt => opt.Ignore()) 
+                .ForMember(d => d.Fields, opt => opt.Ignore())
                 .ForMember(d => d.AsSourceMappings, opt => opt.Ignore())
                 .ForMember(d => d.AsTargetMappings, opt => opt.Ignore());
 
             CreateMap<TemplateFieldRow, FieldData>()
                 .ForMember(d => d.Id, opt => opt.MapFrom(s => s.Id ?? 0))
                 .ForMember(d => d.TemplateSourceId, opt => opt.Ignore())
-                .ForMember(d => d.TemplateSource, opt => opt.Ignore());
+                .ForMember(d => d.TemplateSource, opt => opt.Ignore())
+                .ForMember(d => d.ParentFieldId, opt => opt.Ignore())
+                .ForMember(d => d.IsArrayItem, opt => opt.Ignore())
+                .ForMember(d => d.Children, opt => opt.Ignore());
 
             CreateMap<MappingTemplateForm, MappingTemplateData>()
                 .ForMember(d => d.Id, opt => opt.MapFrom(s => s.Id ?? 0))
-                .ForMember(d => d.MappingFields, opt => opt.Ignore())
                 .ForMember(d => d.SourceTemplate, opt => opt.Ignore())
                 .ForMember(d => d.TargetTemplate, opt => opt.Ignore())
                 .ForMember(d => d.FileConversions, opt => opt.Ignore())
-                .ForMember(d => d.UrlConversions, opt => opt.Ignore());
+                .ForMember(d => d.UrlConversions, opt => opt.Ignore())
+                .ForMember(d => d.MappingFields, opt => opt.Ignore());
         }
     }
 }

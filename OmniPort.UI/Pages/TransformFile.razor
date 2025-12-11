@@ -1,10 +1,11 @@
 ﻿@page "/transform"
 @using OmniPort.Core.Models
+@using OmniPort.UI.Presentation.Models
 @using OmniPort.UI.Presentation.ViewModels
 @using Microsoft.AspNetCore.Components.Forms
 @inject TransformationViewModel ViewModel
 
-<EditForm Model="@ViewModel.FormModel" OnValidSubmit="RunTransformation">
+<EditForm Model="@ViewModel.FormModel" OnValidSubmit="ViewModel.RunTransformation">
     <DataAnnotationsValidator />
     <ValidationSummary />
 
@@ -12,7 +13,8 @@
 
         <div>
             <label>Template</label>
-            <InputSelect @bind-Value="@ViewModel.FormModel.SelectedMappingTemplateId" class="w-full border px-3 py-2 rounded">
+            <InputSelect @bind-Value="@ViewModel.FormModel.SelectedMappingTemplateId"
+                         class="w-full border px-3 py-2 rounded">
                 <option value="0" disabled>Select template</option>
                 @foreach (var t in ViewModel.JoinedTemplates)
                 {
@@ -24,28 +26,41 @@
 
         <div class="flex gap-4 items-center">
             <label>Import mode:</label>
-            <button type="button" @onclick="() => SetMode(UploadMode.Upload)" class="@GetButtonClass(UploadMode.Upload)">Upload</button>
-            <button type="button" @onclick="() => SetMode(UploadMode.Url)" class="@GetButtonClass(UploadMode.Url)">URL</button>
+            <button type="button"
+                    @onclick="() => ViewModel.SetMode(UploadMode.Upload)"
+                    class="@ViewModel.GetButtonClass(UploadMode.Upload)">
+                Upload
+            </button>
+            <button type="button"
+                    @onclick="() => ViewModel.SetMode(UploadMode.Url)"
+                    class="@ViewModel.GetButtonClass(UploadMode.Url)">
+                URL
+            </button>
         </div>
 
-        @if (inputMode == UploadMode.Upload)
+        @if (ViewModel.InputMode == UploadMode.Upload)
         {
             <div class="space-y-1">
                 <label>Upload File</label>
-                <InputFile OnChange="EventCallback.Factory.Create<InputFileChangeEventArgs>(this, OnFileChange)" class="w-full border px-3 py-2 rounded" />
+                <InputFile OnChange="ViewModel.OnFileChange"
+                           class="w-full border px-3 py-2 rounded" />
 
                 @if (!string.IsNullOrWhiteSpace(ViewModel.FormModel.UploadedFileName))
                 {
-                    <div class="text-sm text-gray-600">Selected: @ViewModel.FormModel.UploadedFileName</div>
+                    <div class="text-sm text-gray-600">
+                        Selected: @ViewModel.FormModel.UploadedFileName
+                    </div>
                 }
             </div>
         }
 
-        @if (inputMode == UploadMode.Url)
+        @if (ViewModel.InputMode == UploadMode.Url)
         {
             <div>
                 <label>File URL</label>
-                <InputText @bind-Value="ViewModel.FormModel.FileUrl" class="w-full border px-3 py-2 rounded" placeholder="https://example.com/file.xlsx" />
+                <InputText @bind-Value="ViewModel.FormModel.FileUrl"
+                           class="w-full border px-3 py-2 rounded"
+                           placeholder="https://example.com/file.xlsx" />
                 <ValidationMessage For="@(() => ViewModel.FormModel.FileUrl)" />
             </div>
 
@@ -61,16 +76,16 @@
         <div class="flex items-center gap-3">
             <button type="submit"
                     class="bg-green-600 text-white px-4 py-2 rounded disabled:opacity-50"
-                    disabled="@(!CanRun)">
+                    disabled="@(!ViewModel.CanRun)">
                 Run Transformation
             </button>
 
-            @if (inputMode == UploadMode.Url)
+            @if (ViewModel.InputMode == UploadMode.Url)
             {
                 <button type="button"
                         class="bg-indigo-600 text-white px-4 py-2 rounded disabled:opacity-50"
-                        disabled="@(!CanAddToWatchlist)"
-                        @onclick="AddToWatchlist">
+                        disabled="@(!ViewModel.CanAddToWatchlist)"
+                        @onclick="ViewModel.AddToWatchlistFromForm">
                     Add to Watchlist
                 </button>
             }
@@ -80,7 +95,7 @@
 
 <hr class="my-10" />
 
-@if (inputMode == UploadMode.Url && ViewModel.WatchedUrls.Any())
+@if (ViewModel.InputMode == UploadMode.Url && ViewModel.WatchedUrls.Any())
 {
     <h2 class="text-lg font-semibold mb-2">Watched URLs</h2>
     <table class="w-full table-auto border border-gray-300">
@@ -104,7 +119,7 @@
     </table>
 }
 
-@if (inputMode == UploadMode.Url && ViewModel.UrlConversions.Any())
+@if (ViewModel.InputMode == UploadMode.Url && ViewModel.UrlConversions.Any())
 {
     <h2 class="text-lg font-semibold mb-2">URL Conversion History</h2>
     <table class="w-full table-auto border border-gray-300">
@@ -132,7 +147,7 @@
     </table>
 }
 
-@if (inputMode == UploadMode.Upload && ViewModel.FileConversions.Any())
+@if (ViewModel.InputMode == UploadMode.Upload && ViewModel.FileConversions.Any())
 {
     <h2 class="text-lg font-semibold mb-2">File Conversion History</h2>
     <table class="w-full table-auto border border-gray-300">
@@ -158,66 +173,4 @@
             }
         </tbody>
     </table>
-}
-
-@code {
-    private UploadMode inputMode = UploadMode.Upload;
-
-    private bool CanRun =>
-        ViewModel.FormModel.SelectedMappingTemplateId != 0 &&
-        (inputMode == UploadMode.Upload
-            ? !string.IsNullOrWhiteSpace(ViewModel.FormModel.UploadedFileName)
-            : !string.IsNullOrWhiteSpace(ViewModel.FormModel.FileUrl));
-
-    private bool CanAddToWatchlist =>
-        inputMode == UploadMode.Url &&
-        ViewModel.FormModel.SelectedMappingTemplateId != 0 &&
-        !string.IsNullOrWhiteSpace(ViewModel.FormModel.FileUrl) &&
-        (ViewModel.FormModel.IntervalMinutes.HasValue && ViewModel.FormModel.IntervalMinutes.Value > 0);
-
-    protected override async Task OnInitializedAsync()
-    {
-        await ViewModel.InitAsync();
-    }
-
-    private async Task RunTransformation(EditContext _)
-    {
-        if (ViewModel.FormModel.SelectedMappingTemplateId == 0)
-            return;
-
-        if (inputMode == UploadMode.Upload)
-            await ViewModel.RunUploadAsync();
-        else
-            await ViewModel.RunUrlAsync();
-    }
-
-    private async Task AddToWatchlist()
-    {
-        var templateId = ViewModel.FormModel.SelectedMappingTemplateId;
-        var url = (ViewModel.FormModel.FileUrl ?? string.Empty).Trim();
-        var interval = ViewModel.FormModel.IntervalMinutes.GetValueOrDefault(15);
-
-        if (templateId == 0 || string.IsNullOrWhiteSpace(url) || interval <= 0)
-            return;
-
-        await ViewModel.AddToWatchlistAsync(url, interval, templateId);
-        await ViewModel.ReloadWatchedAsync();
-    }
-
-    private void SetMode(UploadMode mode) => inputMode = mode;
-
-    private Task OnFileChange(InputFileChangeEventArgs e)
-    {
-        var file = e.File;
-        ViewModel.SetUploadedFile(file);
-        ViewModel.FormModel.UploadedFileName = file?.Name;
-        return Task.CompletedTask;
-    }
-
-    private string GetButtonClass(UploadMode mode) =>
-        inputMode == mode
-            ? "bg-blue-600 text-white px-3 py-1 rounded"
-            : "bg-gray-200 text-gray-700 px-3 py-1 rounded";
-
-    enum UploadMode { Upload, Url }
 }

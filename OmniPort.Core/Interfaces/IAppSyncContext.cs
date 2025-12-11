@@ -1,9 +1,4 @@
 ﻿using OmniPort.Core.Records;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace OmniPort.Core.Interfaces
 {
@@ -18,19 +13,19 @@ namespace OmniPort.Core.Interfaces
         IReadOnlyList<UrlConversionHistoryDto> UrlConversions { get; }
         IReadOnlyList<WatchedUrlDto> WatchedUrls { get; }
 
-        Task InitializeAsync(CancellationToken ct = default);
+        Task Initialize(CancellationToken ct = default);
 
-        Task CreateBasicTemplateAsync(CreateBasicTemplateDto dto, CancellationToken ct = default);
-        Task UpdateBasicTemplateAsync(UpdateBasicTemplateDto dto, CancellationToken ct = default);
-        Task DeleteBasicTemplateAsync(int id, CancellationToken ct = default);
+        Task CreateBasicTemplate(CreateBasicTemplateDto dto, CancellationToken ct = default);
+        Task UpdateBasicTemplate(UpdateBasicTemplateDto dto, CancellationToken ct = default);
+        Task DeleteBasicTemplate(int id, CancellationToken ct = default);
 
-        Task CreateMappingTemplateAsync(CreateMappingTemplateDto dto, CancellationToken ct = default);
-        Task DeleteMappingTemplateAsync(int mappingId, CancellationToken ct = default);
+        Task CreateMappingTemplate(CreateMappingTemplateDto dto, CancellationToken ct = default);
+        Task DeleteMappingTemplate(int mappingId, CancellationToken ct = default);
 
-        Task AddFileConversionAsync(FileConversionHistoryDto dto, CancellationToken ct = default);
-        Task AddUrlConversionAsync(UrlConversionHistoryDto dto, CancellationToken ct = default);
-        Task AddWatchedUrlAsync(AddWatchedUrlDto dto, CancellationToken ct = default);
+        Task AddFileConversion(FileConversionHistoryDto dto, CancellationToken ct = default);
+        Task AddUrlConversion(UrlConversionHistoryDto dto, CancellationToken ct = default);
+        Task AddWatchedUrl(AddWatchedUrlDto dto, CancellationToken ct = default);
 
-        Task RefreshAllAsync(CancellationToken ct = default);
+        Task RefreshAll(CancellationToken ct = default);
     }
 }

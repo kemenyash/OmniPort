@@ -1,10 +1,7 @@
 ﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using OmniPort.Core.Interfaces;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace OmniPort.Core.Parsers
 {
@@ -12,11 +9,71 @@ namespace OmniPort.Core.Parsers
     {
         public IEnumerable<IDictionary<string, object?>> Parse(Stream stream)
         {
-            using var reader = new StreamReader(stream, Encoding.UTF8);
-            string json = reader.ReadToEnd();
+            using StreamReader streamReader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+            string text = streamReader.ReadToEnd();
 
-            var list = JsonConvert.DeserializeObject<List<Dictionary<string, object?>>>(json);
-            return list ?? Enumerable.Empty<IDictionary<string, object?>>();
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return Enumerable.Empty<IDictionary<string, object?>>();
+            }
+
+            text = text.Trim();
+
+            if (text.StartsWith("["))
+            {
+                try
+                {
+                    JArray jsonArray = JArray.Parse(text);
+                    List<IDictionary<string, object?>> rows = new List<IDictionary<string, object?>>(jsonArray.Count);
+                    foreach (JToken token in jsonArray)
+                    {
+                        if (token is JObject jsonObject)
+                        {
+                            rows.Add(jsonObject.ToObject<Dictionary<string, object?>>()!);
+                        }
+                    }
+                    return rows;
+                }
+                catch (JsonException)
+                {
+
+                }
+            }
+
+            if (text.StartsWith("{"))
+            {
+                try
+                {
+                    JObject jsonObject = JObject.Parse(text);
+                    return new[]
+                    {
+                        jsonObject.ToObject<Dictionary<string, object?>>()!
+                    };
+                }
+                catch (JsonException)
+                {
+                }
+            }
+
+            string[] lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            List<IDictionary<string, object?>> list = new List<IDictionary<string, object?>>();
+            foreach (string line in lines)
+            {
+                string? trimedLine = line?.Trim();
+                if (string.IsNullOrEmpty(trimedLine)) continue;
+                if (!trimedLine.StartsWith("{")) continue;
+
+                try
+                {
+                    JObject jsonObject = JObject.Parse(trimedLine);
+                    list.Add(jsonObject.ToObject<Dictionary<string, object?>>()!);
+                }
+                catch (JsonException)
+                {
+                }
+            }
+
+            return list;
         }
     }
 }

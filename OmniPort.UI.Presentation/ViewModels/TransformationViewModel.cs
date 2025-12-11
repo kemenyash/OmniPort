@@ -9,103 +9,164 @@ namespace OmniPort.UI.Presentation.ViewModels
 {
     public class TransformationViewModel
     {
-        private readonly IAppSyncContext sync;
+        private readonly IAppSyncContext syncContext;
         private readonly ITransformationExecutionService executor;
+
+        private object? uploadObject;
+        private string? uploadFileName;
+
+        public UploadMode InputMode { get; private set; }
+        public bool CanRun => CanRunTransformation();
+        public bool CanAddToWatchlist => CanAddToWatchListFromForm();
+
+        public TransformationRunForm FormModel { get; private set; }
+        public List<JoinedTemplateSummaryDto> JoinedTemplates { get; private set; }
+        public List<FileConversionHistoryDto> FileConversions { get; private set; }
+        public List<UrlConversionHistoryDto> UrlConversions { get; private set; }
+        public List<WatchedUrlDto> WatchedUrls { get; private set; }
+
 
         public TransformationViewModel(IAppSyncContext sync, ITransformationExecutionService executor)
         {
-            this.sync = sync;
+            this.syncContext = sync;
             this.executor = executor;
+
+            InputMode = UploadMode.Upload;
+            FormModel = new TransformationRunForm();
+            JoinedTemplates = new List<JoinedTemplateSummaryDto>();
+            FileConversions = new List<FileConversionHistoryDto>();
+            UrlConversions = new List<UrlConversionHistoryDto>();
+            WatchedUrls = new List<WatchedUrlDto>();
+
+            _ = Initialization();
         }
 
-        public TransformationRunForm FormModel { get; private set; } = new();
-
-        public List<JoinedTemplateSummaryDto> JoinedTemplates { get; private set; } = new();
-
-        public List<FileConversionHistoryDto> FileConversions { get; private set; } = new();
-        public List<UrlConversionHistoryDto> UrlConversions { get; private set; } = new();
-        public List<WatchedUrlDto> WatchedUrls { get; private set; } = new();
-
-        private object? _uploadObject;
-        private string? _uploadedFileName;
-
-        public async Task InitAsync()
+        public async Task Initialization()
         {
-            if (!sync.JoinedTemplates.Any())
-                await sync.InitializeAsync();
+            if (!syncContext.JoinedTemplates.Any())
+            {
+                await syncContext.Initialize();
+            }
 
-            BindFromSync();
-            sync.Changed += () => BindFromSync();
+            BindFromSyncContext();
+            syncContext.Changed += BindFromSyncContext;
 
             if (FormModel.SelectedMappingTemplateId == 0 && JoinedTemplates.Any())
+            {
                 FormModel.SelectedMappingTemplateId = JoinedTemplates.First().Id;
+            }
         }
 
-        private void BindFromSync()
+        public void SetMode(UploadMode mode)
         {
-            JoinedTemplates = sync.JoinedTemplates.ToList();
-            FileConversions = sync.FileConversions.ToList();
-            UrlConversions = sync.UrlConversions.ToList();
-            WatchedUrls = sync.WatchedUrls.ToList();
+            InputMode = mode;
+        }
+
+        public string GetButtonClass(UploadMode mode)
+        {
+            return InputMode == mode
+                 ? "bg-blue-600 text-white px-3 py-1 rounded"
+                 : "bg-gray-200 text-gray-700 px-3 py-1 rounded";
+        }
+
+        public Task OnFileChange(InputFileChangeEventArgs eventArgs)
+        {
+            IBrowserFile file = eventArgs.File;
+            SetUploadedFile(file);
+            return Task.CompletedTask;
+        }
+
+        public async Task RunTransformation(EditContext editContext)
+        {
+            if (FormModel.SelectedMappingTemplateId == 0) return;
+
+            if (InputMode == UploadMode.Upload)
+            {
+                await RunUpload();
+            }
+            else
+            {
+                await RunUrl();
+            }
+        }
+
+        public async Task AddToWatchlistFromForm()
+        {
+            int templateId = FormModel.SelectedMappingTemplateId;
+            string url = (FormModel.FileUrl ?? string.Empty).Trim();
+            int interval = FormModel.IntervalMinutes.GetValueOrDefault(15);
+
+            if (templateId == 0 || string.IsNullOrWhiteSpace(url) || interval <= 0)
+            {
+                return;
+            }
+
+            await AddToWatchlist(url, interval, templateId);
+            await ReloadWatched();
         }
 
         public void SetUploadedFile(string fileName, Func<Task<Stream>> openStream)
         {
-            _uploadedFileName = fileName;
-            _uploadObject = new LazyStream(openStream);
+            uploadFileName = fileName;
+            uploadObject = new LazyStream(openStream);
             FormModel.UploadedFileName = fileName;
         }
 
         public void SetUploadedFile(IBrowserFile file)
         {
-            _uploadedFileName = file.Name;
-            _uploadObject = file;
+            uploadFileName = file.Name;
+            uploadObject = file;
             FormModel.UploadedFileName = file.Name;
         }
 
-        public async Task RunUploadAsync()
+        public async Task RunUpload()
         {
-            if (FormModel.SelectedMappingTemplateId == 0 || _uploadObject is null || string.IsNullOrWhiteSpace(_uploadedFileName))
+            if (FormModel.SelectedMappingTemplateId == 0 ||
+                uploadObject is null ||
+                string.IsNullOrWhiteSpace(uploadFileName))
+            {
                 return;
+            }
 
-            var selected = JoinedTemplates.FirstOrDefault(x => x.Id == FormModel.SelectedMappingTemplateId);
+            JoinedTemplateSummaryDto? selected = JoinedTemplates.FirstOrDefault(x => x.Id == FormModel.SelectedMappingTemplateId);
             if (selected is null) return;
 
-            var ext = FileToFormatConverter.ToExtension(selected.OutputFormat);
+            string extension = FileToFormatConverter.ToExtension(selected.OutputFormat);
 
-            var outputUrl = await executor.TransformUploadedFileAsync(
+            string outputUrl = await executor.TransformUploadedFileAsync(
                 templateId: FormModel.SelectedMappingTemplateId,
-                file: _uploadObject,
-                outputExtension: ext
+                file: uploadObject,
+                outputExtension: extension
             );
 
-            await sync.AddFileConversionAsync(new FileConversionHistoryDto(
+            await syncContext.AddFileConversion(new FileConversionHistoryDto(
                 Id: 0,
                 ConvertedAt: DateTime.UtcNow,
-                FileName: _uploadedFileName!,
+                FileName: uploadFileName!,
                 OutputLink: outputUrl,
                 MappingTemplateId: FormModel.SelectedMappingTemplateId,
                 MappingTemplateName: string.Empty
             ));
         }
 
-        public async Task RunUrlAsync()
+        public async Task RunUrl()
         {
-            if (FormModel.SelectedMappingTemplateId == 0 || string.IsNullOrWhiteSpace(FormModel.FileUrl))
+            if (FormModel.SelectedMappingTemplateId == 0 ||
+                string.IsNullOrWhiteSpace(FormModel.FileUrl))
                 return;
 
-            var selected = JoinedTemplates.FirstOrDefault(x => x.Id == FormModel.SelectedMappingTemplateId);
+            JoinedTemplateSummaryDto? selected = JoinedTemplates.FirstOrDefault(x => x.Id == FormModel.SelectedMappingTemplateId);
             if (selected is null) return;
 
-            var ext = FileToFormatConverter.ToExtension(selected.OutputFormat);
+            string extension = FileToFormatConverter.ToExtension(selected.OutputFormat);
 
-            var outputUrl = await executor.TransformFromUrlAsync(
+            string outputUrl = await executor.TransformFromUrlAsync(
                 templateId: FormModel.SelectedMappingTemplateId,
                 url: FormModel.FileUrl!,
-                outputExtension: ext
+                outputExtension: extension
             );
 
-            await sync.AddUrlConversionAsync(new UrlConversionHistoryDto(
+            await syncContext.AddUrlConversion(new UrlConversionHistoryDto(
                 Id: 0,
                 ConvertedAt: DateTime.UtcNow,
                 InputUrl: FormModel.FileUrl!,
@@ -114,13 +175,39 @@ namespace OmniPort.UI.Presentation.ViewModels
                 MappingTemplateName: string.Empty
             ));
         }
-
-        public async Task AddToWatchlistAsync(string url, int intervalMinutes, int mappingTemplateId)
+        public async Task AddToWatchlist(string url, int intervalMinutes, int mappingTemplateId)
         {
             if (string.IsNullOrWhiteSpace(url) || intervalMinutes <= 0) return;
-            await sync.AddWatchedUrlAsync(new AddWatchedUrlDto(url, intervalMinutes, mappingTemplateId));
+            await syncContext.AddWatchedUrl(new AddWatchedUrlDto(url, intervalMinutes, mappingTemplateId));
+        }
+        public async Task ReloadWatched()
+        {
+            await syncContext.RefreshAll();
         }
 
-        public async Task ReloadWatchedAsync() => await sync.RefreshAllAsync();
+
+        private void BindFromSyncContext()
+        {
+            JoinedTemplates = syncContext.JoinedTemplates.ToList();
+            FileConversions = syncContext.FileConversions.ToList();
+            UrlConversions = syncContext.UrlConversions.ToList();
+            WatchedUrls = syncContext.WatchedUrls.ToList();
+        }
+
+        private bool CanAddToWatchListFromForm()
+        {
+            return InputMode == UploadMode.Url &&
+            FormModel.SelectedMappingTemplateId != 0 &&
+            !string.IsNullOrWhiteSpace(FormModel.FileUrl) &&
+            (FormModel.IntervalMinutes.HasValue && FormModel.IntervalMinutes.Value > 0);
+        }
+
+        private bool CanRunTransformation()
+        {
+            return FormModel.SelectedMappingTemplateId != 0 &&
+             (InputMode == UploadMode.Upload
+                 ? !string.IsNullOrWhiteSpace(FormModel.UploadedFileName)
+                 : !string.IsNullOrWhiteSpace(FormModel.FileUrl));
+        }
     }
 }

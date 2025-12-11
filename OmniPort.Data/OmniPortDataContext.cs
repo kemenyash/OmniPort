@@ -1,10 +1,4 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using OmniPort.Core.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace OmniPort.Data
 {
@@ -27,27 +21,20 @@ namespace OmniPort.Data
             modelBuilder.Entity<BasicTemplateData>()
                 .HasIndex(x => x.Name).IsUnique(false);
 
-
             modelBuilder.Entity<BasicTemplateData>()
                 .HasMany(t => t.Fields)
                 .WithOne(f => f.TemplateSource)
                 .HasForeignKey(f => f.TemplateSourceId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            modelBuilder.Entity<BasicTemplateData>()
-                .HasMany(t => t.AsSourceMappings)
-                .WithOne(m => m.SourceTemplate)
-                .HasForeignKey(m => m.SourceTemplateId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            modelBuilder.Entity<BasicTemplateData>()
-                .HasMany(t => t.AsTargetMappings)
-                .WithOne(m => m.TargetTemplate)
-                .HasForeignKey(m => m.TargetTemplateId)
+            modelBuilder.Entity<FieldData>()
+                .HasOne(f => f.ParentField)
+                .WithMany(p => p.Children)
+                .HasForeignKey(f => f.ParentFieldId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<FieldData>()
-                .HasIndex(f => new { f.TemplateSourceId, f.Name })
+                .HasIndex(f => new { f.TemplateSourceId, f.ParentFieldId, f.IsArrayItem, f.Name })
                 .IsUnique();
 
             modelBuilder.Entity<MappingTemplateData>()
@@ -88,9 +75,10 @@ namespace OmniPort.Data
                 .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<UrlFileGettingData>()
-                 .HasIndex(x => new { x.Url, x.MappingTemplateId })
-                 .IsUnique();
+                .HasIndex(x => new { x.Url, x.MappingTemplateId })
+                .IsUnique();
         }
+
 
     }
 }

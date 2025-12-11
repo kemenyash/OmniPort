@@ -1,0 +1,188 @@
+﻿@page "/join-templates"
+@using System.Linq
+@using OmniPort.Core.Enums
+@using OmniPort.Core.Models
+@using OmniPort.Core.Records
+@using OmniPort.UI.Presentation.ViewModels
+@inject JoinTemplatesViewModel ViewModel
+
+<h1 class="text-2xl font-bold mb-6">Transforming Templates</h1>
+
+@if (ViewModel.Templates.Count == 0)
+{
+    <p>Loading templates...</p>
+}
+else
+{
+    <div class="grid grid-cols-2 gap-6">
+        <div class="border rounded p-4 shadow bg-white">
+            <div class="flex items-center justify-between mb-2">
+                <h2 class="text-xl font-semibold text-blue-700">Source Template:</h2>
+                <select class="border rounded px-2 py-1"
+                        value="@ViewModel.SourceId"
+                        @onchange="ViewModel.OnSourceChanged">
+                    <option disabled value="">Select Template</option>
+                    @foreach (var t in ViewModel.Templates)
+                    {
+                        <option value="@t.Id">@t.Name</option>
+                    }
+                </select>
+            </div>
+
+            <p class="text-sm text-gray-500 mb-3 italic">Fields from original data</p>
+
+            @if (ViewModel.SourceTemplate?.Fields is { Count: > 0 } roots)
+            {
+                <ul class="list-disc pl-5 space-y-1">
+                    @foreach (var f in roots)
+                    {
+                        <SourceFieldTree Node="f" />
+                    }
+                </ul>
+            }
+            else
+            {
+                <div class="text-gray-500 italic">No fields.</div>
+            }
+        </div>
+
+        <div class="border rounded p-4 shadow bg-white">
+            <div class="flex items-center justify-between mb-2">
+                <h2 class="text-xl font-semibold text-green-700">Internal CRM Schema:</h2>
+                <select class="border rounded px-2 py-1"
+                        value="@ViewModel.TargetId"
+                        @onchange="ViewModel.OnTargetChanged">
+                    <option disabled value="">Select Schema</option>
+                    @foreach (var t in ViewModel.Templates)
+                    {
+                        <option value="@t.Id">@t.Name</option>
+                    }
+                </select>
+            </div>
+
+            <p class="text-sm text-gray-500 mb-3 italic">
+                Match source fields to target structure (full hierarchy)
+            </p>
+
+            @if (ViewModel.TargetFlattened?.Any() == true)
+            {
+                <div class="space-y-3">
+                    @foreach (var node in ViewModel.TargetFlattened)
+                    {
+                        var indent = ViewModel.GetDepth(node.Path) * 12;
+
+                        @if (node.Type == FieldDataType.Object || node.Type == FieldDataType.Array)
+                        {
+                            <div class="font-semibold mt-2"
+                                 style="@($"margin-left:{indent}px")">
+                                @node.Path (@node.Type)
+                            </div>
+                        }
+                        else
+                        {
+                            var current = ViewModel.GetMappedValue(node.Path);
+                            var topValue = ViewModel.GetTopSelectValue(current);
+
+                            <div class="mb-3"
+                                 style="@($"margin-left:{indent}px")">
+
+                                <label class="block text-sm font-medium">
+                                    @node.Path (@node.Type)
+                                </label>
+
+                                <select class="w-full mt-1 px-3 py-2 border rounded bg-white"
+                                        value="@topValue"
+                                        @onchange="e => ViewModel.MapField(node.Path, e.Value?.ToString())">
+                                    <option value="">-- Not Mapped --</option>
+                                    @foreach (var s in ViewModel.SourceFlattened)
+                                    {
+                                        if (ViewModel.IsTopOptionCandidate(s))
+                                        {
+                                            <option value="@s.Path">@s.Path (@s.Type)</option>
+                                        }
+                                    }
+                                </select>
+
+                                @if (!string.IsNullOrWhiteSpace(topValue) && ViewModel.HasDescendants(topValue!))
+                                {
+                                    <div class="mt-2">
+                                        <label class="block text-xs text-gray-600">
+                                            Inside @topValue
+                                        </label>
+
+                                        <select class="w-full mt-1 px-3 py-2 border rounded bg-white"
+                                                value="@(current ?? topValue)"
+                                                @onchange="e => ViewModel.MapField(node.Path, e.Value?.ToString())">
+
+                                            <option value="@topValue">
+                                                — Map to the whole @topValue —
+                                            </option>
+
+                                            @{
+                                                var baseDepth = ViewModel.GetDepth(topValue!);
+                                            }
+
+                                            @foreach (var d in ViewModel.GetDescendants(topValue!))
+                                            {
+                                                var depth = Math.Max(0, ViewModel.GetDepth(d.Path) - baseDepth);
+                                                var label = ViewModel.GetIndentedLabel(d.Path, d.Type, depth);
+
+                                                <option value="@d.Path">@label</option>
+                                            }
+                                        </select>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="text-gray-500 italic">Select target template to map.</div>
+            }
+        </div>
+    </div>
+
+    <button @onclick="ViewModel.SaveMapping"
+            class="mt-6 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-50"
+            disabled="@(!ViewModel.CanSave)">
+        Save Mapping
+    </button>
+
+    <hr class="my-10" />
+
+    <h2 class="text-xl font-semibold mb-4">Saved Join Templates</h2>
+
+    @if (ViewModel.JoinedTemplates.Any())
+    {
+        <table class="min-w-full bg-white border border-gray-300 rounded shadow">
+            <thead class="bg-gray-100 text-left">
+                <tr>
+                    <th class="px-4 py-2 border-b">Source Template</th>
+                    <th class="px-4 py-2 border-b">Target Template</th>
+                    <th class="px-4 py-2 border-b text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var join in ViewModel.JoinedTemplates)
+                {
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="px-4 py-2">@join.SourceTemplate</td>
+                        <td class="px-4 py-2">@join.TargetTemplate</td>
+                        <td class="px-4 py-2 text-right">
+                            <button @onclick="() => ViewModel.DeleteJoinTemplate(join.Id)"
+                                    class="text-red-600 hover:underline">
+                                Delete
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <p class="text-gray-500">No saved join templates found.</p>
+    }
+}

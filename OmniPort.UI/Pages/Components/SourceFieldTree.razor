@@ -1,0 +1,42 @@
+﻿@using OmniPort.Core.Records
+@using OmniPort.Core.Enums
+@using Microsoft.AspNetCore.Components
+
+<li>
+    <div class="flex items-center gap-2">
+        <span class="font-medium">@Node.Name</span>
+        <span class="text-gray-500 text-sm">
+            @{
+                var typeText = Node.Type.ToString();
+                if (Node.Type == FieldDataType.Array && Node.ItemType.HasValue)
+                {
+                    typeText += $"[{Node.ItemType}]";
+                }
+            }
+            (@typeText)
+        </span>
+    </div>
+
+    @{
+        var children = (Node.Children ?? Enumerable.Empty<TemplateFieldDto>()).ToList();
+        var itemChildren = (Node.ChildrenItems ?? Enumerable.Empty<TemplateFieldDto>()).ToList();
+    }
+
+    @if (children.Any() || itemChildren.Any())
+    {
+        <ul class="list-disc pl-5 mt-1">
+            @foreach (var ch in children)
+            {
+                <SourceFieldTree Node="ch" />
+            }
+            @foreach (var ch in itemChildren)
+            {
+                <SourceFieldTree Node="ch" />
+            }
+        </ul>
+    }
+</li>
+
+@code {
+    [Parameter] public TemplateFieldDto Node { get; set; } = default!;
+}

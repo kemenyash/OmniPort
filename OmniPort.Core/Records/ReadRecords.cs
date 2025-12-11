@@ -7,8 +7,12 @@
     public record TemplateFieldDto(
         int Id,
         string Name,
-        FieldDataType Type
+        FieldDataType Type,
+        FieldDataType? ItemType,
+        IReadOnlyList<TemplateFieldDto> Children,
+        IReadOnlyList<TemplateFieldDto> ChildrenItems
     );
+
 
     public record BasicTemplateDto(
         int Id,
@@ -34,6 +38,11 @@
         FieldDataType TargetFieldType
     );
 
+    public record MappingEntryDto(
+    string TargetPath,
+    string? SourcePath
+    );
+
     public record MappingTemplateDto(
         int Id,
         string Name,
@@ -48,7 +57,7 @@
         int Id,
         string SourceTemplate,
         string TargetTemplate,
-        SourceType OutputFormat 
+        SourceType OutputFormat
     )
     {
         public string FullName => $"{SourceTemplate} → {TargetTemplate}";
@@ -75,7 +84,7 @@
     public record WatchedUrlDto(
         int Id,
         string Url,
-        int IntervalMinutes, 
+        int IntervalMinutes,
         int MappingTemplateId,
         string MappingTemplateName
     );

@@ -1,11 +1,6 @@
 ﻿using OmniPort.Core.Enums;
-using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace OmniPort.Data
 {
@@ -25,7 +20,24 @@ namespace OmniPort.Data
         [Required, Column("name")]
         public string Name { get; set; } = null!;
 
+        [Column("parent_field_id")]
+        public int? ParentFieldId { get; set; }
+
+        [Required, Column("is_array_item")]
+        public bool IsArrayItem { get; set; }
+
+        [Column("item_type")]
+        public FieldDataType? ItemType { get; set; }
+
         [ForeignKey(nameof(TemplateSourceId))]
         public BasicTemplateData TemplateSource { get; set; } = null!;
+
+        [ForeignKey(nameof(ParentFieldId))]
+        [InverseProperty(nameof(Children))]
+        public FieldData? ParentField { get; set; }
+
+        [InverseProperty(nameof(ParentField))]
+        public ICollection<FieldData> Children { get; set; } = new List<FieldData>();
+
     }
 }

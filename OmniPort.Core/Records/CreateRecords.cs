@@ -5,22 +5,25 @@
     using System.ComponentModel.DataAnnotations;
 
     public record CreateBasicTemplateDto(
-        [property: Required] string Name,
-        [property: Required] SourceType SourceType,
-        [property: MinLength(1)] IReadOnlyList<CreateTemplateFieldDto> Fields
+        string Name,
+        SourceType SourceType,
+        IReadOnlyList<CreateTemplateFieldDto> Fields
     );
 
     public record CreateTemplateFieldDto(
-        [property: Required] string Name,
-        [property: Required] FieldDataType Type
+        string Name,
+        FieldDataType Type,
+        FieldDataType? ItemType,
+        IReadOnlyList<CreateTemplateFieldDto> Children,
+        IReadOnlyList<CreateTemplateFieldDto> ChildrenItems
     );
 
 
     public record CreateMappingTemplateDto(
-        [property: Required] string Name,
-        [property: Required] int SourceTemplateId,
-        [property: Required] int TargetTemplateId,
-        [property: Required] IReadOnlyDictionary<int, int?> TargetToSource
+        string Name,
+        int SourceTemplateId,
+        int TargetTemplateId,
+        IReadOnlyList<MappingEntryDto> Mappings
     );
 
     public record AddWatchedUrlDto(

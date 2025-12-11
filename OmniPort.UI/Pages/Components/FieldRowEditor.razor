@@ -1,0 +1,136 @@
+﻿@using System.Linq
+@using OmniPort.Core.Enums
+@using OmniPort.UI.Presentation.Models
+
+<div class="border rounded p-2 mb-2" style="margin-left:@(Level * 16)px">
+    <div class="grid grid-cols-12 gap-2 items-center">
+        <!-- Name -->
+        <InputText class="col-span-5 border rounded px-2 py-1"
+                   placeholder="Field name"
+                   @bind-Value="Field.Name" />
+
+        <!-- Type (enum) -->
+        <InputSelect class="col-span-3 border rounded px-2 py-1"
+                     @bind-Value="Field.Type"
+                     @bind-Value:after="OnTypeChanged">
+            @foreach (FieldDataType t in Enum.GetValues(typeof(FieldDataType)))
+            {
+                <option value="@t">@t</option>
+            }
+        </InputSelect>
+
+        <!-- ItemType (only for Array) -->
+        @if (Field.Type == FieldDataType.Array)
+        {
+            <InputSelect class="col-span-2 border rounded px-2 py-1"
+                         @bind-Value="Field.ItemType"
+                         @bind-Value:after="OnItemTypeChanged">
+                <option value="">-- item type --</option>
+                @foreach (FieldDataType t in Enum.GetValues(typeof(FieldDataType)))
+                {
+                    <option value="@t">@t</option>
+                }
+            </InputSelect>
+        }
+
+        <!-- Actions -->
+        <div class="col-span-2 flex gap-2 justify-end">
+            @if (Field.Type == FieldDataType.Object)
+            {
+                <button type="button" class="text-blue-600 hover:underline" @onclick="AddObjectChild">+ Child</button>
+            }
+            @if (Field.Type == FieldDataType.Array && Field.ItemType == FieldDataType.Object)
+            {
+                <button type="button" class="text-blue-600 hover:underline" @onclick="AddArrayItemChild">+ Item field</button>
+            }
+            <button type="button" class="text-red-600 hover:underline" @onclick="() => OnRemove?.Invoke()">Remove</button>
+        </div>
+    </div>
+
+    <!-- Children for Object -->
+    @if (Field.Type == FieldDataType.Object && Field.Children.Any())
+    {
+        <div class="mt-2">
+            @foreach (var ch in Field.Children)
+            {
+                <FieldRowEditor Field="ch"
+                                Level="@(Level + 1)"
+                                OnRemove="(() => RemoveObjectChild(ch))" />
+            }
+        </div>
+    }
+
+    <!-- Children for Array(Object) -->
+    @if (Field.Type == FieldDataType.Array && Field.ItemType == FieldDataType.Object && Field.ChildrenItems.Any())
+    {
+        <div class="mt-2">
+            @foreach (var ch in Field.ChildrenItems)
+            {
+                <FieldRowEditor Field="ch"
+                                Level="@(Level + 1)"
+                                OnRemove="(() => RemoveArrayItemChild(ch))" />
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public TemplateFieldRow Field { get; set; } = default!;
+    [Parameter] public int Level { get; set; } = 0;
+    [Parameter] public Action? OnRemove { get; set; }
+
+    private void OnTypeChanged()
+    {
+        if (Field.Type != FieldDataType.Array)
+        {
+            Field.ItemType = null;
+            Field.ChildrenItems.Clear();
+        }
+        if (Field.Type != FieldDataType.Object)
+        {
+            Field.Children.Clear();
+        }
+        StateHasChanged();
+    }
+
+    private void OnItemTypeChanged()
+    {
+        if (Field.ItemType != FieldDataType.Object)
+        {
+            Field.ChildrenItems.Clear();
+        }
+        StateHasChanged();
+    }
+
+    private void AddObjectChild()
+    {
+        Field.Children.Add(new TemplateFieldRow
+        {
+            Name = "",
+            Type = FieldDataType.String
+        });
+        StateHasChanged();
+    }
+
+    private void RemoveObjectChild(TemplateFieldRow row)
+    {
+        Field.Children.Remove(row);
+        StateHasChanged();
+    }
+
+    private void AddArrayItemChild()
+    {
+        Field.ChildrenItems.Add(new TemplateFieldRow
+        {
+            Name = "",
+            Type = FieldDataType.String
+        });
+        StateHasChanged();
+    }
+
+    private void RemoveArrayItemChild(TemplateFieldRow row)
+    {
+        Field.ChildrenItems.Remove(row);
+        StateHasChanged();
+    }
+}

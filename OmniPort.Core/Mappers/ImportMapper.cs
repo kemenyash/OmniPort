@@ -14,11 +14,11 @@ namespace OmniPort.Core.Mappers
 
         public IDictionary<string, object?> MapRow(IDictionary<string, object?> sourceRow)
         {
-            var result = new Dictionary<string, object?>();
+            Dictionary<string, object?> result = new Dictionary<string, object?>();
 
-            foreach (var mapping in profile.Mappings)
+            foreach (FieldMapping mapping in profile.Mappings)
             {
-                if (!sourceRow.TryGetValue(mapping.SourceField, out var value))
+                if (!sourceRow.TryGetValue(mapping.SourceField, out object? value))
                 {
                     continue;
                 }

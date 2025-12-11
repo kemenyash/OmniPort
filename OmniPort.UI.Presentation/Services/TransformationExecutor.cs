@@ -8,12 +8,10 @@ using OmniPort.Core.Mappers;
 using OmniPort.Core.Models;
 using OmniPort.Core.Parsers;
 using OmniPort.UI.Presentation.Services;
+using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Xml;
-using System.Net.Http;
-using System.Net;
-using System.IO;
 
 public class TransformationExecutor : ITransformationExecutionService
 {
@@ -33,32 +31,32 @@ public class TransformationExecutor : ITransformationExecutionService
 
     public async Task<string> TransformUploadedFileAsync(int templateId, object file, string outputExtension)
     {
-        var (profile, importType, convertType) = await manager.GetImportProfileForJoinAsync(templateId);
-        using var stream = await ResolveStreamAsync(file, importType);
-        var rows = ParseAndMap(stream, importType, profile);
-        var baseName = GetBaseNameFromUpload(file) ?? $"template-{templateId}";
+        (ImportProfile? profile, SourceType importType, SourceType convertType) = await manager.GetImportProfileForJoinAsync(templateId);
+        using Stream stream = await ResolveStreamAsync(file, importType);
+        IEnumerable<IDictionary<string, object?>> rows = ParseAndMap(stream, importType, profile);
+        string baseName = GetBaseNameFromUpload(file) ?? $"template-{templateId}";
         return await SaveTransformedAsync(rows, outputExtension, baseName);
     }
 
     public async Task<string> TransformFromUrlAsync(int templateId, string url, string outputExtension)
     {
-        var (profile, importType, convertType) = await manager.GetImportProfileForJoinAsync(templateId);
-        using var stream = await OpenHttpStreamWithCapAsync(url, importType);
-        var rows = ParseAndMap(stream, importType, profile);
-        var baseName = MakeSafeFileName(new Uri(url).Segments.LastOrDefault() ?? "remote");
+        (ImportProfile? profile, SourceType importType, SourceType convertType) = await manager.GetImportProfileForJoinAsync(templateId);
+        using Stream stream = await OpenHttpStreamWithCapAsync(url, importType);
+        IEnumerable<IDictionary<string, object?>> rows = ParseAndMap(stream, importType, profile);
+        string baseName = MakeSafeFileName(new Uri(url).Segments.LastOrDefault() ?? "remote");
         return await SaveTransformedAsync(rows, outputExtension, baseName);
     }
 
     public async Task<string> SaveTransformedAsync(IEnumerable<IDictionary<string, object?>> rows, string outputExtension, string baseName)
     {
-        var safeExt = (outputExtension ?? "json").Trim('.').ToLowerInvariant();
+        string safeExt = (outputExtension ?? "json").Trim('.').ToLowerInvariant();
         if (safeExt is not ("csv" or "json" or "xml")) safeExt = "json";
 
-        var exportDir = Path.Combine(env.WebRootPath ?? "wwwroot", "exports");
+        string exportDir = Path.Combine(env.WebRootPath ?? "wwwroot", "exports");
         Directory.CreateDirectory(exportDir);
 
-        var fileName = $"{MakeSafeFileName(baseName)}-{DateTime.UtcNow:yyyyMMddHHmmss}.{safeExt}";
-        var fullPath = Path.Combine(exportDir, fileName);
+        string fileName = $"{MakeSafeFileName(baseName)}-{DateTime.UtcNow:yyyyMMddHHmmss}.{safeExt}";
+        string fullPath = Path.Combine(exportDir, fileName);
 
         switch (safeExt)
         {
@@ -78,10 +76,10 @@ public class TransformationExecutor : ITransformationExecutionService
 
     private static IEnumerable<IDictionary<string, object?>> ParseAndMap(Stream stream, SourceType sourceType, ImportProfile profile)
     {
-        var parser = CreateParser(sourceType);
-        var parsed = parser.Parse(stream);
-        var mapper = new ImportMapper(profile);
-        foreach (var row in parsed)
+        IImportParser parser = CreateParser(sourceType);
+        IEnumerable<IDictionary<string, object?>> parsed = parser.Parse(stream);
+        ImportMapper mapper = new ImportMapper(profile);
+        foreach (IDictionary<string, object?> row in parsed)
             yield return mapper.MapRow(row);
     }
 
@@ -96,9 +94,9 @@ public class TransformationExecutor : ITransformationExecutionService
 
     private async Task<Stream> ResolveStreamAsync(object file, SourceType importType)
     {
-        var cfg = limits.CurrentValue;
-        var maxBytes = cfg.GetMaxFor(importType);
-        var threshold = cfg.InMemoryThresholdBytes;
+        UploadLimits cfg = limits.CurrentValue;
+        long maxBytes = cfg.GetMaxFor(importType);
+        long threshold = cfg.InMemoryThresholdBytes;
 
         switch (file)
         {
@@ -106,7 +104,7 @@ public class TransformationExecutor : ITransformationExecutionService
                 {
                     if (bf.Size > maxBytes)
                         throw new InvalidOperationException($"File {bf.Name} exceeds the maximum size of {maxBytes} bytes.");
-                    using var src = bf.OpenReadStream(maxAllowedSize: maxBytes);
+                    using Stream src = bf.OpenReadStream(maxAllowedSize: maxBytes);
                     return await CopyToCappedAsync(src, maxBytes, threshold);
                 }
 
@@ -114,7 +112,7 @@ public class TransformationExecutor : ITransformationExecutionService
                 {
                     if (form.Length > maxBytes)
                         throw new InvalidOperationException($"File {form.FileName} exceeds the maximum size of {maxBytes} bytes.");
-                    using var src = form.OpenReadStream();
+                    using Stream src = form.OpenReadStream();
                     return await CopyToCappedAsync(src, maxBytes, threshold);
                 }
 
@@ -123,11 +121,11 @@ public class TransformationExecutor : ITransformationExecutionService
 
             case string path when File.Exists(path):
                 {
-                    var fi = new FileInfo(path);
+                    FileInfo fi = new FileInfo(path);
                     if (fi.Length > maxBytes)
                         throw new InvalidOperationException($"File {fi.Name} exceeds the maximum size of {maxBytes} bytes.");
 
-                    using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, useAsync: true);
+                    using FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, useAsync: true);
                     return await CopyToCappedAsync(fs, maxBytes, threshold);
                 }
 
@@ -138,11 +136,11 @@ public class TransformationExecutor : ITransformationExecutionService
 
     private async Task<Stream> OpenHttpStreamWithCapAsync(string url, SourceType importType, CancellationToken ct = default)
     {
-        var cfg = limits.CurrentValue;
-        var maxBytes = cfg.GetMaxFor(importType);
-        var threshold = cfg.InMemoryThresholdBytes;
+        UploadLimits cfg = limits.CurrentValue;
+        long maxBytes = cfg.GetMaxFor(importType);
+        long threshold = cfg.InMemoryThresholdBytes;
 
-        using var handler = new SocketsHttpHandler
+        using SocketsHttpHandler handler = new SocketsHttpHandler
         {
             AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate | DecompressionMethods.Brotli,
             AllowAutoRedirect = true,
@@ -151,40 +149,40 @@ public class TransformationExecutor : ITransformationExecutionService
             CookieContainer = new CookieContainer()
         };
 
-        using var client = new HttpClient(handler, disposeHandler: true);
+        using HttpClient client = new HttpClient(handler, disposeHandler: true);
 
-        using var firstReq = new HttpRequestMessage(HttpMethod.Get, url);
+        using HttpRequestMessage firstReq = new HttpRequestMessage(HttpMethod.Get, url);
         firstReq.Headers.UserAgent.ParseAdd("OmniPort/1.0");
         firstReq.Headers.Accept.ParseAdd("*/*");
 
-        using var firstResp = await client.SendAsync(firstReq, HttpCompletionOption.ResponseHeadersRead, ct);
+        using HttpResponseMessage firstResp = await client.SendAsync(firstReq, HttpCompletionOption.ResponseHeadersRead, ct);
         firstResp.EnsureSuccessStatusCode();
 
-        var contentType = firstResp.Content.Headers.ContentType?.MediaType ?? string.Empty;
-        await using var firstStream = await firstResp.Content.ReadAsStreamAsync(ct);
+        string contentType = firstResp.Content.Headers.ContentType?.MediaType ?? string.Empty;
+        await using Stream firstStream = await firstResp.Content.ReadAsStreamAsync(ct);
 
-        var raw = await CopyToCappedAsync(firstStream, maxBytes, threshold);
-        var seekable = await EnsureSeekableAtZeroAsync(raw);
+        Stream raw = await CopyToCappedAsync(firstStream, maxBytes, threshold);
+        Stream seekable = await EnsureSeekableAtZeroAsync(raw);
 
         if (importType == SourceType.Excel && !LooksLikeZip(seekable))
         {
             string htmlHead = await PeekTextAsync(seekable, 512 * 1024);
             if (IsHtml(contentType, htmlHead))
             {
-                var baseUri = new Uri(url, UriKind.Absolute);
-                if (TryExtractXlsxHref(htmlHead, baseUri, out var directUri))
+                Uri baseUri = new Uri(url, UriKind.Absolute);
+                if (TryExtractXlsxHref(htmlHead, baseUri, out Uri? directUri))
                 {
-                    using var fileReq = new HttpRequestMessage(HttpMethod.Get, directUri);
+                    using HttpRequestMessage fileReq = new HttpRequestMessage(HttpMethod.Get, directUri);
                     fileReq.Headers.UserAgent.ParseAdd("OmniPort/1.0");
                     fileReq.Headers.Referrer = baseUri;
                     fileReq.Headers.Accept.ParseAdd("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,*/*");
 
-                    using var fileResp = await client.SendAsync(fileReq, HttpCompletionOption.ResponseHeadersRead, ct);
+                    using HttpResponseMessage fileResp = await client.SendAsync(fileReq, HttpCompletionOption.ResponseHeadersRead, ct);
                     fileResp.EnsureSuccessStatusCode();
 
-                    await using var fileStream = await fileResp.Content.ReadAsStreamAsync(ct);
-                    var fileRaw = await CopyToCappedAsync(fileStream, maxBytes, threshold);
-                    var fileSeekable = await EnsureSeekableAtZeroAsync(fileRaw);
+                    await using Stream fileStream = await fileResp.Content.ReadAsStreamAsync(ct);
+                    Stream fileRaw = await CopyToCappedAsync(fileStream, maxBytes, threshold);
+                    Stream fileSeekable = await EnsureSeekableAtZeroAsync(fileRaw);
 
                     if (!LooksLikeZip(fileSeekable))
                     {
@@ -218,10 +216,10 @@ public class TransformationExecutor : ITransformationExecutionService
     {
         directUri = null!;
 
-        var idx = IndexOfXlsxHref(html, out string href);
+        int idx = IndexOfXlsxHref(html, out string href);
         if (idx < 0) return false;
 
-        if (!Uri.TryCreate(baseUri, href, out var abs))
+        if (!Uri.TryCreate(baseUri, href, out Uri? abs))
             return false;
 
         directUri = abs;
@@ -230,8 +228,8 @@ public class TransformationExecutor : ITransformationExecutionService
         static int IndexOfXlsxHref(string html, out string href)
         {
             href = string.Empty;
-            var lower = html.ToLowerInvariant();
-            var key = "href";
+            string lower = html.ToLowerInvariant();
+            string key = "href";
             int pos = 0;
             while ((pos = lower.IndexOf(key, pos, StringComparison.Ordinal)) >= 0)
             {
@@ -283,8 +281,8 @@ public class TransformationExecutor : ITransformationExecutionService
 
     private static async Task<Stream> CopyToCappedAsync(Stream source, long maxBytes, long threshold)
     {
-        var ms = new MemoryStream();
-        var buffer = new byte[81920];
+        MemoryStream ms = new MemoryStream();
+        byte[] buffer = new byte[81920];
         long total = 0;
 
         while (true)
@@ -302,8 +300,8 @@ public class TransformationExecutor : ITransformationExecutionService
                 continue;
             }
 
-            var tmp = Path.GetTempFileName();
-            await using (var wr = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true))
+            string tmp = Path.GetTempFileName();
+            await using (FileStream wr = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true))
             {
                 ms.Position = 0;
                 await ms.CopyToAsync(wr);
@@ -332,7 +330,7 @@ public class TransformationExecutor : ITransformationExecutionService
             s.Position = 0;
             return s;
         }
-        var ms = new MemoryStream();
+        MemoryStream ms = new MemoryStream();
         await s.CopyToAsync(ms);
         ms.Position = 0;
         s.Dispose();
@@ -353,8 +351,8 @@ public class TransformationExecutor : ITransformationExecutionService
     {
         if (!s.CanSeek) return "(non-seekable)";
         long pos = s.Position;
-        var toRead = (int)Math.Min(maxBytes, s.Length - s.Position);
-        var buf = new byte[toRead];
+        int toRead = (int)Math.Min(maxBytes, s.Length - s.Position);
+        byte[] buf = new byte[toRead];
         int read = await s.ReadAsync(buf.AsMemory(0, toRead));
         s.Position = pos;
         try { return Encoding.UTF8.GetString(buf, 0, read).Replace("\0", "").Trim(); }
@@ -367,7 +365,7 @@ public class TransformationExecutor : ITransformationExecutionService
     private static string MakeSafeFileName(string name)
     {
         if (string.IsNullOrWhiteSpace(name)) return "export";
-        foreach (var c in Path.GetInvalidFileNameChars())
+        foreach (char c in Path.GetInvalidFileNameChars())
             name = name.Replace(c, '_');
         name = name.Trim('.');
         return string.IsNullOrWhiteSpace(name) ? "export" : name;
@@ -375,30 +373,30 @@ public class TransformationExecutor : ITransformationExecutionService
 
     private static string ToJson(IEnumerable<IDictionary<string, object?>> rows)
     {
-        var opts = new JsonSerializerOptions { WriteIndented = true };
+        JsonSerializerOptions opts = new JsonSerializerOptions { WriteIndented = true };
         return JsonSerializer.Serialize(rows, opts);
     }
 
     private static string ToCsv(IEnumerable<IDictionary<string, object?>> rows)
     {
-        var list = rows.ToList();
+        List<IDictionary<string, object?>> list = rows.ToList();
         if (list.Count == 0) return string.Empty;
 
-        var headers = list.First().Keys.ToList();
-        var sb = new StringBuilder();
+        List<string> headers = list.First().Keys.ToList();
+        StringBuilder sb = new StringBuilder();
         sb.AppendLine(string.Join(",", headers.Select(EscapeCsv)));
 
-        foreach (var row in list)
+        foreach (IDictionary<string, object?>? row in list)
         {
-            var line = string.Join(",", headers.Select(h => EscapeCsv(row.TryGetValue(h, out var v) ? v : null)));
+            string line = string.Join(",", headers.Select(h => EscapeCsv(row.TryGetValue(h, out object? v) ? v : null)));
             sb.AppendLine(line);
         }
         return sb.ToString();
 
         static string EscapeCsv(object? value)
         {
-            var s = value?.ToString() ?? string.Empty;
-            var needsQuotes = s.Contains(',') || s.Contains('"') || s.Contains('\n') || s.Contains('\r');
+            string s = value?.ToString() ?? string.Empty;
+            bool needsQuotes = s.Contains(',') || s.Contains('"') || s.Contains('\n') || s.Contains('\r');
             s = s.Replace("\"", "\"\"");
             return needsQuotes ? $"\"{s}\"" : s;
         }
@@ -406,23 +404,23 @@ public class TransformationExecutor : ITransformationExecutionService
 
     private static string ToXml(IEnumerable<IDictionary<string, object?>> rows)
     {
-        var settings = new XmlWriterSettings
+        XmlWriterSettings settings = new XmlWriterSettings
         {
             Indent = true,
             Encoding = Encoding.UTF8,
             OmitXmlDeclaration = false
         };
 
-        using var sw = new StringWriter();
-        using var xw = XmlWriter.Create(sw, settings);
+        using StringWriter sw = new StringWriter();
+        using XmlWriter xw = XmlWriter.Create(sw, settings);
 
         xw.WriteStartDocument();
         xw.WriteStartElement("rows");
 
-        foreach (var row in rows)
+        foreach (IDictionary<string, object?> row in rows)
         {
             xw.WriteStartElement("row");
-            foreach (var kv in row)
+            foreach (KeyValuePair<string, object?> kv in row)
             {
                 xw.WriteStartElement("field");
                 xw.WriteAttributeString("name", kv.Key);

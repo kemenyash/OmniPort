@@ -1,11 +1,6 @@
 ﻿using OmniPort.Core.Enums;
 using OmniPort.Core.Mappers;
 using OmniPort.Core.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Parsing.Tests
 {
@@ -14,15 +9,15 @@ namespace Parsing.Tests
         [Fact]
         public void Should_Map_Correctly_With_Type_Conversion()
         {
-            var profile = new ImportProfile
+            ImportProfile profile = new ImportProfile
             {
-                Template = new ImportTemplate 
-                { 
+                Template = new ImportTemplate
+                {
                     Fields = new List<TemplateField>
                     {
                         new() { Name = "Name", Type = FieldDataType.String },
                         new() { Name = "Age", Type = FieldDataType.Integer }
-                    } 
+                    }
                 },
                 Mappings = new List<FieldMapping>
             {
@@ -31,14 +26,14 @@ namespace Parsing.Tests
             }
             };
 
-            var sourceRow = new Dictionary<string, object?>
+            Dictionary<string, object?> sourceRow = new Dictionary<string, object?>
             {
                 ["full_name"] = "Kateryna Gromovych",
                 ["years"] = "42"
             };
 
-            var mapper = new ImportMapper(profile);
-            var result = mapper.MapRow(sourceRow);
+            ImportMapper mapper = new ImportMapper(profile);
+            IDictionary<string, object?> result = mapper.MapRow(sourceRow);
 
             Assert.Equal("Kateryna Gromovych", result["Name"]);
             Assert.Equal(42, result["Age"]);

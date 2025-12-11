@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace OmniPort.Core.Enums
+﻿namespace OmniPort.Core.Enums
 {
     public enum FieldDataType
     {
@@ -12,6 +6,8 @@ namespace OmniPort.Core.Enums
         Integer,
         Decimal,
         Boolean,
-        DateTime
+        DateTime,
+        Array,
+        Object
     }
 }

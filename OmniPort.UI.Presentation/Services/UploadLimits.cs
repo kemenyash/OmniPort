@@ -1,9 +1,4 @@
 ﻿using OmniPort.Core.Enums;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace OmniPort.UI.Presentation.Services
 {
@@ -15,7 +10,7 @@ namespace OmniPort.UI.Presentation.Services
 
         public long GetMaxFor(SourceType type)
         {
-            var key = type switch
+            string key = type switch
             {
                 SourceType.Excel => "Excel",
                 SourceType.CSV => "Csv",
@@ -23,7 +18,7 @@ namespace OmniPort.UI.Presentation.Services
                 SourceType.XML => "Xml",
                 _ => "Default"
             };
-            return PerType.TryGetValue(key, out var v) ? v : MaxUploadBytes;
+            return PerType.TryGetValue(key, out long v) ? v : MaxUploadBytes;
         }
     }
 

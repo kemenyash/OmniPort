@@ -1,0 +1,13 @@
+﻿@inject NavigationManager Nav
+
+@code {
+    protected override void OnInitialized()
+    {
+        var uri = new Uri(Nav.Uri);
+        if (!uri.AbsolutePath.Equals("/login", StringComparison.OrdinalIgnoreCase))
+        {
+            var returnUrl = Uri.EscapeDataString(uri.PathAndQuery);
+            Nav.NavigateTo($"/login?returnUrl={returnUrl}", forceLoad: true);
+        }
+    }
+}

@@ -1,219 +1,245 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using OmniPort.Core.Interfaces;
 using OmniPort.Core.Records;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace OmniPort.UI.Presentation
 {
-    public sealed class AppSyncContext : IAppSyncContext
+    public class AppSyncContext : IAppSyncContext
     {
-        private readonly IServiceProvider _root;
-        private readonly SemaphoreSlim _gate = new(1, 1);
+        private readonly IServiceProvider serviceProvider;
+        private readonly SemaphoreSlim gate;
 
         public event Action? Changed;
 
-        // Backing stores (mutable only inside the lock)
-        private List<TemplateSummaryDto> _templates = new();
-        private List<BasicTemplateDto> _basicTemplatesFull = new();
-        private List<JoinedTemplateSummaryDto> _joined = new();
-        private List<FileConversionHistoryDto> _fileHist = new();
-        private List<UrlConversionHistoryDto> _urlHist = new();
-        private List<WatchedUrlDto> _watched = new();
+        private List<TemplateSummaryDto> templates;
+        private List<BasicTemplateDto> basicTemplatesFull;
+        private List<JoinedTemplateSummaryDto> joinedTemplates;
+        private List<FileConversionHistoryDto> fileConversionsHistory;
+        private List<UrlConversionHistoryDto> urlConvertsionsHistory;
+        private List<WatchedUrlDto> watchedUrls;
 
-        // Read-only views for UI binding
-        public IReadOnlyList<TemplateSummaryDto> Templates => _templates;
-        public IReadOnlyList<BasicTemplateDto> BasicTemplatesFull => _basicTemplatesFull;
-        public IReadOnlyList<JoinedTemplateSummaryDto> JoinedTemplates => _joined;
-        public IReadOnlyList<FileConversionHistoryDto> FileConversions => _fileHist;
-        public IReadOnlyList<UrlConversionHistoryDto> UrlConversions => _urlHist;
-        public IReadOnlyList<WatchedUrlDto> WatchedUrls => _watched;
+        public IReadOnlyList<TemplateSummaryDto> Templates => templates;
+        public IReadOnlyList<BasicTemplateDto> BasicTemplatesFull => basicTemplatesFull;
+        public IReadOnlyList<JoinedTemplateSummaryDto> JoinedTemplates => joinedTemplates;
+        public IReadOnlyList<FileConversionHistoryDto> FileConversions => fileConversionsHistory;
+        public IReadOnlyList<UrlConversionHistoryDto> UrlConversions => urlConvertsionsHistory;
+        public IReadOnlyList<WatchedUrlDto> WatchedUrls => watchedUrls;
 
-        public AppSyncContext(IServiceProvider root) => _root = root;
-
-        public async Task InitializeAsync(CancellationToken ct = default)
+        public AppSyncContext(IServiceProvider serviceProvider)
         {
-            await _gate.WaitAsync(ct);
+            gate = new(1, 1);
+            this.serviceProvider = serviceProvider;
+        }
+
+        public async Task Initialize(CancellationToken ct = default)
+        {
+            await gate.WaitAsync(ct);
             try
             {
-                using var scope = _root.CreateScope();
-                var tm = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
+                using IServiceScope scope = serviceProvider.CreateScope();
+                ITemplateManager templateManager = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
 
-                var templates = (await tm.GetBasicTemplatesSummaryAsync()).ToList();
-                var full = new List<BasicTemplateDto>();
-                foreach (var t in templates) // fan-out kept to preserve existing API
+                templates = (await templateManager.GetBasicTemplatesSummary()).ToList() ?? new List<TemplateSummaryDto>();
+                basicTemplatesFull = new List<BasicTemplateDto>();
+
+                foreach (TemplateSummaryDto template in templates)
                 {
-                    var dto = await tm.GetBasicTemplateAsync(t.Id);
-                    if (dto != null) full.Add(dto);
+                    BasicTemplateDto? basicTemplate = await templateManager.GetBasicTemplate(template.Id);
+                    if (basicTemplate != null)
+                    {
+                        basicTemplatesFull.Add(basicTemplate);
+                    }
                 }
 
-                var joined = (await tm.GetJoinedTemplatesAsync()).ToList();
-                var fileH = (await tm.GetFileConversionHistoryAsync()).OrderByDescending(x => x.ConvertedAt).ToList();
-                var urlH = (await tm.GetUrlConversionHistoryAsync()).OrderByDescending(x => x.ConvertedAt).ToList();
-                var watched = (await tm.GetWatchedUrlsAsync()).ToList();
-
-                _templates = templates;
-                _basicTemplatesFull = full;
-                _joined = joined;
-                _fileHist = fileH;
-                _urlHist = urlH;
-                _watched = watched;
+                joinedTemplates = (await templateManager.GetJoinedTemplates()).ToList() ?? new List<JoinedTemplateSummaryDto>();
+                fileConversionsHistory = (await templateManager.GetFileConversionHistory()).OrderByDescending(x => x.ConvertedAt).ToList() ?? new List<FileConversionHistoryDto>();
+                urlConvertsionsHistory = (await templateManager.GetUrlConversionHistory()).OrderByDescending(x => x.ConvertedAt).ToList() ?? new List<UrlConversionHistoryDto>();
+                watchedUrls = (await templateManager.GetWatchedUrls()).ToList();
             }
             finally
             {
-                _gate.Release();
+                gate.Release();
             }
             Changed?.Invoke();
         }
-
-        public async Task RefreshAllAsync(CancellationToken ct = default) => await InitializeAsync(ct);
-
-        // ---------- Basic Templates ----------
-
-        public async Task CreateBasicTemplateAsync(CreateBasicTemplateDto dto, CancellationToken ct = default)
+        public async Task RefreshAll(CancellationToken ct = default)
         {
-            await _gate.WaitAsync(ct);
+            await Initialize(ct);
+        }
+
+        public async Task CreateBasicTemplate(CreateBasicTemplateDto basicTemplateCreation, CancellationToken ct = default)
+        {
+            await gate.WaitAsync(ct);
             try
             {
-                using var scope = _root.CreateScope();
-                var tm = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
-                await tm.CreateBasicTemplateAsync(dto);
+                using IServiceScope scope = serviceProvider.CreateScope();
+                ITemplateManager templateManager = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
+                await templateManager.CreateBasicTemplate(basicTemplateCreation);
 
-                // refresh minimal sets affected
-                var summaries = (await tm.GetBasicTemplatesSummaryAsync()).ToList();
-                var newFull = new List<BasicTemplateDto>();
-                foreach (var s in summaries)
+                List<TemplateSummaryDto> summaries = (await templateManager.GetBasicTemplatesSummary()).ToList();
+                List<BasicTemplateDto> newFull = new List<BasicTemplateDto>();
+                foreach (TemplateSummaryDto? s in summaries)
                 {
-                    var one = await tm.GetBasicTemplateAsync(s.Id);
+                    BasicTemplateDto? one = await templateManager.GetBasicTemplate(s.Id);
                     if (one != null) newFull.Add(one);
                 }
-                _templates = summaries;
-                _basicTemplatesFull = newFull;
+                templates = summaries;
+                basicTemplatesFull = newFull;
             }
-            finally { _gate.Release(); }
+            finally
+            {
+                gate.Release();
+            }
+
             Changed?.Invoke();
         }
-
-        public async Task UpdateBasicTemplateAsync(UpdateBasicTemplateDto dto, CancellationToken ct = default)
+        public async Task UpdateBasicTemplate(UpdateBasicTemplateDto basicTemplateUpdating, CancellationToken ct = default)
         {
-            await _gate.WaitAsync(ct);
+            await gate.WaitAsync(ct);
             try
             {
-                using var scope = _root.CreateScope();
-                var tm = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
-                await tm.UpdateBasicTemplateAsync(dto);
+                using IServiceScope scope = serviceProvider.CreateScope();
+                ITemplateManager templateManager = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
+                await templateManager.UpdateBasicTemplate(basicTemplateUpdating);
 
-                // update caches
-                var updated = await tm.GetBasicTemplateAsync(dto.Id);
+                BasicTemplateDto? updated = await templateManager.GetBasicTemplate(basicTemplateUpdating.Id);
                 if (updated != null)
                 {
-                    var idx = _basicTemplatesFull.FindIndex(x => x.Id == dto.Id);
-                    if (idx >= 0) _basicTemplatesFull[idx] = updated;
-                    else _basicTemplatesFull.Add(updated);
+                    int index = basicTemplatesFull.FindIndex(x => x.Id == basicTemplateUpdating.Id);
+                    if (index >= 0)
+                    {
+                        basicTemplatesFull[index] = updated;
+                    }
+                    else
+                    {
+                        basicTemplatesFull.Add(updated);
+                    }
                 }
-                var summaries = (await tm.GetBasicTemplatesSummaryAsync()).ToList();
-                _templates = summaries;
+
+                List<TemplateSummaryDto> summaries = (await templateManager.GetBasicTemplatesSummary()).ToList();
+                templates = summaries;
             }
-            finally { _gate.Release(); }
+            finally
+            {
+                gate.Release();
+            }
+
+            Changed?.Invoke();
+        }
+        public async Task DeleteBasicTemplate(int id, CancellationToken ct = default)
+        {
+            await gate.WaitAsync(ct);
+            try
+            {
+                using IServiceScope scope = serviceProvider.CreateScope();
+                ITemplateManager templateManager = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
+                await templateManager.DeleteBasicTemplate(id);
+
+                basicTemplatesFull.RemoveAll(x => x.Id == id);
+                templates = (await templateManager.GetBasicTemplatesSummary()).ToList();
+
+                joinedTemplates = (await templateManager.GetJoinedTemplates()).ToList();
+                fileConversionsHistory = (await templateManager.GetFileConversionHistory()).OrderByDescending(x => x.ConvertedAt).ToList();
+                urlConvertsionsHistory = (await templateManager.GetUrlConversionHistory()).OrderByDescending(x => x.ConvertedAt).ToList();
+            }
+            finally
+            {
+                gate.Release();
+            }
+
             Changed?.Invoke();
         }
 
-        public async Task DeleteBasicTemplateAsync(int id, CancellationToken ct = default)
+        public async Task CreateMappingTemplate(CreateMappingTemplateDto mapingTemplateCreating, CancellationToken ct = default)
         {
-            await _gate.WaitAsync(ct);
+            await gate.WaitAsync(ct);
+
             try
             {
-                using var scope = _root.CreateScope();
-                var tm = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
-                await tm.DeleteBasicTemplateAsync(id);
+                using IServiceScope scope = serviceProvider.CreateScope();
+                ITemplateManager templateManager = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
+                await templateManager.CreateMappingTemplate(mapingTemplateCreating);
 
-                _basicTemplatesFull.RemoveAll(x => x.Id == id);
-                _templates = (await tm.GetBasicTemplatesSummaryAsync()).ToList();
-
-                _joined = (await tm.GetJoinedTemplatesAsync()).ToList();
-                _fileHist = (await tm.GetFileConversionHistoryAsync()).OrderByDescending(x => x.ConvertedAt).ToList();
-                _urlHist = (await tm.GetUrlConversionHistoryAsync()).OrderByDescending(x => x.ConvertedAt).ToList();
+                joinedTemplates = (await templateManager.GetJoinedTemplates()).ToList();
             }
-            finally { _gate.Release(); }
+            finally
+            {
+                gate.Release();
+            }
+
+            Changed?.Invoke();
+        }
+        public async Task DeleteMappingTemplate(int mappingId, CancellationToken ct = default)
+        {
+            await gate.WaitAsync(ct);
+
+            try
+            {
+                using IServiceScope scope = serviceProvider.CreateScope();
+                ITemplateManager templateManager = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
+                await templateManager.DeleteMappingTemplate(mappingId);
+
+                joinedTemplates = (await templateManager.GetJoinedTemplates()).ToList();
+            }
+            finally
+            {
+                gate.Release();
+            }
+
             Changed?.Invoke();
         }
 
-        // ---------- Mapping Templates ----------
-
-        public async Task CreateMappingTemplateAsync(CreateMappingTemplateDto dto, CancellationToken ct = default)
+        public async Task AddFileConversion(FileConversionHistoryDto fileConversionHistory, CancellationToken ct = default)
         {
-            await _gate.WaitAsync(ct);
+            await gate.WaitAsync(ct);
             try
             {
-                using var scope = _root.CreateScope();
-                var tm = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
-                await tm.CreateMappingTemplateAsync(dto);
-
-                _joined = (await tm.GetJoinedTemplatesAsync()).ToList();
+                using IServiceScope scope = serviceProvider.CreateScope();
+                ITemplateManager templateManager = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
+                await templateManager.AddFileConversion(fileConversionHistory);
+                fileConversionsHistory = (await templateManager.GetFileConversionHistory()).OrderByDescending(x => x.ConvertedAt).ToList();
             }
-            finally { _gate.Release(); }
+            finally
+            {
+                gate.Release();
+            }
+
+            Changed?.Invoke();
+        }
+        public async Task AddUrlConversion(UrlConversionHistoryDto urlConversionHistory, CancellationToken ct = default)
+        {
+            await gate.WaitAsync(ct);
+
+            try
+            {
+                using IServiceScope scope = serviceProvider.CreateScope();
+                ITemplateManager tm = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
+                await tm.AddUrlConversion(urlConversionHistory);
+                urlConvertsionsHistory = (await tm.GetUrlConversionHistory()).OrderByDescending(x => x.ConvertedAt).ToList();
+            }
+            finally
+            {
+                gate.Release();
+            }
+
             Changed?.Invoke();
         }
 
-        public async Task DeleteMappingTemplateAsync(int mappingId, CancellationToken ct = default)
+        public async Task AddWatchedUrl(AddWatchedUrlDto watchedUrlAdding, CancellationToken ct = default)
         {
-            await _gate.WaitAsync(ct);
+            await gate.WaitAsync(ct);
             try
             {
-                using var scope = _root.CreateScope();
-                var tm = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
-                await tm.DeleteMappingTemplateAsync(mappingId);
-
-                _joined = (await tm.GetJoinedTemplatesAsync()).ToList();
+                using IServiceScope scope = serviceProvider.CreateScope();
+                ITemplateManager templateManager = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
+                await templateManager.AddWatchedUrl(watchedUrlAdding.Url, watchedUrlAdding.IntervalMinutes, watchedUrlAdding.MappingTemplateId);
+                watchedUrls = (await templateManager.GetWatchedUrls()).ToList();
             }
-            finally { _gate.Release(); }
-            Changed?.Invoke();
-        }
-
-        // ---------- Conversions & Watchlist ----------
-
-        public async Task AddFileConversionAsync(FileConversionHistoryDto dto, CancellationToken ct = default)
-        {
-            await _gate.WaitAsync(ct);
-            try
+            finally
             {
-                using var scope = _root.CreateScope();
-                var tm = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
-                await tm.AddFileConversionAsync(dto);
-                _fileHist = (await tm.GetFileConversionHistoryAsync()).OrderByDescending(x => x.ConvertedAt).ToList();
+                gate.Release();
             }
-            finally { _gate.Release(); }
-            Changed?.Invoke();
-        }
 
-        public async Task AddUrlConversionAsync(UrlConversionHistoryDto dto, CancellationToken ct = default)
-        {
-            await _gate.WaitAsync(ct);
-            try
-            {
-                using var scope = _root.CreateScope();
-                var tm = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
-                await tm.AddUrlConversionAsync(dto);
-                _urlHist = (await tm.GetUrlConversionHistoryAsync()).OrderByDescending(x => x.ConvertedAt).ToList();
-            }
-            finally { _gate.Release(); }
-            Changed?.Invoke();
-        }
-
-        public async Task AddWatchedUrlAsync(AddWatchedUrlDto dto, CancellationToken ct = default)
-        {
-            await _gate.WaitAsync(ct);
-            try
-            {
-                using var scope = _root.CreateScope();
-                var tm = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
-                await tm.AddWatchedUrlAsync(dto.Url, dto.IntervalMinutes, dto.MappingTemplateId);
-                _watched = (await tm.GetWatchedUrlsAsync()).ToList();
-            }
-            finally { _gate.Release(); }
             Changed?.Invoke();
         }
     }
