@@ -124,5 +124,5 @@ app.MapPost("/auth/logout", async (SignInManager<AppUser> signInManager) =>
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-await app.Services.GetRequiredService<IAppSyncContext>().InitializeAsync();
+await app.Services.GetRequiredService<IAppSyncContext>().Initialize();
 app.Run();

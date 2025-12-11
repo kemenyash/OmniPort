@@ -38,14 +38,14 @@ namespace OmniPort.UI.Presentation.ViewModels
             TargetFlattened = new List<FlatField>();
             JoinedTemplates = new List<JoinedTemplateSummaryDto>();
 
-            _ = InitializeAsync(); // фоновий старт, без коду в в’юсі
+            _ = InitializeAsync();
         }
 
         private async Task InitializeAsync()
         {
             if (!syncContext.Templates.Any())
             {
-                await syncContext.InitializeAsync();
+                await syncContext.Initialize();
             }
 
             Templates = syncContext.BasicTemplatesFull.ToList();
@@ -119,16 +119,93 @@ namespace OmniPort.UI.Presentation.ViewModels
                 Mappings: mappings
             );
 
-            await syncContext.CreateMappingTemplateAsync(creatingMappingTemplate);
-            await syncContext.RefreshAllAsync();
+            await syncContext.CreateMappingTemplate(creatingMappingTemplate);
+            await syncContext.RefreshAll();
             OnChanged();
         }
 
         public async Task DeleteJoinTemplate(int mappingTemplateId)
         {
-            await syncContext.DeleteMappingTemplateAsync(mappingTemplateId);
-            await syncContext.RefreshAllAsync();
+            await syncContext.DeleteMappingTemplate(mappingTemplateId);
+            await syncContext.RefreshAll();
             OnChanged();
+        }
+
+        public bool IsTopOptionCandidate(FlatField flatField)
+        {
+            var result = (!flatField.Path.Contains('.') && !flatField.Path.Contains("[]"))
+               || flatField.Type == FieldDataType.Object
+               || flatField.Type == FieldDataType.Array;
+            return result;
+        }
+
+
+        public string? GetTopSelectValue(string? fullPath)
+        {
+            if (string.IsNullOrWhiteSpace(fullPath)) return null;
+            var dot = fullPath.IndexOf('.');
+            return dot >= 0 ? fullPath[..dot] : fullPath;
+        }
+
+        public int GetDepth(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return 0;
+
+            var dotDepth = path.Count(c => c == '.');
+            var arrDepth = path.Split("[]").Length - 1;
+
+            return dotDepth + arrDepth;
+        }
+
+        private FieldDataType? GetSourceType(string? sourcePath)
+        {
+            return string.IsNullOrWhiteSpace(sourcePath)
+               ? null
+               : SourceFlattened.FirstOrDefault(x => x.Path == sourcePath).Type;
+        }
+
+        public bool HasDescendants(string sourcePath)
+        {
+            var sourceType = GetSourceType(sourcePath);
+            if (sourceType == FieldDataType.Object)
+            {
+                return SourceFlattened.Any(x =>
+                    x.Path.StartsWith(sourcePath + ".", StringComparison.Ordinal));
+            }
+
+            if (sourceType == FieldDataType.Array)
+            {
+                return SourceFlattened.Any(x =>
+                    x.Path.StartsWith(sourcePath + "[]", StringComparison.Ordinal));
+            }
+
+            return false;
+        }
+
+        public IEnumerable<FlatField> GetDescendants(string sourcePath)
+        {
+            var sourceType = GetSourceType(sourcePath);
+            if (sourceType == FieldDataType.Object)
+            {
+                return SourceFlattened
+                    .Where(x => x.Path.StartsWith(sourcePath + ".", StringComparison.Ordinal))
+                    .OrderBy(x => x.Path, StringComparer.OrdinalIgnoreCase);
+            }
+
+            if (sourceType == FieldDataType.Array)
+            {
+                return SourceFlattened
+                    .Where(x => x.Path.StartsWith(sourcePath + "[]", StringComparison.Ordinal))
+                    .OrderBy(x => x.Path, StringComparer.OrdinalIgnoreCase);
+            }
+
+            return Enumerable.Empty<FlatField>();
+        }
+
+        public string GetIndentedLabel(string path, FieldDataType type, int depth)
+        {
+            var result = new string(' ', depth * 2) + path + $" ({type})";
+            return result;
         }
 
         private void OnChanged()
@@ -227,59 +304,5 @@ namespace OmniPort.UI.Presentation.ViewModels
                 .ThenBy(flatField => flatField.Path, StringComparer.OrdinalIgnoreCase)
                 .ToList();
         }
-
-        public bool IsTopOptionCandidate(FlatField s)
-            => (!s.Path.Contains('.') && !s.Path.Contains("[]"))
-               || s.Type == FieldDataType.Object
-               || s.Type == FieldDataType.Array;
-
-        public string? GetTopSelectValue(string? fullPath)
-        {
-            if (string.IsNullOrWhiteSpace(fullPath)) return null;
-            var dot = fullPath.IndexOf('.');
-            return dot >= 0 ? fullPath[..dot] : fullPath;
-        }
-
-        public int GetDepth(string path)
-        {
-            if (string.IsNullOrWhiteSpace(path)) return 0;
-            var dotDepth = path.Count(c => c == '.');
-            var arrDepth = path.Split("[]").Length - 1;
-            return dotDepth + arrDepth;
-        }
-
-        private FieldDataType? GetSourceType(string? sourcePath)
-            => string.IsNullOrWhiteSpace(sourcePath)
-               ? null
-               : SourceFlattened.FirstOrDefault(x => x.Path == sourcePath).Type;
-
-        public bool HasDescendants(string sourcePath)
-        {
-            var t = GetSourceType(sourcePath);
-            if (t == FieldDataType.Object)
-                return SourceFlattened.Any(x =>
-                    x.Path.StartsWith(sourcePath + ".", StringComparison.Ordinal));
-            if (t == FieldDataType.Array)
-                return SourceFlattened.Any(x =>
-                    x.Path.StartsWith(sourcePath + "[]", StringComparison.Ordinal));
-            return false;
-        }
-
-        public IEnumerable<FlatField> GetDescendants(string sourcePath)
-        {
-            var t = GetSourceType(sourcePath);
-            if (t == FieldDataType.Object)
-                return SourceFlattened
-                    .Where(x => x.Path.StartsWith(sourcePath + ".", StringComparison.Ordinal))
-                    .OrderBy(x => x.Path, StringComparer.OrdinalIgnoreCase);
-            if (t == FieldDataType.Array)
-                return SourceFlattened
-                    .Where(x => x.Path.StartsWith(sourcePath + "[]", StringComparison.Ordinal))
-                    .OrderBy(x => x.Path, StringComparer.OrdinalIgnoreCase);
-            return Enumerable.Empty<FlatField>();
-        }
-
-        public string GetIndentedLabel(string path, FieldDataType type, int depth)
-            => new string(' ', depth * 2) + path + $" ({type})";
     }
 }

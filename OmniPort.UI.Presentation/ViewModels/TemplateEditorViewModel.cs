@@ -4,22 +4,16 @@ using OmniPort.Core.Records;
 using OmniPort.UI.Presentation.Models;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography.Xml;
 using System.Threading.Tasks;
 
 namespace OmniPort.UI.Presentation.ViewModels
 {
     public class TemplateEditorViewModel
     {
-        private readonly IAppSyncContext _sync;
-
-        public TemplateEditorViewModel(IAppSyncContext sync) => _sync = sync;
-
-        public List<TemplateSummaryDto> Templates { get; private set; } = new();
-
+        private readonly IAppSyncContext sync;
         public bool IsModalOpen { get; private set; }
         public int? EditingTemplateId { get; private set; }
-        public TemplateEditForm CurrentTemplate { get; private set; } = new();
-        public List<TemplateFieldRow> CurrentFields => CurrentTemplate.Fields;
 
         public SourceType SelectedSourceType
         {
@@ -27,17 +21,29 @@ namespace OmniPort.UI.Presentation.ViewModels
             set => CurrentTemplate.SourceType = value;
         }
 
-        public async Task LoadTemplatesAsync()
+        public TemplateEditForm CurrentTemplate { get; private set; }
+        public List<TemplateSummaryDto> Templates { get; private set; }
+        public List<TemplateFieldRow> CurrentFields => CurrentTemplate.Fields;
+
+
+        public TemplateEditorViewModel(IAppSyncContext sync)
         {
-            if (!_sync.Templates.Any())
-                await _sync.InitializeAsync();
-            Templates = _sync.Templates.ToList();
-            _sync.Changed += OnChanged;
+            this.sync = sync;
+            CurrentTemplate = new TemplateEditForm();
+            Templates = new List<TemplateSummaryDto>();
+
+            _ = LoadTemplates();
         }
 
-        private void OnChanged()
+        
+        public async Task LoadTemplates()
         {
-            Templates = _sync.Templates.ToList();
+            if (!sync.Templates.Any())
+            {
+                await sync.Initialize();
+            }
+            Templates = sync.Templates.ToList();
+            sync.Changed += OnChanged;
         }
 
         public void StartCreate()
@@ -53,24 +59,23 @@ namespace OmniPort.UI.Presentation.ViewModels
             };
             IsModalOpen = true;
         }
-
-        public async Task StartEditAsync(int id)
+        public async Task StartEdit(int id)
         {
-            var full = _sync.BasicTemplatesFull.FirstOrDefault(x => x.Id == id);
+            var full = sync.BasicTemplatesFull.FirstOrDefault(x => x.Id == id);
             if (full == null) return;
 
             EditingTemplateId = full.Id;
 
-            TemplateFieldRow ToRow(TemplateFieldDto f)
+            TemplateFieldRow ToRow(TemplateFieldDto templateField)
             {
                 return new TemplateFieldRow
                 {
-                    Id = f.Id,
-                    Name = f.Name,
-                    Type = f.Type,
-                    ItemType = f.ItemType,
-                    Children = (f.Children ?? Array.Empty<TemplateFieldDto>()).Select(ToRow).ToList(),
-                    ChildrenItems = (f.ChildrenItems ?? Array.Empty<TemplateFieldDto>()).Select(ToRow).ToList()
+                    Id = templateField.Id,
+                    Name = templateField.Name,
+                    Type = templateField.Type,
+                    ItemType = templateField.ItemType,
+                    Children = (templateField.Children ?? Array.Empty<TemplateFieldDto>()).Select(ToRow).ToList(),
+                    ChildrenItems = (templateField.ChildrenItems ?? Array.Empty<TemplateFieldDto>()).Select(ToRow).ToList()
                 };
             }
 
@@ -85,20 +90,22 @@ namespace OmniPort.UI.Presentation.ViewModels
             IsModalOpen = true;
             await Task.CompletedTask;
         }
-
-
-        public void AddField() =>
-            CurrentTemplate.Fields.Add(new TemplateFieldRow { Name = "", Type = FieldDataType.String });
-
-        public void RemoveField(TemplateFieldRow row) => CurrentTemplate.Fields.Remove(row);
-
         public void CancelEdit()
         {
             IsModalOpen = false;
             EditingTemplateId = null;
         }
 
-        public async Task SaveAsync()
+        public void AddField()
+        {
+            CurrentTemplate.Fields.Add(new TemplateFieldRow { Name = "", Type = FieldDataType.String });
+        }
+        public void RemoveField(TemplateFieldRow row)
+        {
+            CurrentTemplate.Fields.Remove(row);
+        }
+
+        public async Task Save()
         {
             if (EditingTemplateId is null)
             {
@@ -107,7 +114,7 @@ namespace OmniPort.UI.Presentation.ViewModels
                     CurrentTemplate.SourceType,
                     CurrentTemplate.Fields.Select(ToCreate).ToList()
                 );
-                await _sync.CreateBasicTemplateAsync(create);
+                await sync.CreateBasicTemplate(create);
             }
             else
             {
@@ -117,41 +124,56 @@ namespace OmniPort.UI.Presentation.ViewModels
                     CurrentTemplate.SourceType,
                     CurrentTemplate.Fields.Select(ToUpsert).ToList()
                 );
-                await _sync.UpdateBasicTemplateAsync(update);
+                await sync.UpdateBasicTemplate(update);
             }
 
             IsModalOpen = false;
         }
-
-        public async Task DeleteAsync(int id) => await _sync.DeleteBasicTemplateAsync(id);
-
-        private static TemplateFieldRow ToRow(TemplateFieldDto f) => new()
+        public async Task Delete(int id)
         {
-            Id = f.Id,
-            Name = f.Name,
-            Type = f.Type,
-            ItemType = f.ItemType,
-            Children = (f.Children ?? new List<TemplateFieldDto>()).Select(ToRow).ToList(),
-            ChildrenItems = (f.ChildrenItems ?? new List<TemplateFieldDto>()).Select(ToRow).ToList()
-        };
+            await sync.DeleteBasicTemplate(id);
+        }
+        
+        private void OnChanged()
+        {
+            Templates = sync.Templates.ToList();
+        }
 
-        private static CreateTemplateFieldDto ToCreate(TemplateFieldRow r) =>
-            new(
-                Name: r.Name,
-                Type: r.Type,
-                ItemType: r.ItemType,
-                Children: (r.Children ?? new List<TemplateFieldRow>()).Select(ToCreate).ToList(),
-                ChildrenItems: (r.ChildrenItems ?? new List<TemplateFieldRow>()).Select(ToCreate).ToList()
-            );
+        private static TemplateFieldRow ToRow(TemplateFieldDto field)
+        {
+            return new TemplateFieldRow()
+            {
+                Id = field.Id,
+                Name = field.Name,
+                Type = field.Type,
+                ItemType = field.ItemType,
+                Children = (field.Children ?? new List<TemplateFieldDto>()).Select(ToRow).ToList(),
+                ChildrenItems = (field.ChildrenItems ?? new List<TemplateFieldDto>()).Select(ToRow).ToList()
 
-        private static UpsertTemplateFieldDto ToUpsert(TemplateFieldRow r) =>
-            new(
-                Id: r.Id,
-                Name: r.Name,
-                Type: r.Type,
-                ItemType: r.ItemType,
-                Children: (r.Children ?? new List<TemplateFieldRow>()).Select(ToUpsert).ToList(),
-                ChildrenItems: (r.ChildrenItems ?? new List<TemplateFieldRow>()).Select(ToUpsert).ToList()
+            };
+        }
+
+        private static CreateTemplateFieldDto ToCreate(TemplateFieldRow row)
+        {
+            return new CreateTemplateFieldDto(
+                 Name: row.Name,
+                 Type: row.Type,
+                 ItemType: row.ItemType,
+                 Children: (row.Children ?? new List<TemplateFieldRow>()).Select(ToCreate).ToList(),
+                 ChildrenItems: (row.ChildrenItems ?? new List<TemplateFieldRow>()).Select(ToCreate).ToList()
+             );
+        }
+
+        private static UpsertTemplateFieldDto ToUpsert(TemplateFieldRow row)
+        {
+            return new UpsertTemplateFieldDto(
+                Id: row.Id,
+                Name: row.Name,
+                Type: row.Type,
+                ItemType: row.ItemType,
+                Children: (row.Children ?? new List<TemplateFieldRow>()).Select(ToUpsert).ToList(),
+                ChildrenItems: (row.ChildrenItems ?? new List<TemplateFieldRow>()).Select(ToUpsert).ToList()
             );
+        }
     }
 }

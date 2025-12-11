@@ -26,8 +26,14 @@
                     <td class="p-3">@tpl.FieldsCount</td>
                     <td class="p-3">@tpl.SourceType</td>
                     <td class="p-3 flex gap-2">
-                        <button class="text-blue-600 hover:underline" @onclick="() => ViewModel.StartEditAsync(tpl.Id)">Edit</button>
-                        <button class="text-red-600 hover:underline" @onclick="() => ViewModel.DeleteAsync(tpl.Id)">Delete</button>
+                        <button class="text-blue-600 hover:underline"
+                                @onclick="() => ViewModel.StartEdit(tpl.Id)">
+                            Edit
+                        </button>
+                        <button class="text-red-600 hover:underline"
+                                @onclick="() => ViewModel.Delete(tpl.Id)">
+                            Delete
+                        </button>
                     </td>
                 </tr>
             }
@@ -42,28 +48,36 @@
 </table>
 
 <div class="flex gap-4 mb-8">
-    <button class="bg-blue-600 text-white px-4 py-2 rounded" @onclick="ViewModel.StartCreate">Create Template</button>
+    <button class="bg-blue-600 text-white px-4 py-2 rounded"
+            @onclick="ViewModel.StartCreate">
+        Create Template
+    </button>
 </div>
 
 @if (ViewModel.IsModalOpen)
 {
     <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-3xl" @onclick:stopPropagation>
-            <h2 class="text-xl font-semibold mb-4">@((ViewModel.EditingTemplateId == null) ? "Create Template" : "Edit Template")</h2>
+            <h2 class="text-xl font-semibold mb-4">
+                @((ViewModel.EditingTemplateId == null) ? "Create Template" : "Edit Template")
+            </h2>
 
-            <EditForm Model="@ViewModel.CurrentTemplate" OnValidSubmit="ViewModel.SaveAsync">
+            <EditForm Model="@ViewModel.CurrentTemplate"
+                      OnValidSubmit="ViewModel.Save">
                 <DataAnnotationsValidator />
                 <ValidationSummary />
 
                 <div class="mb-4">
                     <label class="block font-medium mb-1">Template Name</label>
-                    <InputText class="w-full border rounded px-3 py-2" @bind-Value="ViewModel.CurrentTemplate.Name" />
+                    <InputText class="w-full border rounded px-3 py-2"
+                               @bind-Value="ViewModel.CurrentTemplate.Name" />
                     <ValidationMessage For="@(() => ViewModel.CurrentTemplate.Name)" />
                 </div>
 
                 <div class="mb-4">
                     <label class="block font-medium mb-1">Source Type</label>
-                    <InputSelect class="w-full border rounded px-3 py-2" @bind-Value="ViewModel.SelectedSourceType">
+                    <InputSelect class="w-full border rounded px-3 py-2"
+                                 @bind-Value="ViewModel.SelectedSourceType">
                         @foreach (SourceType type in Enum.GetValues(typeof(SourceType)))
                         {
                             <option value="@type">@type</option>
@@ -74,7 +88,11 @@
                 <div class="mb-4">
                     <div class="flex items-center justify-between">
                         <label class="block font-medium mb-1">Fields</label>
-                        <button type="button" class="text-blue-600 hover:underline" @onclick="ViewModel.AddField">+ Add Field</button>
+                        <button type="button"
+                                class="text-blue-600 hover:underline"
+                                @onclick="ViewModel.AddField">
+                            + Add Field
+                        </button>
                     </div>
 
                     @if (ViewModel.CurrentFields.Any())
@@ -93,17 +111,17 @@
                 </div>
 
                 <div class="flex justify-end gap-3 mt-4">
-                    <button type="button" class="px-4 py-2 bg-gray-300 rounded" @onclick="ViewModel.CancelEdit">Cancel</button>
-                    <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded">Save Template</button>
+                    <button type="button"
+                            class="px-4 py-2 bg-gray-300 rounded"
+                            @onclick="ViewModel.CancelEdit">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                            class="px-4 py-2 bg-green-600 text-white rounded">
+                        Save Template
+                    </button>
                 </div>
             </EditForm>
         </div>
     </div>
-}
-
-@code {
-    protected override async Task OnInitializedAsync()
-    {
-        await ViewModel.LoadTemplatesAsync();
-    }
 }

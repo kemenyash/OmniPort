@@ -10,37 +10,51 @@ namespace OmniPort.UI.Presentation
 {
     public static class FieldPathHelper
     {
-        public static IReadOnlyList<(string Path, FieldDataType Type)> Flatten(TemplateFieldDto f, string prefix = "")
+        public static IReadOnlyList<(string Path, FieldDataType Type)> Flatten(TemplateFieldDto templateField, string prefix = "")
         {
             var list = new List<(string, FieldDataType)>();
-            var name = string.IsNullOrEmpty(prefix) ? f.Name : $"{prefix}.{f.Name}";
+            var name = string.IsNullOrEmpty(prefix) ? templateField.Name : $"{prefix}.{templateField.Name}";
 
-            switch (f.Type)
+            switch (templateField.Type)
             {
                 case FieldDataType.Object:
-                    if (f.Children?.Count > 0)
-                        foreach (var c in f.Children) list.AddRange(Flatten(c, name));
+                    if (templateField.Children?.Count > 0)
+                    {
+                        foreach (var child in templateField.Children)
+                        {
+                            list.AddRange(Flatten(child, name));
+                        }
+                    }
                     else
+                    {
                         list.Add((name, FieldDataType.Object));
+                    }
                     break;
 
                 case FieldDataType.Array:
                     var arrBase = $"{name}[]";
-                    if (f.ItemType == FieldDataType.Object)
+                    if (templateField.ItemType == FieldDataType.Object)
                     {
-                        if (f.ChildrenItems?.Count > 0)
-                            foreach (var c in f.ChildrenItems) list.AddRange(Flatten(c, arrBase));
+                        if (templateField.ChildrenItems?.Count > 0)
+                        {
+                            foreach (var child in templateField.ChildrenItems)
+                            {
+                                list.AddRange(Flatten(child, arrBase));
+                            }
+                        }
                         else
+                        {
                             list.Add((arrBase, FieldDataType.Object));
+                        }
                     }
                     else
                     {
-                        list.Add((arrBase, f.ItemType ?? FieldDataType.String));
+                        list.Add((arrBase, templateField.ItemType ?? FieldDataType.String));
                     }
                     break;
 
                 default:
-                    list.Add((name, f.Type));
+                    list.Add((name, templateField.Type));
                     break;
             }
             return list;
@@ -49,7 +63,10 @@ namespace OmniPort.UI.Presentation
         public static IReadOnlyList<(string Path, FieldDataType Type)> FlattenMany(IEnumerable<TemplateFieldDto> fields)
         {
             var result = new List<(string, FieldDataType)>();
-            foreach (var f in fields) result.AddRange(Flatten(f));
+            foreach (var field in fields)
+            {
+                result.AddRange(Flatten(field));
+            }
             return result;
         }
     }

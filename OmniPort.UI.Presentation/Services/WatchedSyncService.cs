@@ -43,7 +43,7 @@ namespace OmniPort.UI.Presentation.Services
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            try { await syncContext.InitializeAsync(stoppingToken); }
+            try { await syncContext.Initialize(stoppingToken); }
             catch (Exception ex) { logger.LogError(ex, "AppSyncContext initialization failed"); }
 
             while (!stoppingToken.IsCancellationRequested)
@@ -109,7 +109,7 @@ namespace OmniPort.UI.Presentation.Services
                 {
                     var currentHash = await ComputeSha256HexAsync(contentStream, ct);
 
-                    var prevHash = await fingerprints.GetHashAsync(effectiveUrl, mappingTemplateId, ct);
+                    var prevHash = await fingerprints.GetHash(effectiveUrl, mappingTemplateId, ct);
                     if (string.Equals(prevHash, currentHash, StringComparison.Ordinal))
                     {
                         logger.LogDebug("No changes by hash for {Url}", effectiveUrl);
@@ -131,7 +131,7 @@ namespace OmniPort.UI.Presentation.Services
 
                 var output = await executor.TransformFromUrlAsync(mappingTemplateId, storedUrl, ext);
 
-                await syncContext.AddUrlConversionAsync(new UrlConversionHistoryDto(
+                await syncContext.AddUrlConversion(new UrlConversionHistoryDto(
                     Id: 0,
                     ConvertedAt: DateTime.UtcNow,
                     InputUrl: storedUrl,
@@ -141,7 +141,7 @@ namespace OmniPort.UI.Presentation.Services
                 ), ct);
 
                 var hash = await RecomputeHashForUrlAsync(http, effectiveUrl, ct);
-                await fingerprints.SetHashAsync(effectiveUrl, hash, mappingTemplateId, ct);
+                await fingerprints.SetHash(effectiveUrl, hash, mappingTemplateId, ct);
 
                 logger.LogInformation("Updated from {Url} (hash changed)", effectiveUrl);
             }
