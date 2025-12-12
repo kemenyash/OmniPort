@@ -5,7 +5,7 @@ using OmniPort.Core.Records;
 using OmniPort.Core.Utilities;
 using OmniPort.UI.Presentation.Models;
 
-namespace OmniPort.UI.Presentation.ViewModels
+namespace OmniPort.UI.Presentation.ViewModels.Pages
 {
     public class TransformationViewModel
     {
@@ -14,6 +14,8 @@ namespace OmniPort.UI.Presentation.ViewModels
 
         private object? uploadObject;
         private string? uploadFileName;
+
+        public event Action? Changed;
 
         public UploadMode InputMode { get; private set; }
         public bool CanRun => CanRunTransformation();
@@ -25,10 +27,9 @@ namespace OmniPort.UI.Presentation.ViewModels
         public List<UrlConversionHistoryDto> UrlConversions { get; private set; }
         public List<WatchedUrlDto> WatchedUrls { get; private set; }
 
-
-        public TransformationViewModel(IAppSyncContext sync, ITransformationExecutionService executor)
+        public TransformationViewModel(IAppSyncContext syncContext, ITransformationExecutionService executor)
         {
-            this.syncContext = sync;
+            this.syncContext = syncContext;
             this.executor = executor;
 
             InputMode = UploadMode.Upload;
@@ -37,11 +38,9 @@ namespace OmniPort.UI.Presentation.ViewModels
             FileConversions = new List<FileConversionHistoryDto>();
             UrlConversions = new List<UrlConversionHistoryDto>();
             WatchedUrls = new List<WatchedUrlDto>();
-
-            _ = Initialization();
         }
 
-        public async Task Initialization()
+        public async Task InitializeAsync()
         {
             if (!syncContext.JoinedTemplates.Any())
             {
@@ -49,17 +48,20 @@ namespace OmniPort.UI.Presentation.ViewModels
             }
 
             BindFromSyncContext();
-            syncContext.Changed += BindFromSyncContext;
+            syncContext.Changed += OnSyncChanged;
 
             if (FormModel.SelectedMappingTemplateId == 0 && JoinedTemplates.Any())
             {
                 FormModel.SelectedMappingTemplateId = JoinedTemplates.First().Id;
             }
+
+            Changed?.Invoke();
         }
 
         public void SetMode(UploadMode mode)
         {
             InputMode = mode;
+            Changed?.Invoke();
         }
 
         public string GetButtonClass(UploadMode mode)
@@ -69,14 +71,23 @@ namespace OmniPort.UI.Presentation.ViewModels
                  : "bg-gray-200 text-gray-700 px-3 py-1 rounded";
         }
 
-        public Task OnFileChange(InputFileChangeEventArgs eventArgs)
+        public void SetUploadedFile(string fileName, Func<Task<Stream>> openStream)
         {
-            IBrowserFile file = eventArgs.File;
-            SetUploadedFile(file);
-            return Task.CompletedTask;
+            uploadFileName = fileName;
+            uploadObject = new LazyStream(openStream);
+            FormModel.UploadedFileName = fileName;
+            Changed?.Invoke();
         }
 
-        public async Task RunTransformation(EditContext editContext)
+        public void SetUploadedFile(IBrowserFile file)
+        {
+            uploadFileName = file.Name;
+            uploadObject = file;
+            FormModel.UploadedFileName = file.Name;
+            Changed?.Invoke();
+        }
+
+        public async Task RunTransformation()
         {
             if (FormModel.SelectedMappingTemplateId == 0) return;
 
@@ -88,6 +99,10 @@ namespace OmniPort.UI.Presentation.ViewModels
             {
                 await RunUrl();
             }
+
+            await ReloadWatched();
+            BindFromSyncContext();
+            Changed?.Invoke();
         }
 
         public async Task AddToWatchlistFromForm()
@@ -103,23 +118,11 @@ namespace OmniPort.UI.Presentation.ViewModels
 
             await AddToWatchlist(url, interval, templateId);
             await ReloadWatched();
+            BindFromSyncContext();
+            Changed?.Invoke();
         }
 
-        public void SetUploadedFile(string fileName, Func<Task<Stream>> openStream)
-        {
-            uploadFileName = fileName;
-            uploadObject = new LazyStream(openStream);
-            FormModel.UploadedFileName = fileName;
-        }
-
-        public void SetUploadedFile(IBrowserFile file)
-        {
-            uploadFileName = file.Name;
-            uploadObject = file;
-            FormModel.UploadedFileName = file.Name;
-        }
-
-        public async Task RunUpload()
+        private async Task RunUpload()
         {
             if (FormModel.SelectedMappingTemplateId == 0 ||
                 uploadObject is null ||
@@ -149,11 +152,13 @@ namespace OmniPort.UI.Presentation.ViewModels
             ));
         }
 
-        public async Task RunUrl()
+        private async Task RunUrl()
         {
             if (FormModel.SelectedMappingTemplateId == 0 ||
                 string.IsNullOrWhiteSpace(FormModel.FileUrl))
+            {
                 return;
+            }
 
             JoinedTemplateSummaryDto? selected = JoinedTemplates.FirstOrDefault(x => x.Id == FormModel.SelectedMappingTemplateId);
             if (selected is null) return;
@@ -175,16 +180,27 @@ namespace OmniPort.UI.Presentation.ViewModels
                 MappingTemplateName: string.Empty
             ));
         }
-        public async Task AddToWatchlist(string url, int intervalMinutes, int mappingTemplateId)
+
+        private Task AddToWatchlist(string url, int intervalMinutes, int mappingTemplateId)
         {
-            if (string.IsNullOrWhiteSpace(url) || intervalMinutes <= 0) return;
-            await syncContext.AddWatchedUrl(new AddWatchedUrlDto(url, intervalMinutes, mappingTemplateId));
-        }
-        public async Task ReloadWatched()
-        {
-            await syncContext.RefreshAll();
+            if (string.IsNullOrWhiteSpace(url) || intervalMinutes <= 0)
+            {
+                return Task.CompletedTask;
+            }
+
+            return syncContext.AddWatchedUrl(new AddWatchedUrlDto(url, intervalMinutes, mappingTemplateId));
         }
 
+        private Task ReloadWatched()
+        {
+            return syncContext.RefreshAll();
+        }
+
+        private void OnSyncChanged()
+        {
+            BindFromSyncContext();
+            Changed?.Invoke();
+        }
 
         private void BindFromSyncContext()
         {
@@ -196,18 +212,18 @@ namespace OmniPort.UI.Presentation.ViewModels
 
         private bool CanAddToWatchListFromForm()
         {
-            return InputMode == UploadMode.Url &&
-            FormModel.SelectedMappingTemplateId != 0 &&
-            !string.IsNullOrWhiteSpace(FormModel.FileUrl) &&
-            (FormModel.IntervalMinutes.HasValue && FormModel.IntervalMinutes.Value > 0);
+            return InputMode == UploadMode.Url
+                && FormModel.SelectedMappingTemplateId != 0
+                && !string.IsNullOrWhiteSpace(FormModel.FileUrl)
+                && (FormModel.IntervalMinutes.HasValue && FormModel.IntervalMinutes.Value > 0);
         }
 
         private bool CanRunTransformation()
         {
-            return FormModel.SelectedMappingTemplateId != 0 &&
-             (InputMode == UploadMode.Upload
-                 ? !string.IsNullOrWhiteSpace(FormModel.UploadedFileName)
-                 : !string.IsNullOrWhiteSpace(FormModel.FileUrl));
+            return FormModel.SelectedMappingTemplateId != 0
+                && (InputMode == UploadMode.Upload
+                    ? !string.IsNullOrWhiteSpace(FormModel.UploadedFileName)
+                    : !string.IsNullOrWhiteSpace(FormModel.FileUrl));
         }
     }
 }

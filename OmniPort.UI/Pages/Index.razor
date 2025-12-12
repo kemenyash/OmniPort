@@ -1,52 +1,53 @@
 ﻿@using Microsoft.AspNetCore.Authorization
-@using Microsoft.AspNetCore.Components.Authorization
-
 @page "/"
 @attribute [Authorize]
 @using OmniPort.UI.Pages.Layout
+@using OmniPort.UI.Presentation.Inherits.Pages
+@using OmniPort.UI.Presentation.ViewModels
 @layout MainLayout
 @rendermode InteractiveServer
+@inherits IndexBase
 
 <h1 class="text-2xl font-bold mb-6">OmniPort: All-in-one</h1>
 
 <div class="flex gap-4 flex-wrap">
-    <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700" @onclick="() => ShowTemplates = true">
+    <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+            @onclick="OpenTemplates">
         Basic Templates
     </button>
 
-    <button class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700" @onclick="() => ShowJoinTemplates = true">
+    <button class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+            @onclick="OpenJoinTemplates">
         Transforming Templates
     </button>
 </div>
 
 <div style="margin-top: 20px"></div>
 
-<!-- Templates Modal -->
-@if (ShowTemplates)
+@if (ViewModel.ShowTemplates)
 {
     <div class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
         <div class="bg-white p-6 rounded shadow-xl w-full max-w-6xl h-[90vh] overflow-y-auto relative">
-            <button class="absolute top-3 right-3 text-gray-600 hover:text-black text-xl" @onclick="() => ShowTemplates = false">&times;</button>
+            <button class="absolute top-3 right-3 text-gray-600 hover:text-black text-xl"
+                    @onclick="CloseTemplates">
+                &times;
+            </button>
             <Templates />
         </div>
     </div>
 }
 
-<!-- JoinTemplates Modal -->
-@if (ShowJoinTemplates)
+@if (ViewModel.ShowJoinTemplates)
 {
     <div class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
         <div class="bg-white p-6 rounded shadow-xl w-full max-w-6xl h-[90vh] overflow-y-auto relative">
-            <button class="absolute top-3 right-3 text-gray-600 hover:text-black text-xl" @onclick="() => ShowJoinTemplates = false">&times;</button>
+            <button class="absolute top-3 right-3 text-gray-600 hover:text-black text-xl"
+                    @onclick="CloseJoinTemplates">
+                &times;
+            </button>
             <JoinTemplates />
         </div>
     </div>
 }
 
-
 <TransformFile />
-
-@code {
-    private bool ShowTemplates = false;
-    private bool ShowJoinTemplates = false;
-}

@@ -1,14 +1,15 @@
-﻿using Microsoft.AspNetCore.Components;
-using OmniPort.Core.Enums;
+﻿using OmniPort.Core.Enums;
 using OmniPort.Core.Interfaces;
 using OmniPort.Core.Records;
 
-namespace OmniPort.UI.Presentation.ViewModels
+namespace OmniPort.UI.Presentation.ViewModels.Pages
 {
     public class JoinTemplatesViewModel
     {
         private readonly IAppSyncContext syncContext;
         private readonly Dictionary<string, string?> mapByPath;
+
+        public event Action? Changed;
 
         public record FlatField(string Path, FieldDataType Type);
 
@@ -33,11 +34,9 @@ namespace OmniPort.UI.Presentation.ViewModels
             SourceFlattened = new List<FlatField>();
             TargetFlattened = new List<FlatField>();
             JoinedTemplates = new List<JoinedTemplateSummaryDto>();
-
-            _ = InitializeAsync();
         }
 
-        private async Task InitializeAsync()
+        public async Task InitializeAsync()
         {
             if (!syncContext.Templates.Any())
             {
@@ -48,32 +47,19 @@ namespace OmniPort.UI.Presentation.ViewModels
             JoinedTemplates = syncContext.JoinedTemplates.ToList();
 
             syncContext.Changed += OnChanged;
+            Changed?.Invoke();
         }
 
-        public async Task OnSourceChanged(ChangeEventArgs e)
-        {
-            if (int.TryParse(e.Value?.ToString(), out int id))
-            {
-                await SetSourceTemplate(id);
-            }
-        }
-
-        public async Task OnTargetChanged(ChangeEventArgs e)
-        {
-            if (int.TryParse(e.Value?.ToString(), out int id))
-            {
-                await SetTargetTemplate(id);
-            }
-        }
-
-        public async Task SetSourceTemplate(int id)
+        public Task SetSourceTemplate(int id)
         {
             SourceId = id;
             SourceTemplate = Templates.FirstOrDefault(x => x.Id == id);
             SourceFlattened = FlattenTemplate(SourceTemplate);
+            Changed?.Invoke();
+            return Task.CompletedTask;
         }
 
-        public async Task SetTargetTemplate(int id)
+        public Task SetTargetTemplate(int id)
         {
             TargetId = id;
             TargetTemplate = Templates.FirstOrDefault(x => x.Id == id);
@@ -84,6 +70,9 @@ namespace OmniPort.UI.Presentation.ViewModels
             {
                 mapByPath[target.Path] = null;
             }
+
+            Changed?.Invoke();
+            return Task.CompletedTask;
         }
 
         public string? GetMappedValue(string targetPath)
@@ -95,6 +84,7 @@ namespace OmniPort.UI.Presentation.ViewModels
         {
             if (!mapByPath.ContainsKey(targetPath)) return;
             mapByPath[targetPath] = string.IsNullOrWhiteSpace(sourcePath) ? null : sourcePath;
+            Changed?.Invoke();
         }
 
         public async Task SaveMapping()
@@ -129,12 +119,10 @@ namespace OmniPort.UI.Presentation.ViewModels
 
         public bool IsTopOptionCandidate(FlatField flatField)
         {
-            bool result = (!flatField.Path.Contains('.') && !flatField.Path.Contains("[]"))
-               || flatField.Type == FieldDataType.Object
-               || flatField.Type == FieldDataType.Array;
-            return result;
+            return (!flatField.Path.Contains('.') && !flatField.Path.Contains("[]"))
+                || flatField.Type == FieldDataType.Object
+                || flatField.Type == FieldDataType.Array;
         }
-
 
         public string? GetTopSelectValue(string? fullPath)
         {
@@ -151,13 +139,6 @@ namespace OmniPort.UI.Presentation.ViewModels
             int arrDepth = path.Split("[]").Length - 1;
 
             return dotDepth + arrDepth;
-        }
-
-        private FieldDataType? GetSourceType(string? sourcePath)
-        {
-            return string.IsNullOrWhiteSpace(sourcePath)
-               ? null
-               : SourceFlattened.FirstOrDefault(x => x.Path == sourcePath).Type;
         }
 
         public bool HasDescendants(string sourcePath)
@@ -200,8 +181,14 @@ namespace OmniPort.UI.Presentation.ViewModels
 
         public string GetIndentedLabel(string path, FieldDataType type, int depth)
         {
-            string result = new string(' ', depth * 2) + path + $" ({type})";
-            return result;
+            return new string(' ', depth * 2) + path + $" ({type})";
+        }
+
+        private FieldDataType? GetSourceType(string? sourcePath)
+        {
+            return string.IsNullOrWhiteSpace(sourcePath)
+                ? null
+                : SourceFlattened.FirstOrDefault(x => x.Path == sourcePath).Type;
         }
 
         private void OnChanged()
@@ -223,7 +210,7 @@ namespace OmniPort.UI.Presentation.ViewModels
             TargetFlattened = FlattenTemplate(TargetTemplate);
 
             HashSet<string> targetSet = new HashSet<string>(TargetFlattened.Select(f => f.Path));
-            foreach (string? key in mapByPath.Keys.ToList())
+            foreach (string key in mapByPath.Keys.ToList())
             {
                 if (!targetSet.Contains(key)) mapByPath.Remove(key);
             }
@@ -232,6 +219,8 @@ namespace OmniPort.UI.Presentation.ViewModels
             {
                 if (!mapByPath.ContainsKey(target.Path)) mapByPath[target.Path] = null;
             }
+
+            Changed?.Invoke();
         }
 
         private static List<FlatField> FlattenTemplate(BasicTemplateDto? basicTemplate)
@@ -241,7 +230,7 @@ namespace OmniPort.UI.Presentation.ViewModels
 
             HashSet<int> visitingIds = new HashSet<int>();
 
-            void Walk(TemplateFieldDto templateField, string prefix, bool isArrayItem)
+            void Walk(TemplateFieldDto templateField, string prefix)
             {
                 if (templateField.Id == 0 || !visitingIds.Add(templateField.Id)) return;
 
@@ -259,7 +248,7 @@ namespace OmniPort.UI.Presentation.ViewModels
                         {
                             if (child.Id != templateField.Id)
                             {
-                                Walk(child, baseName, false);
+                                Walk(child, baseName);
                             }
                         }
                     }
@@ -274,7 +263,7 @@ namespace OmniPort.UI.Presentation.ViewModels
                             {
                                 if (child.Id != templateField.Id)
                                 {
-                                    Walk(child, arrPath, true);
+                                    Walk(child, arrPath);
                                 }
                             }
                         }
@@ -292,7 +281,7 @@ namespace OmniPort.UI.Presentation.ViewModels
 
             foreach (TemplateFieldDto root in basicTemplate.Fields ?? Enumerable.Empty<TemplateFieldDto>())
             {
-                Walk(root, "", false);
+                Walk(root, "");
             }
 
             return flatFields

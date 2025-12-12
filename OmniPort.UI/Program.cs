@@ -8,7 +8,8 @@ using OmniPort.UI.Pages;
 using OmniPort.UI.Presentation;
 using OmniPort.UI.Presentation.Mapping;
 using OmniPort.UI.Presentation.Services;
-using OmniPort.UI.Presentation.ViewModels;
+using OmniPort.UI.Presentation.ViewModels.Components;
+using OmniPort.UI.Presentation.ViewModels.Pages;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -34,6 +35,10 @@ builder.Services.AddScoped<ITemplateManager, TemplateManager>();
 builder.Services.AddScoped<ITransformationManager, TransformationManager>();
 builder.Services.AddScoped<ITransformationExecutionService, TransformationExecutor>();
 
+builder.Services.AddScoped<LoginViewModel>();
+builder.Services.AddScoped<IndexViewModel>();
+builder.Services.AddScoped<ErrorViewModel>();
+builder.Services.AddScoped<FieldRowEditorViewModel>();
 builder.Services.AddScoped<TemplateEditorViewModel>();
 builder.Services.AddScoped<JoinTemplatesViewModel>();
 builder.Services.AddScoped<TransformationViewModel>();

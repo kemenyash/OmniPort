@@ -1,42 +1,25 @@
 ﻿@using OmniPort.Core.Records
 @using OmniPort.Core.Enums
-@using Microsoft.AspNetCore.Components
+@using OmniPort.UI.Presentation.Inherits.Components
+@inherits SourceFieldTreeBase
 
 <li>
     <div class="flex items-center gap-2">
-        <span class="font-medium">@Node.Name</span>
-        <span class="text-gray-500 text-sm">
-            @{
-                var typeText = Node.Type.ToString();
-                if (Node.Type == FieldDataType.Array && Node.ItemType.HasValue)
-                {
-                    typeText += $"[{Node.ItemType}]";
-                }
-            }
-            (@typeText)
-        </span>
+        <span class="font-medium">@ViewModel.Name</span>
+        <span class="text-gray-500 text-sm">(@ViewModel.TypeText)</span>
     </div>
 
-    @{
-        var children = (Node.Children ?? Enumerable.Empty<TemplateFieldDto>()).ToList();
-        var itemChildren = (Node.ChildrenItems ?? Enumerable.Empty<TemplateFieldDto>()).ToList();
-    }
-
-    @if (children.Any() || itemChildren.Any())
+    @if (ViewModel.HasChildren)
     {
         <ul class="list-disc pl-5 mt-1">
-            @foreach (var ch in children)
+            @foreach (var templateField in ViewModel.Children)
             {
-                <SourceFieldTree Node="ch" />
+                <SourceFieldTree Node="templateField" />
             }
-            @foreach (var ch in itemChildren)
+            @foreach (var templateField in ViewModel.ItemChildren)
             {
-                <SourceFieldTree Node="ch" />
+                <SourceFieldTree Node="templateField" />
             }
         </ul>
     }
 </li>
-
-@code {
-    [Parameter] public TemplateFieldDto Node { get; set; } = default!;
-}

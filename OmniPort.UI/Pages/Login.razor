@@ -1,7 +1,8 @@
 ﻿@attribute [AllowAnonymous]
 @using Microsoft.AspNetCore.Authorization
-
+@using OmniPort.UI.Presentation.Inherits.Pages
 @page "/login"
+@inherits LoginBase
 
 <h1 class="text-2xl font-bold mb-4">Sign in</h1>
 
@@ -20,12 +21,8 @@
 
     <button class="bg-blue-600 text-white px-4 py-2 rounded" type="submit">Sign in</button>
 
-    @if (Context?.Request?.Query.ContainsKey("e") == true)
+    @if (ViewModel.ShowInvalidCredentials)
     {
         <div class="mt-3 text-red-600">Invalid credentials.</div>
     }
 </form>
-
-@code {
-    [CascadingParameter] public HttpContext? Context { get; set; }
-}
