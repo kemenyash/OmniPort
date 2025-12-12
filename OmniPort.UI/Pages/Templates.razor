@@ -1,9 +1,9 @@
 ﻿@page "/templates"
 @using OmniPort.Core.Enums
-@using OmniPort.Core.Models
-@using OmniPort.UI.Presentation.ViewModels
+@using OmniPort.UI.Presentation.Inherits.Pages
 @using OmniPort.UI.Presentation.Models
-@inject TemplateEditorViewModel ViewModel
+@using OmniPort.UI.Presentation.ViewModels.Pages
+@inherits TemplatesBase
 
 <h1 class="text-2xl font-bold mb-6">Basic Templates</h1>
 
@@ -19,19 +19,19 @@
     <tbody>
         @if (ViewModel.Templates.Any())
         {
-            @foreach (var tpl in ViewModel.Templates)
+            @foreach (var templateSummary in ViewModel.Templates)
             {
                 <tr>
-                    <td class="p-3">@tpl.Name</td>
-                    <td class="p-3">@tpl.FieldsCount</td>
-                    <td class="p-3">@tpl.SourceType</td>
+                    <td class="p-3">@templateSummary.Name</td>
+                    <td class="p-3">@templateSummary.FieldsCount</td>
+                    <td class="p-3">@templateSummary.SourceType</td>
                     <td class="p-3 flex gap-2">
                         <button class="text-blue-600 hover:underline"
-                                @onclick="() => ViewModel.StartEdit(tpl.Id)">
+                                @onclick="() => StartEdit(templateSummary.Id)">
                             Edit
                         </button>
                         <button class="text-red-600 hover:underline"
-                                @onclick="() => ViewModel.Delete(tpl.Id)">
+                                @onclick="() => Delete(templateSummary.Id)">
                             Delete
                         </button>
                     </td>
@@ -49,7 +49,7 @@
 
 <div class="flex gap-4 mb-8">
     <button class="bg-blue-600 text-white px-4 py-2 rounded"
-            @onclick="ViewModel.StartCreate">
+            @onclick="StartCreate">
         Create Template
     </button>
 </div>
@@ -63,7 +63,7 @@
             </h2>
 
             <EditForm Model="@ViewModel.CurrentTemplate"
-                      OnValidSubmit="ViewModel.Save">
+                      OnValidSubmit="Save">
                 <DataAnnotationsValidator />
                 <ValidationSummary />
 
@@ -78,9 +78,9 @@
                     <label class="block font-medium mb-1">Source Type</label>
                     <InputSelect class="w-full border rounded px-3 py-2"
                                  @bind-Value="ViewModel.SelectedSourceType">
-                        @foreach (SourceType type in Enum.GetValues(typeof(SourceType)))
+                        @foreach (SourceType sourceType in Enum.GetValues(typeof(SourceType)))
                         {
-                            <option value="@type">@type</option>
+                            <option value="@sourceType">@sourceType</option>
                         }
                     </InputSelect>
                 </div>
@@ -90,7 +90,7 @@
                         <label class="block font-medium mb-1">Fields</label>
                         <button type="button"
                                 class="text-blue-600 hover:underline"
-                                @onclick="ViewModel.AddField">
+                                @onclick="AddField">
                             + Add Field
                         </button>
                     </div>
@@ -101,7 +101,7 @@
                         {
                             <FieldRowEditor Field="field"
                                             Level="0"
-                                            OnRemove="(() => ViewModel.RemoveField(field))" />
+                                            OnRemove="(() => RemoveField(field))" />
                         }
                     }
                     else
@@ -113,7 +113,7 @@
                 <div class="flex justify-end gap-3 mt-4">
                     <button type="button"
                             class="px-4 py-2 bg-gray-300 rounded"
-                            @onclick="ViewModel.CancelEdit">
+                            @onclick="CancelEdit">
                         Cancel
                     </button>
                     <button type="submit"

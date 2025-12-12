@@ -5,6 +5,6 @@ namespace OmniPort.Core.Interfaces
 {
     public interface ITransformationManager
     {
-        Task<(ImportProfile Profile, SourceType ImportSourceType, SourceType ConvertSourceType)> GetImportProfileForJoinAsync(int mappingTemplateId);
+        Task<(ImportProfile Profile, SourceType ImportSourceType, SourceType ConvertSourceType)> GetImportProfileForJoin(int mappingTemplateId);
     }
 }

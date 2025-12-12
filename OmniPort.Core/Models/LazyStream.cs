@@ -2,8 +2,8 @@
 {
     public class LazyStream
     {
-        private readonly Func<Task<Stream>> _factory;
-        public LazyStream(Func<Task<Stream>> factory) => _factory = factory;
-        public async Task<Stream> OpenAsync() => await _factory();
+        private readonly Func<Task<Stream>> factory;
+        public LazyStream(Func<Task<Stream>> factory) => this.factory = factory;
+        public async Task<Stream> OpenAsync() => await factory();
     }
 }

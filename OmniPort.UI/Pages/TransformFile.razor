@@ -1,11 +1,10 @@
 ﻿@page "/transform"
 @using OmniPort.Core.Models
+@using OmniPort.UI.Presentation.Inherits.Pages
 @using OmniPort.UI.Presentation.Models
-@using OmniPort.UI.Presentation.ViewModels
-@using Microsoft.AspNetCore.Components.Forms
-@inject TransformationViewModel ViewModel
+@inherits TransformationBase
 
-<EditForm Model="@ViewModel.FormModel" OnValidSubmit="ViewModel.RunTransformation">
+<EditForm Model="@ViewModel.FormModel" OnValidSubmit="RunTransformation">
     <DataAnnotationsValidator />
     <ValidationSummary />
 
@@ -16,9 +15,9 @@
             <InputSelect @bind-Value="@ViewModel.FormModel.SelectedMappingTemplateId"
                          class="w-full border px-3 py-2 rounded">
                 <option value="0" disabled>Select template</option>
-                @foreach (var t in ViewModel.JoinedTemplates)
+                @foreach (var joinedTemplate in ViewModel.JoinedTemplates)
                 {
-                    <option value="@t.Id">@t.FullName</option>
+                    <option value="@joinedTemplate.Id">@joinedTemplate.FullName</option>
                 }
             </InputSelect>
             <ValidationMessage For="@(() => ViewModel.FormModel.SelectedMappingTemplateId)" />
@@ -27,12 +26,12 @@
         <div class="flex gap-4 items-center">
             <label>Import mode:</label>
             <button type="button"
-                    @onclick="() => ViewModel.SetMode(UploadMode.Upload)"
+                    @onclick="() => SetMode(UploadMode.Upload)"
                     class="@ViewModel.GetButtonClass(UploadMode.Upload)">
                 Upload
             </button>
             <button type="button"
-                    @onclick="() => ViewModel.SetMode(UploadMode.Url)"
+                    @onclick="() => SetMode(UploadMode.Url)"
                     class="@ViewModel.GetButtonClass(UploadMode.Url)">
                 URL
             </button>
@@ -42,7 +41,7 @@
         {
             <div class="space-y-1">
                 <label>Upload File</label>
-                <InputFile OnChange="ViewModel.OnFileChange"
+                <InputFile OnChange="OnFileChange"
                            class="w-full border px-3 py-2 rounded" />
 
                 @if (!string.IsNullOrWhiteSpace(ViewModel.FormModel.UploadedFileName))
@@ -85,7 +84,7 @@
                 <button type="button"
                         class="bg-indigo-600 text-white px-4 py-2 rounded disabled:opacity-50"
                         disabled="@(!ViewModel.CanAddToWatchlist)"
-                        @onclick="ViewModel.AddToWatchlistFromForm">
+                        @onclick="AddToWatchlistFromForm">
                     Add to Watchlist
                 </button>
             }
@@ -107,12 +106,12 @@
             </tr>
         </thead>
         <tbody>
-            @foreach (var w in ViewModel.WatchedUrls)
+            @foreach (var watchedUrl in ViewModel.WatchedUrls)
             {
                 <tr>
-                    <td class="border px-4 py-2">@w.Url</td>
-                    <td class="border px-4 py-2">@w.MappingTemplateName</td>
-                    <td class="border px-4 py-2">@w.IntervalMinutes</td>
+                    <td class="border px-4 py-2">@watchedUrl.Url</td>
+                    <td class="border px-4 py-2">@watchedUrl.MappingTemplateName</td>
+                    <td class="border px-4 py-2">@watchedUrl.IntervalMinutes</td>
                 </tr>
             }
         </tbody>
@@ -132,14 +131,14 @@
             </tr>
         </thead>
         <tbody>
-            @foreach (var u in ViewModel.UrlConversions)
+            @foreach (var urlConversionHistoryItem in ViewModel.UrlConversions)
             {
                 <tr>
-                    <td class="border px-4 py-2">@u.InputUrl</td>
-                    <td class="border px-4 py-2">@u.ConvertedAt.ToLocalTime()</td>
-                    <td class="border px-4 py-2">@u.MappingTemplateName</td>
+                    <td class="border px-4 py-2">@urlConversionHistoryItem.InputUrl</td>
+                    <td class="border px-4 py-2">@urlConversionHistoryItem.ConvertedAt.ToLocalTime()</td>
+                    <td class="border px-4 py-2">@urlConversionHistoryItem.MappingTemplateName</td>
                     <td class="border px-4 py-2">
-                        <a href="@u.OutputLink" target="_blank" class="text-blue-600 underline">View</a>
+                        <a href="@urlConversionHistoryItem.OutputLink" target="_blank" class="text-blue-600 underline">View</a>
                     </td>
                 </tr>
             }
@@ -160,14 +159,14 @@
             </tr>
         </thead>
         <tbody>
-            @foreach (var f in ViewModel.FileConversions)
+            @foreach (var fileConversionHistoryItem in ViewModel.FileConversions)
             {
                 <tr>
-                    <td class="border px-4 py-2">@f.FileName</td>
-                    <td class="border px-4 py-2">@f.ConvertedAt.ToLocalTime()</td>
-                    <td class="border px-4 py-2">@f.MappingTemplateName</td>
+                    <td class="border px-4 py-2">@fileConversionHistoryItem.FileName</td>
+                    <td class="border px-4 py-2">@fileConversionHistoryItem.ConvertedAt.ToLocalTime()</td>
+                    <td class="border px-4 py-2">@fileConversionHistoryItem.MappingTemplateName</td>
                     <td class="border px-4 py-2">
-                        <a href="@f.OutputLink" target="_blank" class="text-blue-600 underline">View</a>
+                        <a href="@fileConversionHistoryItem.OutputLink" target="_blank" class="text-blue-600 underline">View</a>
                     </td>
                 </tr>
             }

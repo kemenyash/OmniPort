@@ -3,43 +3,50 @@ using OmniPort.Core.Interfaces;
 using OmniPort.Core.Records;
 using OmniPort.UI.Presentation.Models;
 
-namespace OmniPort.UI.Presentation.ViewModels
+namespace OmniPort.UI.Presentation.ViewModels.Pages
 {
     public class TemplateEditorViewModel
     {
         private readonly IAppSyncContext sync;
+
+        public event Action? Changed;
+
         public bool IsModalOpen { get; private set; }
         public int? EditingTemplateId { get; private set; }
 
         public SourceType SelectedSourceType
         {
             get => CurrentTemplate.SourceType;
-            set => CurrentTemplate.SourceType = value;
+            set
+            {
+                CurrentTemplate.SourceType = value;
+                Changed?.Invoke();
+            }
         }
 
         public TemplateEditForm CurrentTemplate { get; private set; }
         public List<TemplateSummaryDto> Templates { get; private set; }
         public List<TemplateFieldRow> CurrentFields => CurrentTemplate.Fields;
 
-
         public TemplateEditorViewModel(IAppSyncContext sync)
         {
             this.sync = sync;
+
             CurrentTemplate = new TemplateEditForm();
             Templates = new List<TemplateSummaryDto>();
-
-            _ = LoadTemplates();
         }
 
-
-        public async Task LoadTemplates()
+        public async Task Initialize()
         {
             if (!sync.Templates.Any())
             {
                 await sync.Initialize();
             }
+
             Templates = sync.Templates.ToList();
             sync.Changed += OnChanged;
+
+            Changed?.Invoke();
         }
 
         public void StartCreate()
@@ -53,12 +60,15 @@ namespace OmniPort.UI.Presentation.ViewModels
                     new() { Name = "Name", Type = FieldDataType.String }
                 }
             };
+
             IsModalOpen = true;
+            Changed?.Invoke();
         }
-        public async Task StartEdit(int id)
+
+        public Task StartEdit(int id)
         {
             BasicTemplateDto? full = sync.BasicTemplatesFull.FirstOrDefault(x => x.Id == id);
-            if (full == null) return;
+            if (full == null) return Task.CompletedTask;
 
             EditingTemplateId = full.Id;
 
@@ -84,21 +94,27 @@ namespace OmniPort.UI.Presentation.ViewModels
             };
 
             IsModalOpen = true;
-            await Task.CompletedTask;
+            Changed?.Invoke();
+            return Task.CompletedTask;
         }
+
         public void CancelEdit()
         {
             IsModalOpen = false;
             EditingTemplateId = null;
+            Changed?.Invoke();
         }
 
         public void AddField()
         {
             CurrentTemplate.Fields.Add(new TemplateFieldRow { Name = "", Type = FieldDataType.String });
+            Changed?.Invoke();
         }
+
         public void RemoveField(TemplateFieldRow row)
         {
             CurrentTemplate.Fields.Remove(row);
+            Changed?.Invoke();
         }
 
         public async Task Save()
@@ -124,29 +140,19 @@ namespace OmniPort.UI.Presentation.ViewModels
             }
 
             IsModalOpen = false;
+            Changed?.Invoke();
         }
+
         public async Task Delete(int id)
         {
             await sync.DeleteBasicTemplate(id);
+            Changed?.Invoke();
         }
 
         private void OnChanged()
         {
             Templates = sync.Templates.ToList();
-        }
-
-        private static TemplateFieldRow ToRow(TemplateFieldDto field)
-        {
-            return new TemplateFieldRow()
-            {
-                Id = field.Id,
-                Name = field.Name,
-                Type = field.Type,
-                ItemType = field.ItemType,
-                Children = (field.Children ?? new List<TemplateFieldDto>()).Select(ToRow).ToList(),
-                ChildrenItems = (field.ChildrenItems ?? new List<TemplateFieldDto>()).Select(ToRow).ToList()
-
-            };
+            Changed?.Invoke();
         }
 
         private static CreateTemplateFieldDto ToCreate(TemplateFieldRow row)

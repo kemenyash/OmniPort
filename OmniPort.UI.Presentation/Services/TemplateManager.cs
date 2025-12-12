@@ -5,59 +5,61 @@ using OmniPort.Core.Interfaces;
 using OmniPort.Core.Records;
 using OmniPort.Data;
 using OmniPort.UI.Presentation.Helpers;
+using System.Collections.Concurrent;
 
 namespace OmniPort.UI.Presentation.Services
 {
     public class TemplateManager : ITemplateManager
     {
-        private readonly OmniPortDataContext dataContext;
-        private readonly IMapper mapper;
+        private readonly OmniPortDataContext omniPortDataContext;
+        private readonly IMapper objectMapper;
         private readonly TemplateManagerHelpers templateManagerHelpers;
 
-        public TemplateManager(OmniPortDataContext dataContext, IMapper mapper)
+        public TemplateManager(OmniPortDataContext omniPortDataContext, IMapper objectMapper)
         {
-            this.dataContext = dataContext;
-            this.mapper = mapper;
-            this.templateManagerHelpers = new TemplateManagerHelpers(dataContext);
+            this.omniPortDataContext = omniPortDataContext;
+            this.objectMapper = objectMapper;
+            templateManagerHelpers = new TemplateManagerHelpers(omniPortDataContext);
         }
 
         public async Task<IReadOnlyList<TemplateSummaryDto>> GetBasicTemplatesSummary()
         {
-            List<TemplateSummaryDto> basicTemplates = await dataContext.BasicTemplates
+            var basicTemplates = await omniPortDataContext.BasicTemplates
                 .AsNoTracking()
-                .ProjectTo<TemplateSummaryDto>(mapper.ConfigurationProvider)
+                .ProjectTo<TemplateSummaryDto>(objectMapper.ConfigurationProvider)
                 .ToListAsync();
 
             return basicTemplates;
         }
+
         public async Task<BasicTemplateDto?> GetBasicTemplate(int templateId)
         {
-            BasicTemplateData? basicTemplateEntity = await dataContext.BasicTemplates
-                                                    .AsNoTracking()
-                                                    .FirstOrDefaultAsync(templateEntity => templateEntity.Id == templateId);
+            var basicTemplateEntity = await omniPortDataContext.BasicTemplates
+                .AsNoTracking()
+                .FirstOrDefaultAsync(templateEntity => templateEntity.Id == templateId);
 
             if (basicTemplateEntity is null)
             {
                 return null;
             }
 
-            List<FieldData> allFieldEntities = await dataContext.Fields
-                                .AsNoTracking()
-                                .Where(fieldEntity => fieldEntity.TemplateSourceId == templateId)
-                                .ToListAsync();
+            var allFieldEntities = await omniPortDataContext.Fields
+                .AsNoTracking()
+                .Where(fieldEntity => fieldEntity.TemplateSourceId == templateId)
+                .ToListAsync();
 
-            List<FieldData> rootFieldEntities = allFieldEntities
-                                    .Where(fieldEntity => fieldEntity.ParentFieldId == null && !fieldEntity.IsArrayItem)
-                                    .ToList();
+            var rootFieldEntities = allFieldEntities
+                .Where(fieldEntity => fieldEntity.ParentFieldId == null && !fieldEntity.IsArrayItem)
+                .ToList();
 
-            Dictionary<int, List<FieldData>> childrenByParent = allFieldEntities.Where(fieldEntity => fieldEntity.ParentFieldId.HasValue)
-                    .GroupBy(fieldEntity => fieldEntity.ParentFieldId!.Value)
-                    .ToDictionary(group => group.Key, group => group.ToList());
+            var childrenByParentFieldId = allFieldEntities
+                .Where(fieldEntity => fieldEntity.ParentFieldId.HasValue)
+                .GroupBy(fieldEntity => fieldEntity.ParentFieldId!.Value)
+                .ToDictionary(group => group.Key, group => group.ToList());
 
-            List<TemplateFieldDto> templateFieldDtos =
-                rootFieldEntities
-                    .Select(fieldEntity => ConvertFieldToDto(fieldEntity, childrenByParent))
-                    .ToList();
+            var templateFieldDtos = rootFieldEntities
+                .Select(rootFieldEntity => ConvertFieldToDto(rootFieldEntity, childrenByParentFieldId))
+                .ToList();
 
             return new BasicTemplateDto(
                 Id: basicTemplateEntity.Id,
@@ -66,271 +68,284 @@ namespace OmniPort.UI.Presentation.Services
                 Fields: templateFieldDtos
             );
         }
-        public async Task<int> CreateBasicTemplate(CreateBasicTemplateDto dto)
+
+        public async Task<int> CreateBasicTemplate(CreateBasicTemplateDto createBasicTemplateDto)
         {
-            BasicTemplateData newBasicTemplateEntity = new BasicTemplateData
+            var basicTemplateEntity = new BasicTemplateData
             {
-                Name = dto.Name,
-                SourceType = dto.SourceType
+                Name = createBasicTemplateDto.Name,
+                SourceType = createBasicTemplateDto.SourceType
             };
 
-            dataContext.BasicTemplates.Add(newBasicTemplateEntity);
-            await dataContext.SaveChangesAsync();
+            omniPortDataContext.BasicTemplates.Add(basicTemplateEntity);
+            await omniPortDataContext.SaveChangesAsync();
 
-            foreach (CreateTemplateFieldDto field in dto.Fields)
+            foreach (var createTemplateFieldDto in createBasicTemplateDto.Fields)
             {
                 templateManagerHelpers.AddFieldRecursive(
-                    newBasicTemplateEntity.Id,
+                    basicTemplateEntity.Id,
                     parentId: null,
                     isArrayItem: false,
-                    fieldDto: field);
+                    fieldDto: createTemplateFieldDto);
             }
 
-            await dataContext.SaveChangesAsync();
-            return newBasicTemplateEntity.Id;
+            await omniPortDataContext.SaveChangesAsync();
+            return basicTemplateEntity.Id;
         }
-        public async Task<bool> UpdateBasicTemplate(UpdateBasicTemplateDto dto)
+
+        public async Task<bool> UpdateBasicTemplate(UpdateBasicTemplateDto updateBasicTemplateDto)
         {
-            BasicTemplateData? existingTemplateEntity = await dataContext.BasicTemplates
-                                        .Include(template => template.Fields)
-                                        .FirstOrDefaultAsync(template => template.Id == dto.Id);
+            var existingTemplateEntity = await omniPortDataContext.BasicTemplates
+                .Include(template => template.Fields)
+                .FirstOrDefaultAsync(template => template.Id == updateBasicTemplateDto.Id);
 
             if (existingTemplateEntity is null)
             {
                 return false;
             }
 
-            existingTemplateEntity.Name = dto.Name;
-            existingTemplateEntity.SourceType = dto.SourceType;
+            existingTemplateEntity.Name = updateBasicTemplateDto.Name;
+            existingTemplateEntity.SourceType = updateBasicTemplateDto.SourceType;
 
-            List<FieldData> existingRootFields = existingTemplateEntity.Fields
-                                    .Where(field => field.ParentFieldId == null && !field.IsArrayItem)
-                                    .ToList();
+            var existingRootFieldEntities = existingTemplateEntity.Fields
+                .Where(fieldEntity => fieldEntity.ParentFieldId == null && !fieldEntity.IsArrayItem)
+                .ToList();
 
             templateManagerHelpers.UpsertChildren(
                 templateId: existingTemplateEntity.Id,
                 parentId: null,
                 isArrayItem: false,
-                incomingFields: dto.Fields,
-                existingSiblingFields: existingRootFields
+                incomingFields: updateBasicTemplateDto.Fields,
+                existingSiblingFields: existingRootFieldEntities
             );
 
-            await dataContext.SaveChangesAsync();
+            await omniPortDataContext.SaveChangesAsync();
             return true;
         }
+
         public async Task<bool> DeleteBasicTemplate(int templateId)
         {
-            BasicTemplateData? templateEntity = await dataContext.BasicTemplates.FindAsync(templateId);
+            var templateEntity = await omniPortDataContext.BasicTemplates.FindAsync(templateId);
 
             if (templateEntity is null)
             {
                 return false;
             }
 
-            dataContext.BasicTemplates.Remove(templateEntity);
-            await dataContext.SaveChangesAsync();
+            omniPortDataContext.BasicTemplates.Remove(templateEntity);
+            await omniPortDataContext.SaveChangesAsync();
             return true;
         }
 
         public async Task<IReadOnlyList<JoinedTemplateSummaryDto>> GetJoinedTemplates()
         {
-            List<JoinedTemplateSummaryDto> joindTemplates = await dataContext.MappingTemplates
-                                .AsNoTracking()
-                                .Include(mapping => mapping.SourceTemplate)
-                                .Include(mapping => mapping.TargetTemplate)
-                                .ProjectTo<JoinedTemplateSummaryDto>(mapper.ConfigurationProvider)
-                                .ToListAsync();
+            var joinedTemplates = await omniPortDataContext.MappingTemplates
+                .AsNoTracking()
+                .Include(mapping => mapping.SourceTemplate)
+                .Include(mapping => mapping.TargetTemplate)
+                .ProjectTo<JoinedTemplateSummaryDto>(objectMapper.ConfigurationProvider)
+                .ToListAsync();
 
-            return joindTemplates;
+            return joinedTemplates;
         }
 
         public async Task<MappingTemplateDto?> GetMappingTemplate(int mappingTemplateId)
         {
-            MappingTemplateData? mappingTemplateEntity = await dataContext.MappingTemplates
-                    .AsNoTracking()
-                    .Include(mapping => mapping.SourceTemplate)
-                    .Include(mapping => mapping.TargetTemplate)
-                    .Include(mapping => mapping.MappingFields).ThenInclude(field => field.SourceField)
-                    .Include(mapping => mapping.MappingFields).ThenInclude(field => field.TargetField)
-                    .FirstOrDefaultAsync(mapping => mapping.Id == mappingTemplateId);
+            var mappingTemplateEntity = await omniPortDataContext.MappingTemplates
+                .AsNoTracking()
+                .Include(mapping => mapping.SourceTemplate)
+                .Include(mapping => mapping.TargetTemplate)
+                .Include(mapping => mapping.MappingFields).ThenInclude(mappingField => mappingField.SourceField)
+                .Include(mapping => mapping.MappingFields).ThenInclude(mappingField => mappingField.TargetField)
+                .FirstOrDefaultAsync(mapping => mapping.Id == mappingTemplateId);
 
             if (mappingTemplateEntity is null)
             {
                 return null;
             }
 
-            return mapper.Map<MappingTemplateDto>(mappingTemplateEntity);
+            return objectMapper.Map<MappingTemplateDto>(mappingTemplateEntity);
         }
-        public async Task<int> CreateMappingTemplate(CreateMappingTemplateDto dto)
+
+        public async Task<int> CreateMappingTemplate(CreateMappingTemplateDto createMappingTemplateDto)
         {
-            MappingTemplateData mappingTemplateEntity = new MappingTemplateData
+            var mappingTemplateEntity = new MappingTemplateData
             {
-                Name = dto.Name,
-                SourceTemplateId = dto.SourceTemplateId,
-                TargetTemplateId = dto.TargetTemplateId
+                Name = createMappingTemplateDto.Name,
+                SourceTemplateId = createMappingTemplateDto.SourceTemplateId,
+                TargetTemplateId = createMappingTemplateDto.TargetTemplateId
             };
 
-            dataContext.MappingTemplates.Add(mappingTemplateEntity);
-            await dataContext.SaveChangesAsync();
+            omniPortDataContext.MappingTemplates.Add(mappingTemplateEntity);
+            await omniPortDataContext.SaveChangesAsync();
 
             await templateManagerHelpers.RebuildMappingFieldsFromPaths(
                 mappingTemplateEntity.Id,
-                dto.SourceTemplateId,
-                dto.TargetTemplateId,
-                dto.Mappings
+                createMappingTemplateDto.SourceTemplateId,
+                createMappingTemplateDto.TargetTemplateId,
+                createMappingTemplateDto.Mappings
             );
 
             return mappingTemplateEntity.Id;
         }
-        public async Task<bool> UpdateMappingTemplate(UpdateMappingTemplateDto dto)
-        {
-            MappingTemplateData? existingMappingTemplate = await dataContext.MappingTemplates
-                    .Include(mapping => mapping.MappingFields)
-                    .FirstOrDefaultAsync(mapping => mapping.Id == dto.Id);
 
-            if (existingMappingTemplate is null)
+        public async Task<bool> UpdateMappingTemplate(UpdateMappingTemplateDto updateMappingTemplateDto)
+        {
+            var existingMappingTemplateEntity = await omniPortDataContext.MappingTemplates
+                .Include(mapping => mapping.MappingFields)
+                .FirstOrDefaultAsync(mapping => mapping.Id == updateMappingTemplateDto.Id);
+
+            if (existingMappingTemplateEntity is null)
             {
                 return false;
             }
 
-            existingMappingTemplate.Name = dto.Name;
-            existingMappingTemplate.SourceTemplateId = dto.SourceTemplateId;
-            existingMappingTemplate.TargetTemplateId = dto.TargetTemplateId;
+            existingMappingTemplateEntity.Name = updateMappingTemplateDto.Name;
+            existingMappingTemplateEntity.SourceTemplateId = updateMappingTemplateDto.SourceTemplateId;
+            existingMappingTemplateEntity.TargetTemplateId = updateMappingTemplateDto.TargetTemplateId;
 
-            dataContext.MappingFields.RemoveRange(existingMappingTemplate.MappingFields);
-            await dataContext.SaveChangesAsync();
+            omniPortDataContext.MappingFields.RemoveRange(existingMappingTemplateEntity.MappingFields);
+            await omniPortDataContext.SaveChangesAsync();
 
             await templateManagerHelpers.RebuildMappingFieldsFromPaths(
-                existingMappingTemplate.Id,
-                dto.SourceTemplateId,
-                dto.TargetTemplateId,
-                dto.Mappings
+                existingMappingTemplateEntity.Id,
+                updateMappingTemplateDto.SourceTemplateId,
+                updateMappingTemplateDto.TargetTemplateId,
+                updateMappingTemplateDto.Mappings
             );
 
             return true;
         }
+
         public async Task<bool> DeleteMappingTemplate(int mappingTemplateId)
         {
-            MappingTemplateData? mappingTemplateEntity = await dataContext.MappingTemplates.FindAsync(mappingTemplateId);
+            var mappingTemplateEntity = await omniPortDataContext.MappingTemplates.FindAsync(mappingTemplateId);
 
             if (mappingTemplateEntity is null)
             {
                 return false;
             }
 
-            dataContext.MappingTemplates.Remove(mappingTemplateEntity);
-            await dataContext.SaveChangesAsync();
+            omniPortDataContext.MappingTemplates.Remove(mappingTemplateEntity);
+            await omniPortDataContext.SaveChangesAsync();
             return true;
         }
 
         public async Task<IReadOnlyList<UrlConversionHistoryDto>> GetUrlConversionHistory()
         {
-            List<UrlConversionHistoryDto> urlConversionHistory = await dataContext.UrlConversionHistory
+            var urlConversionHistoryItems = await omniPortDataContext.UrlConversionHistory
                 .AsNoTracking()
                 .Include(history => history.MappingTemplate)
-                .ProjectTo<UrlConversionHistoryDto>(mapper.ConfigurationProvider)
+                .ProjectTo<UrlConversionHistoryDto>(objectMapper.ConfigurationProvider)
                 .ToListAsync();
 
-            return urlConversionHistory;
+            return urlConversionHistoryItems;
         }
-        public async Task AddUrlConversion(UrlConversionHistoryDto dto)
+
+        public async Task AddUrlConversion(UrlConversionHistoryDto urlConversionHistoryDto)
         {
-            UrlConversionHistoryData urlConversionEntity = new UrlConversionHistoryData
+            var urlConversionHistoryEntity = new UrlConversionHistoryData
             {
-                ConvertedAt = dto.ConvertedAt,
-                InputUrl = dto.InputUrl,
-                OutputUrl = dto.OutputLink,
-                MappingTemplateId = dto.MappingTemplateId
+                ConvertedAt = urlConversionHistoryDto.ConvertedAt,
+                InputUrl = urlConversionHistoryDto.InputUrl,
+                OutputUrl = urlConversionHistoryDto.OutputLink,
+                MappingTemplateId = urlConversionHistoryDto.MappingTemplateId
             };
 
-            dataContext.UrlConversionHistory.Add(urlConversionEntity);
-            await dataContext.SaveChangesAsync();
+            omniPortDataContext.UrlConversionHistory.Add(urlConversionHistoryEntity);
+            await omniPortDataContext.SaveChangesAsync();
         }
-        public async Task AddFileConversion(FileConversionHistoryDto dto)
+
+        public async Task AddFileConversion(FileConversionHistoryDto fileConversionHistoryDto)
         {
-            FileConversionHistoryData fileConversionEntity = new FileConversionHistoryData
+            var fileConversionHistoryEntity = new FileConversionHistoryData
             {
-                ConvertedAt = dto.ConvertedAt,
-                FileName = dto.FileName,
-                OutputUrl = dto.OutputLink,
-                MappingTemplateId = dto.MappingTemplateId
+                ConvertedAt = fileConversionHistoryDto.ConvertedAt,
+                FileName = fileConversionHistoryDto.FileName,
+                OutputUrl = fileConversionHistoryDto.OutputLink,
+                MappingTemplateId = fileConversionHistoryDto.MappingTemplateId
             };
 
-            dataContext.FileConversionHistory.Add(fileConversionEntity);
-            await dataContext.SaveChangesAsync();
+            omniPortDataContext.FileConversionHistory.Add(fileConversionHistoryEntity);
+            await omniPortDataContext.SaveChangesAsync();
         }
+
         public async Task<IReadOnlyList<FileConversionHistoryDto>> GetFileConversionHistory()
         {
-            List<FileConversionHistoryDto> fileConversations = await dataContext.FileConversionHistory
+            var fileConversionHistoryItems = await omniPortDataContext.FileConversionHistory
                 .AsNoTracking()
                 .Include(history => history.MappingTemplate)
-                .ProjectTo<FileConversionHistoryDto>(mapper.ConfigurationProvider)
+                .ProjectTo<FileConversionHistoryDto>(objectMapper.ConfigurationProvider)
                 .ToListAsync();
 
-            return fileConversations;
+            return fileConversionHistoryItems;
         }
 
         public async Task<IReadOnlyList<WatchedUrlDto>> GetWatchedUrls()
         {
-            List<WatchedUrlDto> urls = await dataContext.UrlFileGetting
+            var watchedUrls = await omniPortDataContext.UrlFileGetting
                 .AsNoTracking()
-                .ProjectTo<WatchedUrlDto>(mapper.ConfigurationProvider)
+                .ProjectTo<WatchedUrlDto>(objectMapper.ConfigurationProvider)
                 .ToListAsync();
 
-            return urls;
+            return watchedUrls;
         }
+
         public async Task<int> AddWatchedUrl(string url, int intervalMinutes, int mappingTemplateId)
         {
-            UrlFileGettingData? existingWatchedUrl = await dataContext.UrlFileGetting.FirstOrDefaultAsync(watchedUrlEntity =>
-                            watchedUrlEntity.Url == url &&
-                            watchedUrlEntity.MappingTemplateId == mappingTemplateId);
+            var existingWatchedUrlEntity = await omniPortDataContext.UrlFileGetting
+                .FirstOrDefaultAsync(watchedUrlEntity =>
+                    watchedUrlEntity.Url == url &&
+                    watchedUrlEntity.MappingTemplateId == mappingTemplateId);
 
-            if (existingWatchedUrl is not null)
+            if (existingWatchedUrlEntity is not null)
             {
-                existingWatchedUrl.CheckIntervalMinutes = intervalMinutes;
-                await dataContext.SaveChangesAsync();
-                return existingWatchedUrl.Id;
+                existingWatchedUrlEntity.CheckIntervalMinutes = intervalMinutes;
+                await omniPortDataContext.SaveChangesAsync();
+                return existingWatchedUrlEntity.Id;
             }
 
-            UrlFileGettingData newWatchedUrl = new UrlFileGettingData
+            var watchedUrlEntityToCreate = new UrlFileGettingData
             {
                 Url = url,
                 CheckIntervalMinutes = intervalMinutes,
                 MappingTemplateId = mappingTemplateId
             };
 
-            dataContext.UrlFileGetting.Add(newWatchedUrl);
-            await dataContext.SaveChangesAsync();
-            return newWatchedUrl.Id;
+            omniPortDataContext.UrlFileGetting.Add(watchedUrlEntityToCreate);
+            await omniPortDataContext.SaveChangesAsync();
+            return watchedUrlEntityToCreate.Id;
         }
+
         public async Task<bool> DeleteWatchedUrl(int watchedUrlId)
         {
-            UrlFileGettingData? watchedUrlEntity = await dataContext.UrlFileGetting.FindAsync(watchedUrlId);
+            var watchedUrlEntity = await omniPortDataContext.UrlFileGetting.FindAsync(watchedUrlId);
 
             if (watchedUrlEntity is null)
             {
                 return false;
             }
 
-            dataContext.UrlFileGetting.Remove(watchedUrlEntity);
-            await dataContext.SaveChangesAsync();
+            omniPortDataContext.UrlFileGetting.Remove(watchedUrlEntity);
+            await omniPortDataContext.SaveChangesAsync();
             return true;
         }
 
         private TemplateFieldDto ConvertFieldToDto(
             FieldData fieldEntity,
-            Dictionary<int, List<FieldData>> childrenByParent)
+            Dictionary<int, List<FieldData>> childrenByParentFieldId)
         {
-            List<FieldData> directChildren = childrenByParent.TryGetValue(fieldEntity.Id, out List<FieldData>? foundChildren)
-                    ? foundChildren
-                    : new List<FieldData>();
+            if (!childrenByParentFieldId.TryGetValue(fieldEntity.Id, out var directChildren))
+            {
+                directChildren = new List<FieldData>();
+            }
 
-            List<FieldData> objectChildren = directChildren
-                .Where(child => !child.IsArrayItem)
+            var objectChildren = directChildren
+                .Where(childEntity => !childEntity.IsArrayItem)
                 .ToList();
 
-            List<FieldData> arrayChildren = directChildren
-                .Where(child => child.IsArrayItem)
+            var arrayItemChildren = directChildren
+                .Where(childEntity => childEntity.IsArrayItem)
                 .ToList();
 
             return new TemplateFieldDto(
@@ -339,10 +354,10 @@ namespace OmniPort.UI.Presentation.Services
                 Type: fieldEntity.Type,
                 ItemType: fieldEntity.ItemType,
                 Children: objectChildren
-                    .Select(child => ConvertFieldToDto(child, childrenByParent))
+                    .Select(childEntity => ConvertFieldToDto(childEntity, childrenByParentFieldId))
                     .ToList(),
-                ChildrenItems: arrayChildren
-                    .Select(child => ConvertFieldToDto(child, childrenByParent))
+                ChildrenItems: arrayItemChildren
+                    .Select(childEntity => ConvertFieldToDto(childEntity, childrenByParentFieldId))
                     .ToList()
             );
         }

@@ -4,22 +4,54 @@ namespace OmniPort.UI.Presentation.Services
 {
     public class UploadLimits
     {
-        public long MaxUploadBytes { get; set; } = 200L * 1024 * 1024;
-        public long InMemoryThresholdBytes { get; set; } = 32L * 1024 * 1024;
-        public Dictionary<string, long> PerType { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+        public long MaxUploadBytes { get; set; }
+        public long InMemoryThresholdBytes { get; set; }
+        public Dictionary<string, long> PerType { get; set; }
 
-        public long GetMaxFor(SourceType type)
+        public UploadLimits()
         {
-            string key = type switch
+            MaxUploadBytes = 200L * 1024 * 1024;
+            InMemoryThresholdBytes = 32L * 1024 * 1024;
+            PerType = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        public long GetMaxFor(SourceType sourceType)
+        {
+            var sourceTypeKey = ResolveSourceTypeKey(sourceType);
+
+            if (PerType.TryGetValue(sourceTypeKey, out var maxBytesForType))
             {
-                SourceType.Excel => "Excel",
-                SourceType.CSV => "Csv",
-                SourceType.JSON => "Json",
-                SourceType.XML => "Xml",
-                _ => "Default"
-            };
-            return PerType.TryGetValue(key, out long v) ? v : MaxUploadBytes;
+                return maxBytesForType;
+            }
+
+            return MaxUploadBytes;
+        }
+
+        private static string ResolveSourceTypeKey(SourceType sourceType)
+        {
+            switch (sourceType)
+            {
+                case SourceType.Excel:
+                    {
+                        return "Excel";
+                    }
+                case SourceType.CSV:
+                    {
+                        return "Csv";
+                    }
+                case SourceType.JSON:
+                    {
+                        return "Json";
+                    }
+                case SourceType.XML:
+                    {
+                        return "Xml";
+                    }
+                default:
+                    {
+                        return "Default";
+                    }
+            }
         }
     }
-
 }

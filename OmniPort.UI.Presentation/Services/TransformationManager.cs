@@ -6,122 +6,155 @@ using OmniPort.Data;
 
 public class TransformationManager : ITransformationManager
 {
-    private readonly OmniPortDataContext dataContext;
+    private readonly OmniPortDataContext omniPortDataContext;
 
-    public TransformationManager(OmniPortDataContext db)
+    public TransformationManager(OmniPortDataContext omniPortDataContext)
     {
-        dataContext = db;
+        this.omniPortDataContext = omniPortDataContext;
     }
 
     public async Task<(ImportProfile Profile, SourceType ImportSourceType, SourceType ConvertSourceType)>
-        GetImportProfileForJoinAsync(int mappingTemplateId)
+        GetImportProfileForJoin(int mappingTemplateId)
     {
-        MappingTemplateData? mapping = await dataContext.MappingTemplates
-            .Include(m => m.SourceTemplate)
-            .Include(m => m.TargetTemplate)
-            .FirstOrDefaultAsync(m => m.Id == mappingTemplateId);
+        var mappingTemplateData = await omniPortDataContext.MappingTemplates
+            .Include(mappingTemplate => mappingTemplate.SourceTemplate)
+            .Include(mappingTemplate => mappingTemplate.TargetTemplate)
+            .FirstOrDefaultAsync(mappingTemplate => mappingTemplate.Id == mappingTemplateId);
 
-        if (mapping is null)
-            throw new InvalidOperationException($"Join mapping {mappingTemplateId} not found.");
-
-        List<FieldData> sourceFields = await dataContext.Fields
-            .Where(f => f.TemplateSourceId == mapping.SourceTemplateId)
-            .AsNoTracking()
-            .ToListAsync();
-
-        List<FieldData> targetFields = await dataContext.Fields
-            .Where(f => f.TemplateSourceId == mapping.TargetTemplateId)
-            .AsNoTracking()
-            .ToListAsync();
-
-        Dictionary<int, FieldData> byId = targetFields.Concat(sourceFields).ToDictionary(f => f.Id);
-
-        string BuildPath(FieldData f)
+        if (mappingTemplateData is null)
         {
-            List<string> parts = new List<string>();
-            FieldData cur = f;
-            while (cur != null!)
-            {
-                string seg = cur.Name;
-
-                if (cur.IsArrayItem)
-                {
-
-                }
-                parts.Add(seg);
-
-                if (cur.ParentFieldId is null) break;
-
-                FieldData parent = byId[cur.ParentFieldId.Value];
-                if (parent.Type == FieldDataType.Array)
-                {
-                    parts.Add(parent.Name + "[]");
-                    cur = parent.ParentFieldId is null ? null! : byId[parent.ParentFieldId.Value];
-                }
-                else
-                {
-                    cur = parent;
-                }
-            }
-
-            parts.Reverse();
-
-            return string.Join('.', parts);
+            throw new InvalidOperationException($"Join mapping {mappingTemplateId} not found.");
         }
 
-        static bool IsLeaf(FieldData f) =>
-            f.Type switch
-            {
-                FieldDataType.Object => false,
-                FieldDataType.Array => true,
-                _ => true,
-            };
-
-        List<FieldData> targetLeafs = targetFields.Where(IsLeaf).ToList();
-
-        ImportTemplate importTemplate = new ImportTemplate
-        {
-            Id = mapping.TargetTemplateId,
-            TemplateName = mapping.TargetTemplate.Name,
-            SourceType = mapping.TargetTemplate.SourceType,
-            Fields = targetLeafs.Select(tf => new TemplateField
-            {
-                Name = BuildPath(tf),
-                Type = tf.Type
-            }).ToList()
-        };
-
-        List<MappingFieldData> mf = await dataContext.MappingFields
-            .Where(x => x.MappingTemplateId == mappingTemplateId)
+        var sourceTemplateFields = await omniPortDataContext.Fields
+            .Where(field => field.TemplateSourceId == mappingTemplateData.SourceTemplateId)
             .AsNoTracking()
             .ToListAsync();
 
-        Dictionary<int, FieldData> targetById = targetFields.ToDictionary(x => x.Id);
-        Dictionary<int, FieldData> sourceById = sourceFields.ToDictionary(x => x.Id);
+        var targetTemplateFields = await omniPortDataContext.Fields
+            .Where(field => field.TemplateSourceId == mappingTemplateData.TargetTemplateId)
+            .AsNoTracking()
+            .ToListAsync();
 
-        List<FieldMapping> mappings = new List<FieldMapping>(mf.Count);
-        foreach (MappingFieldData? m in mf)
+        var fieldsById = targetTemplateFields
+            .Concat(sourceTemplateFields)
+            .ToDictionary(field => field.Id);
+
+        var targetTemplateLeafFields = targetTemplateFields
+            .Where(IsLeafField)
+            .ToList();
+
+        var importTemplate = new ImportTemplate
         {
-            if (!sourceById.TryGetValue(m.SourceFieldId, out FieldData? s) ||
-                !targetById.TryGetValue(m.TargetFieldId, out FieldData? t))
-                continue;
+            Id = mappingTemplateData.TargetTemplateId,
+            TemplateName = mappingTemplateData.TargetTemplate.Name,
+            SourceType = mappingTemplateData.TargetTemplate.SourceType,
+            Fields = targetTemplateLeafFields
+                .Select(targetField => new TemplateField
+                {
+                    Name = BuildFieldPath(targetField, fieldsById),
+                    Type = targetField.Type
+                })
+                .ToList()
+        };
 
-            mappings.Add(new FieldMapping
+        var mappingFields = await omniPortDataContext.MappingFields
+            .Where(mappingField => mappingField.MappingTemplateId == mappingTemplateId)
+            .AsNoTracking()
+            .ToListAsync();
+
+        var targetFieldsById = targetTemplateFields.ToDictionary(field => field.Id);
+        var sourceFieldsById = sourceTemplateFields.ToDictionary(field => field.Id);
+
+        var fieldMappings = new List<FieldMapping>(mappingFields.Count);
+
+        foreach (var mappingField in mappingFields)
+        {
+            if (!sourceFieldsById.TryGetValue(mappingField.SourceFieldId, out var sourceField))
             {
-                SourceField = BuildPath(s),
-                TargetField = BuildPath(t),
-                TargetType = t.Type
+                continue;
+            }
+
+            if (!targetFieldsById.TryGetValue(mappingField.TargetFieldId, out var targetField))
+            {
+                continue;
+            }
+
+            fieldMappings.Add(new FieldMapping
+            {
+                SourceField = BuildFieldPath(sourceField, fieldsById),
+                TargetField = BuildFieldPath(targetField, fieldsById),
+                TargetType = targetField.Type
             });
         }
 
-        ImportProfile profile = new ImportProfile
+        var importProfile = new ImportProfile
         {
-            Id = mapping.Id,
-            ProfileName = $"{mapping.SourceTemplate.Name} → {mapping.TargetTemplate.Name}",
+            Id = mappingTemplateData.Id,
+            ProfileName = $"{mappingTemplateData.SourceTemplate.Name} → {mappingTemplateData.TargetTemplate.Name}",
             Template = importTemplate,
-            Mappings = mappings
+            Mappings = fieldMappings
         };
 
-        return (profile, mapping.SourceTemplate.SourceType, mapping.TargetTemplate.SourceType);
+        return (importProfile, mappingTemplateData.SourceTemplate.SourceType, mappingTemplateData.TargetTemplate.SourceType);
+    }
+
+    private static bool IsLeafField(FieldData fieldData)
+    {
+        switch (fieldData.Type)
+        {
+            case FieldDataType.Object:
+                {
+                    return false;
+                }
+            case FieldDataType.Array:
+                {
+                    return true;
+                }
+            default:
+                {
+                    return true;
+                }
+        }
+    }
+
+    private static string BuildFieldPath(FieldData fieldData, Dictionary<int, FieldData> fieldsById)
+    {
+        var pathSegments = new List<string>();
+        var currentField = fieldData;
+
+        while (currentField != null)
+        {
+            pathSegments.Add(currentField.Name);
+
+            if (currentField.ParentFieldId is null)
+            {
+                break;
+            }
+
+            var parentField = fieldsById[currentField.ParentFieldId.Value];
+
+            if (parentField.Type == FieldDataType.Array)
+            {
+                pathSegments.Add(parentField.Name + "[]");
+
+                if (parentField.ParentFieldId is null)
+                {
+                    currentField = null;
+                }
+                else
+                {
+                    currentField = fieldsById[parentField.ParentFieldId.Value];
+                }
+            }
+            else
+            {
+                currentField = parentField;
+            }
+        }
+
+        pathSegments.Reverse();
+
+        return string.Join('.', pathSegments);
     }
 }

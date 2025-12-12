@@ -1,10 +1,12 @@
 ﻿@page "/join-templates"
 @using System.Linq
+@using Microsoft.AspNetCore.Authorization
 @using OmniPort.Core.Enums
-@using OmniPort.Core.Models
 @using OmniPort.Core.Records
-@using OmniPort.UI.Presentation.ViewModels
-@inject JoinTemplatesViewModel ViewModel
+@using OmniPort.UI.Presentation.Inherits.Pages
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inherits JoinTemplatesBase
 
 <h1 class="text-2xl font-bold mb-6">Transforming Templates</h1>
 
@@ -20,11 +22,11 @@ else
                 <h2 class="text-xl font-semibold text-blue-700">Source Template:</h2>
                 <select class="border rounded px-2 py-1"
                         value="@ViewModel.SourceId"
-                        @onchange="ViewModel.OnSourceChanged">
+                        @onchange="OnSourceChanged">
                     <option disabled value="">Select Template</option>
-                    @foreach (var t in ViewModel.Templates)
+                    @foreach (var template in ViewModel.Templates)
                     {
-                        <option value="@t.Id">@t.Name</option>
+                        <option value="@template.Id">@template.Name</option>
                     }
                 </select>
             </div>
@@ -34,9 +36,9 @@ else
             @if (ViewModel.SourceTemplate?.Fields is { Count: > 0 } roots)
             {
                 <ul class="list-disc pl-5 space-y-1">
-                    @foreach (var f in roots)
+                    @foreach (var templateField in roots)
                     {
-                        <SourceFieldTree Node="f" />
+                        <SourceFieldTree Node="templateField" />
                     }
                 </ul>
             }
@@ -51,11 +53,11 @@ else
                 <h2 class="text-xl font-semibold text-green-700">Internal CRM Schema:</h2>
                 <select class="border rounded px-2 py-1"
                         value="@ViewModel.TargetId"
-                        @onchange="ViewModel.OnTargetChanged">
+                        @onchange="OnTargetChanged">
                     <option disabled value="">Select Schema</option>
-                    @foreach (var t in ViewModel.Templates)
+                    @foreach (var template in ViewModel.Templates)
                     {
-                        <option value="@t.Id">@t.Name</option>
+                        <option value="@template.Id">@template.Name</option>
                     }
                 </select>
             </div>
@@ -92,13 +94,13 @@ else
 
                                 <select class="w-full mt-1 px-3 py-2 border rounded bg-white"
                                         value="@topValue"
-                                        @onchange="e => ViewModel.MapField(node.Path, e.Value?.ToString())">
+                                        @onchange="eventArgs => OnMapFieldChanged(node.Path, eventArgs)">
                                     <option value="">-- Not Mapped --</option>
-                                    @foreach (var s in ViewModel.SourceFlattened)
+                                    @foreach (var flatField in ViewModel.SourceFlattened)
                                     {
-                                        if (ViewModel.IsTopOptionCandidate(s))
+                                        if (ViewModel.IsTopOptionCandidate(flatField))
                                         {
-                                            <option value="@s.Path">@s.Path (@s.Type)</option>
+                                            <option value="@flatField.Path">@flatField.Path (@flatField.Type)</option>
                                         }
                                     }
                                 </select>
@@ -112,7 +114,7 @@ else
 
                                         <select class="w-full mt-1 px-3 py-2 border rounded bg-white"
                                                 value="@(current ?? topValue)"
-                                                @onchange="e => ViewModel.MapField(node.Path, e.Value?.ToString())">
+                                                @onchange="eventArgs => OnMapFieldChanged(node.Path, eventArgs)">
 
                                             <option value="@topValue">
                                                 — Map to the whole @topValue —
@@ -122,12 +124,12 @@ else
                                                 var baseDepth = ViewModel.GetDepth(topValue!);
                                             }
 
-                                            @foreach (var d in ViewModel.GetDescendants(topValue!))
+                                            @foreach (var flatField in ViewModel.GetDescendants(topValue!))
                                             {
-                                                var depth = Math.Max(0, ViewModel.GetDepth(d.Path) - baseDepth);
-                                                var label = ViewModel.GetIndentedLabel(d.Path, d.Type, depth);
+                                                var depth = Math.Max(0, ViewModel.GetDepth(flatField.Path) - baseDepth);
+                                                var label = ViewModel.GetIndentedLabel(flatField.Path, flatField.Type, depth);
 
-                                                <option value="@d.Path">@label</option>
+                                                <option value="@flatField.Path">@label</option>
                                             }
                                         </select>
                                     </div>
@@ -144,7 +146,7 @@ else
         </div>
     </div>
 
-    <button @onclick="ViewModel.SaveMapping"
+    <button @onclick="SaveMapping"
             class="mt-6 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-50"
             disabled="@(!ViewModel.CanSave)">
         Save Mapping
@@ -171,7 +173,7 @@ else
                         <td class="px-4 py-2">@join.SourceTemplate</td>
                         <td class="px-4 py-2">@join.TargetTemplate</td>
                         <td class="px-4 py-2 text-right">
-                            <button @onclick="() => ViewModel.DeleteJoinTemplate(join.Id)"
+                            <button @onclick="() => DeleteJoinTemplate(join.Id)"
                                     class="text-red-600 hover:underline">
                                 Delete
                             </button>
