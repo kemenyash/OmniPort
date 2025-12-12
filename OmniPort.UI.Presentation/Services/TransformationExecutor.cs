@@ -15,132 +15,212 @@ using System.Xml;
 
 public class TransformationExecutor : ITransformationExecutionService
 {
-    private readonly IOptionsMonitor<UploadLimits> limits;
-    private readonly ITransformationManager manager;
-    private readonly IWebHostEnvironment env;
+    private readonly IOptionsMonitor<UploadLimits> uploadLimitsMonitor;
+    private readonly ITransformationManager transformationManager;
+    private readonly IWebHostEnvironment webHostEnvironment;
 
     public TransformationExecutor(
-        IOptionsMonitor<UploadLimits> limits,
-        ITransformationManager manager,
-        IWebHostEnvironment env)
+        IOptionsMonitor<UploadLimits> uploadLimitsMonitor,
+        ITransformationManager transformationManager,
+        IWebHostEnvironment webHostEnvironment)
     {
-        this.limits = limits;
-        this.manager = manager;
-        this.env = env;
+        this.uploadLimitsMonitor = uploadLimitsMonitor;
+        this.transformationManager = transformationManager;
+        this.webHostEnvironment = webHostEnvironment;
     }
 
-    public async Task<string> TransformUploadedFileAsync(int templateId, object file, string outputExtension)
+    public async Task<string> TransformUploadedFile(int templateId, object file, string outputExtension)
     {
-        (ImportProfile? profile, SourceType importType, SourceType convertType) = await manager.GetImportProfileForJoinAsync(templateId);
-        using Stream stream = await ResolveStreamAsync(file, importType);
-        IEnumerable<IDictionary<string, object?>> rows = ParseAndMap(stream, importType, profile);
-        string baseName = GetBaseNameFromUpload(file) ?? $"template-{templateId}";
-        return await SaveTransformedAsync(rows, outputExtension, baseName);
+        var (importProfile, importSourceType, convertSourceType) = await transformationManager.GetImportProfileForJoin(templateId);
+
+        using var inputStream = await ResolveStream(file, importSourceType);
+
+        var mappedRows = ParseAndMap(inputStream, importSourceType, importProfile);
+
+        var baseFileName = GetBaseNameFromUpload(file) ?? $"template-{templateId}";
+
+        return await SaveTransformed(mappedRows, outputExtension, baseFileName);
     }
 
-    public async Task<string> TransformFromUrlAsync(int templateId, string url, string outputExtension)
+    public async Task<string> TransformFromUrl(int templateId, string url, string outputExtension)
     {
-        (ImportProfile? profile, SourceType importType, SourceType convertType) = await manager.GetImportProfileForJoinAsync(templateId);
-        using Stream stream = await OpenHttpStreamWithCapAsync(url, importType);
-        IEnumerable<IDictionary<string, object?>> rows = ParseAndMap(stream, importType, profile);
-        string baseName = MakeSafeFileName(new Uri(url).Segments.LastOrDefault() ?? "remote");
-        return await SaveTransformedAsync(rows, outputExtension, baseName);
+        var (importProfile, importSourceType, convertSourceType) = await transformationManager.GetImportProfileForJoin(templateId);
+
+        using var inputStream = await OpenHttpStreamWithCap(url, importSourceType);
+
+        var mappedRows = ParseAndMap(inputStream, importSourceType, importProfile);
+
+        var baseFileName = MakeSafeFileName(new Uri(url).Segments.LastOrDefault() ?? "remote");
+
+        return await SaveTransformed(mappedRows, outputExtension, baseFileName);
     }
 
-    public async Task<string> SaveTransformedAsync(IEnumerable<IDictionary<string, object?>> rows, string outputExtension, string baseName)
+    public async Task<string> SaveTransformed(
+        IEnumerable<IDictionary<string, object?>> rows,
+        string outputExtension,
+        string baseFileName)
     {
-        string safeExt = (outputExtension ?? "json").Trim('.').ToLowerInvariant();
-        if (safeExt is not ("csv" or "json" or "xml")) safeExt = "json";
+        var safeOutputExtension = NormalizeOutputExtension(outputExtension);
 
-        string exportDir = Path.Combine(env.WebRootPath ?? "wwwroot", "exports");
-        Directory.CreateDirectory(exportDir);
+        var exportsDirectoryPath = Path.Combine(webHostEnvironment.WebRootPath ?? "wwwroot", "exports");
+        Directory.CreateDirectory(exportsDirectoryPath);
 
-        string fileName = $"{MakeSafeFileName(baseName)}-{DateTime.UtcNow:yyyyMMddHHmmss}.{safeExt}";
-        string fullPath = Path.Combine(exportDir, fileName);
+        var outputFileName = $"{MakeSafeFileName(baseFileName)}-{DateTime.UtcNow:yyyyMMddHHmmss}.{safeOutputExtension}";
+        var outputFilePath = Path.Combine(exportsDirectoryPath, outputFileName);
 
-        switch (safeExt)
+        switch (safeOutputExtension)
         {
             case "csv":
-                await File.WriteAllTextAsync(fullPath, ToCsv(rows), Encoding.UTF8);
-                break;
+                {
+                    await File.WriteAllTextAsync(outputFilePath, ToCsv(rows), Encoding.UTF8);
+                    break;
+                }
             case "json":
-                await File.WriteAllTextAsync(fullPath, ToJson(rows), Encoding.UTF8);
-                break;
+                {
+                    await File.WriteAllTextAsync(outputFilePath, ToJson(rows), Encoding.UTF8);
+                    break;
+                }
             case "xml":
-                await File.WriteAllTextAsync(fullPath, ToXml(rows), Encoding.UTF8);
-                break;
+                {
+                    await File.WriteAllTextAsync(outputFilePath, ToXml(rows), Encoding.UTF8);
+                    break;
+                }
         }
 
-        return $"/exports/{fileName}";
+        return $"/exports/{outputFileName}";
     }
 
-    private static IEnumerable<IDictionary<string, object?>> ParseAndMap(Stream stream, SourceType sourceType, ImportProfile profile)
+    private static string NormalizeOutputExtension(string outputExtension)
     {
-        IImportParser parser = CreateParser(sourceType);
-        IEnumerable<IDictionary<string, object?>> parsed = parser.Parse(stream);
-        ImportMapper mapper = new ImportMapper(profile);
-        foreach (IDictionary<string, object?> row in parsed)
-            yield return mapper.MapRow(row);
+        var safeExtension = (outputExtension ?? "json").Trim('.').ToLowerInvariant();
+
+        if (safeExtension != "csv" && safeExtension != "json" && safeExtension != "xml")
+        {
+            safeExtension = "json";
+        }
+
+        return safeExtension;
     }
 
-    private static IImportParser CreateParser(SourceType sourceType) => sourceType switch
+    private static IEnumerable<IDictionary<string, object?>> ParseAndMap(
+        Stream stream,
+        SourceType sourceType,
+        ImportProfile importProfile)
     {
-        SourceType.CSV => new CsvImportParser(),
-        SourceType.Excel => new ExcelImportParser(),
-        SourceType.JSON => new JsonImportParser(),
-        SourceType.XML => new XmlImportParser("record"),
-        _ => new CsvImportParser()
-    };
+        var importParser = CreateParser(sourceType);
 
-    private async Task<Stream> ResolveStreamAsync(object file, SourceType importType)
+        var parsedRows = importParser.Parse(stream);
+
+        var importMapper = new ImportMapper(importProfile);
+
+        foreach (var parsedRow in parsedRows)
+        {
+            yield return importMapper.MapRow(parsedRow);
+        }
+    }
+
+    private static IImportParser CreateParser(SourceType sourceType)
     {
-        UploadLimits cfg = limits.CurrentValue;
-        long maxBytes = cfg.GetMaxFor(importType);
-        long threshold = cfg.InMemoryThresholdBytes;
+        switch (sourceType)
+        {
+            case SourceType.CSV:
+                {
+                    return new CsvImportParser();
+                }
+            case SourceType.Excel:
+                {
+                    return new ExcelImportParser();
+                }
+            case SourceType.JSON:
+                {
+                    return new JsonImportParser();
+                }
+            case SourceType.XML:
+                {
+                    return new XmlImportParser("record");
+                }
+            default:
+                {
+                    return new CsvImportParser();
+                }
+        }
+    }
+
+    private async Task<Stream> ResolveStream(object file, SourceType importSourceType)
+    {
+        var uploadLimits = uploadLimitsMonitor.CurrentValue;
+        var maxAllowedBytes = uploadLimits.GetMaxFor(importSourceType);
+        var inMemoryThresholdBytes = uploadLimits.InMemoryThresholdBytes;
 
         switch (file)
         {
-            case IBrowserFile bf:
+            case IBrowserFile browserFile:
                 {
-                    if (bf.Size > maxBytes)
-                        throw new InvalidOperationException($"File {bf.Name} exceeds the maximum size of {maxBytes} bytes.");
-                    using Stream src = bf.OpenReadStream(maxAllowedSize: maxBytes);
-                    return await CopyToCappedAsync(src, maxBytes, threshold);
+                    if (browserFile.Size > maxAllowedBytes)
+                    {
+                        throw new InvalidOperationException(
+                            $"File {browserFile.Name} exceeds the maximum size of {maxAllowedBytes} bytes.");
+                    }
+
+                    using var sourceStream = browserFile.OpenReadStream(maxAllowedSize: maxAllowedBytes);
+                    return await CopyToCapped(sourceStream, maxAllowedBytes, inMemoryThresholdBytes);
                 }
 
-            case IFormFile form:
+            case IFormFile formFile:
                 {
-                    if (form.Length > maxBytes)
-                        throw new InvalidOperationException($"File {form.FileName} exceeds the maximum size of {maxBytes} bytes.");
-                    using Stream src = form.OpenReadStream();
-                    return await CopyToCappedAsync(src, maxBytes, threshold);
+                    if (formFile.Length > maxAllowedBytes)
+                    {
+                        throw new InvalidOperationException(
+                            $"File {formFile.FileName} exceeds the maximum size of {maxAllowedBytes} bytes.");
+                    }
+
+                    using var sourceStream = formFile.OpenReadStream();
+                    return await CopyToCapped(sourceStream, maxAllowedBytes, inMemoryThresholdBytes);
                 }
 
-            case Stream s:
-                return await CopyToCappedAsync(s, maxBytes, threshold);
-
-            case string path when File.Exists(path):
+            case Stream inputStream:
                 {
-                    FileInfo fi = new FileInfo(path);
-                    if (fi.Length > maxBytes)
-                        throw new InvalidOperationException($"File {fi.Name} exceeds the maximum size of {maxBytes} bytes.");
+                    return await CopyToCapped(inputStream, maxAllowedBytes, inMemoryThresholdBytes);
+                }
 
-                    using FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, useAsync: true);
-                    return await CopyToCappedAsync(fs, maxBytes, threshold);
+            case string filePath when File.Exists(filePath):
+                {
+                    var fileInfo = new FileInfo(filePath);
+
+                    if (fileInfo.Length > maxAllowedBytes)
+                    {
+                        throw new InvalidOperationException(
+                            $"File {fileInfo.Name} exceeds the maximum size of {maxAllowedBytes} bytes.");
+                    }
+
+                    using var fileStream = new FileStream(
+                        filePath,
+                        FileMode.Open,
+                        FileAccess.Read,
+                        FileShare.Read,
+                        4096,
+                        useAsync: true);
+
+                    return await CopyToCapped(fileStream, maxAllowedBytes, inMemoryThresholdBytes);
                 }
 
             default:
-                throw new NotSupportedException($"Unsupported upload type: {file?.GetType().FullName}");
+                {
+                    throw new NotSupportedException($"Unsupported upload type: {file?.GetType().FullName}");
+                }
         }
     }
 
-    private async Task<Stream> OpenHttpStreamWithCapAsync(string url, SourceType importType, CancellationToken ct = default)
+    private async Task<Stream> OpenHttpStreamWithCap(
+        string url,
+        SourceType importSourceType,
+        CancellationToken cancellationToken = default)
     {
-        UploadLimits cfg = limits.CurrentValue;
-        long maxBytes = cfg.GetMaxFor(importType);
-        long threshold = cfg.InMemoryThresholdBytes;
+        var uploadLimits = uploadLimitsMonitor.CurrentValue;
+        var maxAllowedBytes = uploadLimits.GetMaxFor(importSourceType);
+        var inMemoryThresholdBytes = uploadLimits.InMemoryThresholdBytes;
 
-        using SocketsHttpHandler handler = new SocketsHttpHandler
+        using var socketsHttpHandler = new SocketsHttpHandler
         {
             AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate | DecompressionMethods.Brotli,
             AllowAutoRedirect = true,
@@ -149,292 +229,450 @@ public class TransformationExecutor : ITransformationExecutionService
             CookieContainer = new CookieContainer()
         };
 
-        using HttpClient client = new HttpClient(handler, disposeHandler: true);
+        using var httpClient = new HttpClient(socketsHttpHandler, disposeHandler: true);
 
-        using HttpRequestMessage firstReq = new HttpRequestMessage(HttpMethod.Get, url);
-        firstReq.Headers.UserAgent.ParseAdd("OmniPort/1.0");
-        firstReq.Headers.Accept.ParseAdd("*/*");
+        using var initialRequest = new HttpRequestMessage(HttpMethod.Get, url);
+        initialRequest.Headers.UserAgent.ParseAdd("OmniPort/1.0");
+        initialRequest.Headers.Accept.ParseAdd("*/*");
 
-        using HttpResponseMessage firstResp = await client.SendAsync(firstReq, HttpCompletionOption.ResponseHeadersRead, ct);
-        firstResp.EnsureSuccessStatusCode();
+        using var initialResponse = await httpClient.SendAsync(
+            initialRequest,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken);
 
-        string contentType = firstResp.Content.Headers.ContentType?.MediaType ?? string.Empty;
-        await using Stream firstStream = await firstResp.Content.ReadAsStreamAsync(ct);
+        initialResponse.EnsureSuccessStatusCode();
 
-        Stream raw = await CopyToCappedAsync(firstStream, maxBytes, threshold);
-        Stream seekable = await EnsureSeekableAtZeroAsync(raw);
+        var responseContentType = initialResponse.Content.Headers.ContentType?.MediaType ?? string.Empty;
 
-        if (importType == SourceType.Excel && !LooksLikeZip(seekable))
+        await using var initialResponseStream = await initialResponse.Content.ReadAsStreamAsync(cancellationToken);
+
+        var cappedStream = await CopyToCapped(initialResponseStream, maxAllowedBytes, inMemoryThresholdBytes);
+        var seekableStream = await EnsureSeekableAtZero(cappedStream);
+
+        if (importSourceType == SourceType.Excel && !LooksLikeZip(seekableStream))
         {
-            string htmlHead = await PeekTextAsync(seekable, 512 * 1024);
-            if (IsHtml(contentType, htmlHead))
+            var htmlHead = await PeekText(seekableStream, 512 * 1024);
+
+            if (IsHtml(responseContentType, htmlHead))
             {
-                Uri baseUri = new Uri(url, UriKind.Absolute);
-                if (TryExtractXlsxHref(htmlHead, baseUri, out Uri? directUri))
+                var baseUri = new Uri(url, UriKind.Absolute);
+
+                if (TryExtractXlsxHref(htmlHead, baseUri, out var directUri))
                 {
-                    using HttpRequestMessage fileReq = new HttpRequestMessage(HttpMethod.Get, directUri);
-                    fileReq.Headers.UserAgent.ParseAdd("OmniPort/1.0");
-                    fileReq.Headers.Referrer = baseUri;
-                    fileReq.Headers.Accept.ParseAdd("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,*/*");
+                    using var fileRequest = new HttpRequestMessage(HttpMethod.Get, directUri);
+                    fileRequest.Headers.UserAgent.ParseAdd("OmniPort/1.0");
+                    fileRequest.Headers.Referrer = baseUri;
+                    fileRequest.Headers.Accept.ParseAdd(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,*/*");
 
-                    using HttpResponseMessage fileResp = await client.SendAsync(fileReq, HttpCompletionOption.ResponseHeadersRead, ct);
-                    fileResp.EnsureSuccessStatusCode();
+                    using var fileResponse = await httpClient.SendAsync(
+                        fileRequest,
+                        HttpCompletionOption.ResponseHeadersRead,
+                        cancellationToken);
 
-                    await using Stream fileStream = await fileResp.Content.ReadAsStreamAsync(ct);
-                    Stream fileRaw = await CopyToCappedAsync(fileStream, maxBytes, threshold);
-                    Stream fileSeekable = await EnsureSeekableAtZeroAsync(fileRaw);
+                    fileResponse.EnsureSuccessStatusCode();
 
-                    if (!LooksLikeZip(fileSeekable))
+                    await using var fileResponseStream = await fileResponse.Content.ReadAsStreamAsync(cancellationToken);
+
+                    var cappedFileStream = await CopyToCapped(fileResponseStream, maxAllowedBytes, inMemoryThresholdBytes);
+                    var seekableFileStream = await EnsureSeekableAtZero(cappedFileStream);
+
+                    if (!LooksLikeZip(seekableFileStream))
                     {
-                        string head2 = await PeekTextAsync(fileSeekable, 1024);
+                        var responseHeadPreview = await PeekText(seekableFileStream, 1024);
+
                         throw new InvalidOperationException(
-                            $"Direct link did not return XLSX/ZIP. Content-Type: '{fileResp.Content.Headers.ContentType?.MediaType}'. Head: {head2}");
+                            $"Direct link did not return XLSX/ZIP. Content-Type: '{fileResponse.Content.Headers.ContentType?.MediaType}'. Head: {responseHeadPreview}");
                     }
 
-                    return fileSeekable;
+                    return seekableFileStream;
                 }
             }
 
             throw new InvalidOperationException(
-                $"Remote content is not a valid XLSX/ZIP. Content-Type: '{contentType}'. " +
+                $"Remote content is not a valid XLSX/ZIP. Content-Type: '{responseContentType}'. " +
                 $"Head: {TrimPreview(htmlHead)}");
         }
 
-        return seekable;
-
-        static bool IsHtml(string contentType, string head)
-            => contentType.Contains("html", StringComparison.OrdinalIgnoreCase)
-               || head.StartsWith("<!DOCTYPE html", StringComparison.OrdinalIgnoreCase)
-               || head.Contains("<html", StringComparison.OrdinalIgnoreCase);
+        return seekableStream;
     }
 
+    private static bool IsHtml(string contentType, string head)
+    {
+        if (contentType.Contains("html", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (head.StartsWith("<!DOCTYPE html", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (head.Contains("<html", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return false;
+    }
 
     // === Helpers ===
-
 
     private static bool TryExtractXlsxHref(string html, Uri baseUri, out Uri directUri)
     {
         directUri = null!;
 
-        int idx = IndexOfXlsxHref(html, out string href);
-        if (idx < 0) return false;
-
-        if (!Uri.TryCreate(baseUri, href, out Uri? abs))
+        var index = IndexOfXlsxHref(html, out var href);
+        if (index < 0)
+        {
             return false;
-
-        directUri = abs;
-        return true;
-
-        static int IndexOfXlsxHref(string html, out string href)
-        {
-            href = string.Empty;
-            string lower = html.ToLowerInvariant();
-            string key = "href";
-            int pos = 0;
-            while ((pos = lower.IndexOf(key, pos, StringComparison.Ordinal)) >= 0)
-            {
-                int eq = lower.IndexOf('=', pos + key.Length);
-                if (eq < 0) { pos += key.Length; continue; }
-
-                int i = eq + 1;
-                while (i < html.Length && char.IsWhiteSpace(html[i])) i++;
-
-                if (i >= html.Length) break;
-
-                char quote = html[i];
-                string candidate;
-                if (quote == '"' || quote == '\'')
-                {
-                    i++;
-                    int j = html.IndexOf(quote, i);
-                    if (j < 0) break;
-                    candidate = html.Substring(i, j - i);
-                    pos = j + 1;
-                }
-                else
-                {
-                    int j = i;
-                    while (j < html.Length && !char.IsWhiteSpace(html[j]) && html[j] != '>')
-                        j++;
-                    candidate = html.Substring(i, j - i);
-                    pos = j;
-                }
-
-                if (candidate.Contains(".xlsx", StringComparison.OrdinalIgnoreCase))
-                {
-                    href = candidate.Trim();
-                    return pos;
-                }
-            }
-            return -1;
         }
-    }
 
-    private static string TrimPreview(string s)
-    {
-        if (string.IsNullOrWhiteSpace(s)) return "(empty)";
-        s = s.Replace("\r", " ").Replace("\n", " ").Trim();
-        if (s.Length > 300) s = s.Substring(0, 300) + "…";
-        return s;
-    }
-
-
-    private static async Task<Stream> CopyToCappedAsync(Stream source, long maxBytes, long threshold)
-    {
-        MemoryStream ms = new MemoryStream();
-        byte[] buffer = new byte[81920];
-        long total = 0;
-
-        while (true)
+        if (!Uri.TryCreate(baseUri, href, out var absoluteUri))
         {
-            int read = await source.ReadAsync(buffer.AsMemory(0, buffer.Length));
-            if (read <= 0) break;
+            return false;
+        }
 
-            total += read;
-            if (total > maxBytes)
-                throw new InvalidOperationException($"The input stream exceeded the limit of {maxBytes} bytes.");
+        directUri = absoluteUri;
+        return true;
+    }
 
-            if (total <= threshold)
+    private static int IndexOfXlsxHref(string html, out string href)
+    {
+        href = string.Empty;
+
+        var lower = html.ToLowerInvariant();
+        var key = "href";
+        var position = 0;
+
+        while ((position = lower.IndexOf(key, position, StringComparison.Ordinal)) >= 0)
+        {
+            var equalsIndex = lower.IndexOf('=', position + key.Length);
+            if (equalsIndex < 0)
             {
-                await ms.WriteAsync(buffer.AsMemory(0, read));
+                position += key.Length;
                 continue;
             }
 
-            string tmp = Path.GetTempFileName();
-            await using (FileStream wr = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true))
+            var i = equalsIndex + 1;
+            while (i < html.Length && char.IsWhiteSpace(html[i]))
             {
-                ms.Position = 0;
-                await ms.CopyToAsync(wr);
-                await wr.WriteAsync(buffer.AsMemory(0, read));
+                i++;
+            }
 
-                while ((read = await source.ReadAsync(buffer.AsMemory(0, buffer.Length))) > 0)
+            if (i >= html.Length)
+            {
+                break;
+            }
+
+            var quote = html[i];
+            string candidate;
+
+            if (quote == '"' || quote == '\'')
+            {
+                i++;
+                var j = html.IndexOf(quote, i);
+                if (j < 0)
                 {
-                    total += read;
-                    if (total > maxBytes)
+                    break;
+                }
+
+                candidate = html.Substring(i, j - i);
+                position = j + 1;
+            }
+            else
+            {
+                var j = i;
+
+                while (j < html.Length && !char.IsWhiteSpace(html[j]) && html[j] != '>')
+                {
+                    j++;
+                }
+
+                candidate = html.Substring(i, j - i);
+                position = j;
+            }
+
+            if (candidate.Contains(".xlsx", StringComparison.OrdinalIgnoreCase))
+            {
+                href = candidate.Trim();
+                return position;
+            }
+        }
+
+        return -1;
+    }
+
+    private static string TrimPreview(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return "(empty)";
+        }
+
+        var normalized = text.Replace("\r", " ").Replace("\n", " ").Trim();
+
+        if (normalized.Length > 300)
+        {
+            normalized = normalized.Substring(0, 300) + "…";
+        }
+
+        return normalized;
+    }
+
+    private static async Task<Stream> CopyToCapped(Stream source, long maxBytes, long inMemoryThresholdBytes)
+    {
+        var memoryStream = new MemoryStream();
+        var buffer = new byte[81920];
+        long totalBytesRead = 0;
+
+        while (true)
+        {
+            var bytesRead = await source.ReadAsync(buffer.AsMemory(0, buffer.Length));
+            if (bytesRead <= 0)
+            {
+                break;
+            }
+
+            totalBytesRead += bytesRead;
+
+            if (totalBytesRead > maxBytes)
+            {
+                throw new InvalidOperationException($"The input stream exceeded the limit of {maxBytes} bytes.");
+            }
+
+            if (totalBytesRead <= inMemoryThresholdBytes)
+            {
+                await memoryStream.WriteAsync(buffer.AsMemory(0, bytesRead));
+                continue;
+            }
+
+            var tempFilePath = Path.GetTempFileName();
+
+            await using (var writeStream = new FileStream(
+                tempFilePath,
+                FileMode.Create,
+                FileAccess.Write,
+                FileShare.None,
+                81920,
+                useAsync: true))
+            {
+                memoryStream.Position = 0;
+                await memoryStream.CopyToAsync(writeStream);
+
+                await writeStream.WriteAsync(buffer.AsMemory(0, bytesRead));
+
+                while ((bytesRead = await source.ReadAsync(buffer.AsMemory(0, buffer.Length))) > 0)
+                {
+                    totalBytesRead += bytesRead;
+
+                    if (totalBytesRead > maxBytes)
+                    {
                         throw new InvalidOperationException($"The input stream exceeded the limit of {maxBytes} bytes.");
-                    await wr.WriteAsync(buffer.AsMemory(0, read));
+                    }
+
+                    await writeStream.WriteAsync(buffer.AsMemory(0, bytesRead));
                 }
             }
 
-            return new FileStream(tmp, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, useAsync: false);
+            return new FileStream(tempFilePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, useAsync: false);
         }
 
-        ms.Position = 0;
-        return ms;
+        memoryStream.Position = 0;
+        return memoryStream;
     }
 
-    private static async Task<Stream> EnsureSeekableAtZeroAsync(Stream s)
+    private static async Task<Stream> EnsureSeekableAtZero(Stream stream)
     {
-        if (s.CanSeek)
+        if (stream.CanSeek)
         {
-            s.Position = 0;
-            return s;
+            stream.Position = 0;
+            return stream;
         }
-        MemoryStream ms = new MemoryStream();
-        await s.CopyToAsync(ms);
-        ms.Position = 0;
-        s.Dispose();
-        return ms;
+
+        var memoryStream = new MemoryStream();
+
+        await stream.CopyToAsync(memoryStream);
+
+        memoryStream.Position = 0;
+        stream.Dispose();
+
+        return memoryStream;
     }
 
-    private static bool LooksLikeZip(Stream s)
+    private static bool LooksLikeZip(Stream stream)
     {
-        if (!s.CanSeek) return false;
-        long pos = s.Position;
+        if (!stream.CanSeek)
+        {
+            return false;
+        }
+
+        var position = stream.Position;
+
         Span<byte> magic = stackalloc byte[4];
-        int read = s.Read(magic);
-        s.Position = pos;
-        return read == 4 && magic[0] == (byte)'P' && magic[1] == (byte)'K' && magic[2] == 3 && magic[3] == 4;
+        var bytesRead = stream.Read(magic);
+
+        stream.Position = position;
+
+        return bytesRead == 4 &&
+               magic[0] == (byte)'P' &&
+               magic[1] == (byte)'K' &&
+               magic[2] == 3 &&
+               magic[3] == 4;
     }
 
-    private static async Task<string> PeekTextAsync(Stream s, int maxBytes)
+    private static async Task<string> PeekText(Stream stream, int maxBytes)
     {
-        if (!s.CanSeek) return "(non-seekable)";
-        long pos = s.Position;
-        int toRead = (int)Math.Min(maxBytes, s.Length - s.Position);
-        byte[] buf = new byte[toRead];
-        int read = await s.ReadAsync(buf.AsMemory(0, toRead));
-        s.Position = pos;
-        try { return Encoding.UTF8.GetString(buf, 0, read).Replace("\0", "").Trim(); }
-        catch { return "(binary or non-UTF8)"; }
+        if (!stream.CanSeek)
+        {
+            return "(non-seekable)";
+        }
+
+        var position = stream.Position;
+        var toRead = (int)Math.Min(maxBytes, stream.Length - stream.Position);
+
+        var buffer = new byte[toRead];
+        var bytesRead = await stream.ReadAsync(buffer.AsMemory(0, toRead));
+
+        stream.Position = position;
+
+        try
+        {
+            return Encoding.UTF8.GetString(buffer, 0, bytesRead).Replace("\0", "").Trim();
+        }
+        catch
+        {
+            return "(binary or non-UTF8)";
+        }
     }
 
-    private static string? GetBaseNameFromUpload(object file) =>
-        file is IBrowserFile bf ? Path.GetFileNameWithoutExtension(bf.Name) : null;
+    private static string? GetBaseNameFromUpload(object file)
+    {
+        if (file is IBrowserFile browserFile)
+        {
+            return Path.GetFileNameWithoutExtension(browserFile.Name);
+        }
+
+        return null;
+    }
 
     private static string MakeSafeFileName(string name)
     {
-        if (string.IsNullOrWhiteSpace(name)) return "export";
-        foreach (char c in Path.GetInvalidFileNameChars())
-            name = name.Replace(c, '_');
-        name = name.Trim('.');
-        return string.IsNullOrWhiteSpace(name) ? "export" : name;
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return "export";
+        }
+
+        var safeName = name;
+
+        foreach (var invalidCharacter in Path.GetInvalidFileNameChars())
+        {
+            safeName = safeName.Replace(invalidCharacter, '_');
+        }
+
+        safeName = safeName.Trim('.');
+
+        if (string.IsNullOrWhiteSpace(safeName))
+        {
+            return "export";
+        }
+
+        return safeName;
     }
 
     private static string ToJson(IEnumerable<IDictionary<string, object?>> rows)
     {
-        JsonSerializerOptions opts = new JsonSerializerOptions { WriteIndented = true };
-        return JsonSerializer.Serialize(rows, opts);
+        var jsonSerializerOptions = new JsonSerializerOptions
+        {
+            WriteIndented = true
+        };
+
+        return JsonSerializer.Serialize(rows, jsonSerializerOptions);
     }
 
     private static string ToCsv(IEnumerable<IDictionary<string, object?>> rows)
     {
-        List<IDictionary<string, object?>> list = rows.ToList();
-        if (list.Count == 0) return string.Empty;
+        var rowList = rows.ToList();
 
-        List<string> headers = list.First().Keys.ToList();
-        StringBuilder sb = new StringBuilder();
-        sb.AppendLine(string.Join(",", headers.Select(EscapeCsv)));
-
-        foreach (IDictionary<string, object?>? row in list)
+        if (rowList.Count == 0)
         {
-            string line = string.Join(",", headers.Select(h => EscapeCsv(row.TryGetValue(h, out object? v) ? v : null)));
-            sb.AppendLine(line);
+            return string.Empty;
         }
-        return sb.ToString();
 
-        static string EscapeCsv(object? value)
+        var headers = rowList.First().Keys.ToList();
+
+        var stringBuilder = new StringBuilder();
+        stringBuilder.AppendLine(string.Join(",", headers.Select(EscapeCsvValue)));
+
+        foreach (var row in rowList)
         {
-            string s = value?.ToString() ?? string.Empty;
-            bool needsQuotes = s.Contains(',') || s.Contains('"') || s.Contains('\n') || s.Contains('\r');
-            s = s.Replace("\"", "\"\"");
-            return needsQuotes ? $"\"{s}\"" : s;
+            var line = string.Join(
+                ",",
+                headers.Select(header =>
+                    EscapeCsvValue(row.TryGetValue(header, out var value) ? value : null)));
+
+            stringBuilder.AppendLine(line);
         }
+
+        return stringBuilder.ToString();
+    }
+
+    private static string EscapeCsvValue(object? value)
+    {
+        var text = value?.ToString() ?? string.Empty;
+
+        var needsQuotes = text.Contains(',') || text.Contains('"') || text.Contains('\n') || text.Contains('\r');
+
+        text = text.Replace("\"", "\"\"");
+
+        if (needsQuotes)
+        {
+            return $"\"{text}\"";
+        }
+
+        return text;
     }
 
     private static string ToXml(IEnumerable<IDictionary<string, object?>> rows)
     {
-        XmlWriterSettings settings = new XmlWriterSettings
+        var xmlWriterSettings = new XmlWriterSettings
         {
             Indent = true,
             Encoding = Encoding.UTF8,
             OmitXmlDeclaration = false
         };
 
-        using StringWriter sw = new StringWriter();
-        using XmlWriter xw = XmlWriter.Create(sw, settings);
+        using var stringWriter = new StringWriter();
+        using var xmlWriter = XmlWriter.Create(stringWriter, xmlWriterSettings);
 
-        xw.WriteStartDocument();
-        xw.WriteStartElement("rows");
+        xmlWriter.WriteStartDocument();
+        xmlWriter.WriteStartElement("rows");
 
-        foreach (IDictionary<string, object?> row in rows)
+        foreach (var row in rows)
         {
-            xw.WriteStartElement("row");
-            foreach (KeyValuePair<string, object?> kv in row)
+            xmlWriter.WriteStartElement("row");
+
+            foreach (var keyValuePair in row)
             {
-                xw.WriteStartElement("field");
-                xw.WriteAttributeString("name", kv.Key);
-                if (kv.Value is not null)
-                    xw.WriteString(kv.Value.ToString());
-                xw.WriteEndElement();
+                xmlWriter.WriteStartElement("field");
+                xmlWriter.WriteAttributeString("name", keyValuePair.Key);
+
+                if (keyValuePair.Value is not null)
+                {
+                    xmlWriter.WriteString(keyValuePair.Value.ToString());
+                }
+
+                xmlWriter.WriteEndElement();
             }
-            xw.WriteEndElement();
+
+            xmlWriter.WriteEndElement();
         }
 
-        xw.WriteEndElement();
-        xw.WriteEndDocument();
-        xw.Flush();
+        xmlWriter.WriteEndElement();
+        xmlWriter.WriteEndDocument();
+        xmlWriter.Flush();
 
-        return sw.ToString();
+        return stringWriter.ToString();
     }
 }

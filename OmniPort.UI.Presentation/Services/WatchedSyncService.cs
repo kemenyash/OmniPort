@@ -10,45 +10,45 @@ namespace OmniPort.UI.Presentation.Services
 {
     public class WatchedHashSyncService : BackgroundService
     {
-        private readonly IAppSyncContext syncContext;
-        private readonly ISourceFingerprintStore fingerprints;
-        private readonly IServiceProvider serviceProvider;
-        private readonly ILogger<WatchedHashSyncService> logger;
+        private readonly IAppSyncContext applicationSyncContext;
+        private readonly ISourceFingerprintStore sourceFingerprintStore;
+        private readonly IServiceProvider rootServiceProvider;
+        private readonly ILogger<WatchedHashSyncService> serviceLogger;
 
         private readonly TimeSpan scanPeriod;
-        private readonly ConcurrentDictionary<string, SemaphoreSlim> urlLocks;
-        private readonly SemaphoreSlim parallelGate;
+        private readonly ConcurrentDictionary<string, SemaphoreSlim> urlLocksByEffectiveUrl;
+        private readonly SemaphoreSlim parallelProcessingGate;
 
-        private readonly UrlContentFetcher fetcher;
+        private readonly UrlContentFetcher urlContentFetcher;
 
         public WatchedHashSyncService(
-            IAppSyncContext sync,
-            ISourceFingerprintStore fingerprints,
-            IServiceProvider root,
-            ILogger<WatchedHashSyncService> log)
+            IAppSyncContext applicationSyncContext,
+            ISourceFingerprintStore sourceFingerprintStore,
+            IServiceProvider rootServiceProvider,
+            ILogger<WatchedHashSyncService> serviceLogger)
         {
-            syncContext = sync;
-            this.fingerprints = fingerprints;
-            serviceProvider = root;
-            logger = log;
+            this.applicationSyncContext = applicationSyncContext;
+            this.sourceFingerprintStore = sourceFingerprintStore;
+            this.rootServiceProvider = rootServiceProvider;
+            this.serviceLogger = serviceLogger;
 
             scanPeriod = TimeSpan.FromSeconds(20);
 
-            urlLocks = new ConcurrentDictionary<string, SemaphoreSlim>(StringComparer.OrdinalIgnoreCase);
-            parallelGate = new SemaphoreSlim(4, 4);
+            urlLocksByEffectiveUrl = new ConcurrentDictionary<string, SemaphoreSlim>(StringComparer.OrdinalIgnoreCase);
+            parallelProcessingGate = new SemaphoreSlim(4, 4);
 
-            fetcher = new UrlContentFetcher("OmniPort/1.0");
+            urlContentFetcher = new UrlContentFetcher("OmniPort/1.0");
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             try
             {
-                await syncContext.Initialize(stoppingToken);
+                await applicationSyncContext.Initialize(stoppingToken);
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                logger.LogError(ex, "AppSyncContext initialization failed");
+                serviceLogger.LogError(exception, "AppSyncContext initialization failed");
             }
 
             while (!stoppingToken.IsCancellationRequested)
@@ -60,9 +60,9 @@ namespace OmniPort.UI.Presentation.Services
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {
                 }
-                catch (Exception ex)
+                catch (Exception exception)
                 {
-                    logger.LogError(ex, "Unhandled error in watch loop");
+                    serviceLogger.LogError(exception, "Unhandled error in watch loop");
                 }
 
                 try
@@ -75,107 +75,120 @@ namespace OmniPort.UI.Presentation.Services
             }
         }
 
-        private async Task Tick(CancellationToken ct)
+        private async Task Tick(CancellationToken cancellationToken)
         {
-            var watchedUrls = syncContext.WatchedUrls;
-            if (watchedUrls.Count == 0) return;
-
-            var dateTimeNow = DateTime.UtcNow;
-
-            foreach (WatchedUrlDto watched in watchedUrls)
+            var watchedUrls = applicationSyncContext.WatchedUrls;
+            if (watchedUrls.Count == 0)
             {
-                string storedUrl = (watched.Url ?? string.Empty).Trim();
-                if (string.IsNullOrWhiteSpace(storedUrl)) continue;
+                return;
+            }
 
-                var interval = TimeSpan.FromMinutes(watched.IntervalMinutes);
-                int mapId = watched.MappingTemplateId;
+            var utcNow = DateTime.UtcNow;
 
-                var last = syncContext.UrlConversions
-                    .Where(x => string.Equals(x.InputUrl, storedUrl, StringComparison.OrdinalIgnoreCase)
-                             && x.MappingTemplateId == mapId)
-                    .OrderByDescending(x => x.ConvertedAt)
+            foreach (var watchedUrl in watchedUrls)
+            {
+                var storedUrl = (watchedUrl.Url ?? string.Empty).Trim();
+                if (string.IsNullOrWhiteSpace(storedUrl))
+                {
+                    continue;
+                }
+
+                var watchInterval = TimeSpan.FromMinutes(watchedUrl.IntervalMinutes);
+                var mappingTemplateId = watchedUrl.MappingTemplateId;
+
+                var lastConversion = applicationSyncContext.UrlConversions
+                    .Where(urlConversion =>
+                        string.Equals(urlConversion.InputUrl, storedUrl, StringComparison.OrdinalIgnoreCase) &&
+                        urlConversion.MappingTemplateId == mappingTemplateId)
+                    .OrderByDescending(urlConversion => urlConversion.ConvertedAt)
                     .FirstOrDefault();
 
-                if (last == null || dateTimeNow - last.ConvertedAt >= interval)
+                if (lastConversion == null || utcNow - lastConversion.ConvertedAt >= watchInterval)
                 {
-                    _ = ProcessOneScheduled(storedUrl, mapId, ct);
+                    _ = ProcessScheduledUrl(storedUrl, mappingTemplateId, cancellationToken);
                 }
             }
         }
 
-        private async Task ProcessOneScheduled(string storedUrl, int mappingTemplateId, CancellationToken ct)
+        private async Task ProcessScheduledUrl(string storedUrl, int mappingTemplateId, CancellationToken cancellationToken)
         {
-            await parallelGate.WaitAsync(ct);
+            await parallelProcessingGate.WaitAsync(cancellationToken);
             try
             {
-                await ProcessOne(storedUrl, mappingTemplateId, ct);
+                await ProcessUrl(storedUrl, mappingTemplateId, cancellationToken);
             }
             finally
             {
-                parallelGate.Release();
+                parallelProcessingGate.Release();
             }
         }
 
-        private async Task ProcessOne(string storedUrl, int mappingTemplateId, CancellationToken ct)
+        private async Task ProcessUrl(string storedUrl, int mappingTemplateId, CancellationToken cancellationToken)
         {
-            string effectiveUrl = UrlWatchTagger.StripTag(storedUrl);
+            var effectiveUrl = UrlWatchTagger.StripTag(storedUrl);
 
-            var gate = urlLocks.GetOrAdd(effectiveUrl, _ => new SemaphoreSlim(1, 1));
-            await gate.WaitAsync(ct);
+            var effectiveUrlLock = urlLocksByEffectiveUrl.GetOrAdd(
+                effectiveUrl,
+                _ => new SemaphoreSlim(1, 1));
+
+            await effectiveUrlLock.WaitAsync(cancellationToken);
 
             try
             {
-                var snap = fetcher.DownloadEffectiveContent(effectiveUrl, ct);
-                if (snap.IsEmpty)
+                var contentSnapshot = urlContentFetcher.DownloadEffectiveContent(effectiveUrl, cancellationToken);
+                if (contentSnapshot.IsEmpty)
                 {
-                    logger.LogDebug("Empty content for {Url}", effectiveUrl);
+                    serviceLogger.LogDebug("Empty content for {Url}", effectiveUrl);
                     return;
                 }
 
-                string currentHash = Sha256HexGenerator.Compute(snap.Bytes);
+                var currentContentHash = Sha256HexGenerator.Compute(contentSnapshot.Bytes);
 
-                string? prevHash = await fingerprints.GetHash(effectiveUrl, mappingTemplateId, ct);
-                if (string.Equals(prevHash, currentHash, StringComparison.Ordinal))
+                var previousContentHash = await sourceFingerprintStore.GetHash(effectiveUrl, mappingTemplateId, cancellationToken);
+                if (string.Equals(previousContentHash, currentContentHash, StringComparison.Ordinal))
                 {
-                    logger.LogDebug("No changes by hash for {Url}", effectiveUrl);
+                    serviceLogger.LogDebug("No changes by hash for {Url}", effectiveUrl);
                     return;
                 }
 
-                var mapping = syncContext.JoinedTemplates.FirstOrDefault(x => x.Id == mappingTemplateId);
-                if (mapping is null)
+                var mappingTemplate = applicationSyncContext.JoinedTemplates.FirstOrDefault(template => template.Id == mappingTemplateId);
+                if (mappingTemplate is null)
                 {
-                    logger.LogWarning("Mapping {MappingId} not found for {Url}", mappingTemplateId, storedUrl);
+                    serviceLogger.LogWarning("Mapping {MappingId} not found for {Url}", mappingTemplateId, storedUrl);
                     return;
                 }
 
-                var extension = FileToFormatConverter.ToExtension(mapping.OutputFormat);
+                var outputExtension = FileToFormatConverter.ToExtension(mappingTemplate.OutputFormat);
 
-                using IServiceScope scope = serviceProvider.CreateScope();
-                var executor = scope.ServiceProvider.GetRequiredService<ITransformationExecutionService>();
+                using var serviceScope = rootServiceProvider.CreateScope();
+                var transformationExecutionService = serviceScope.ServiceProvider.GetRequiredService<ITransformationExecutionService>();
 
-                var output = await executor.TransformFromUrlAsync(mappingTemplateId, storedUrl, extension);
+                var outputLink = await transformationExecutionService.TransformFromUrl(mappingTemplateId, storedUrl, outputExtension);
 
-                await syncContext.AddUrlConversion(new UrlConversionHistoryDto(
+                var urlConversionHistory = new UrlConversionHistoryDto(
                     Id: 0,
                     ConvertedAt: DateTime.UtcNow,
                     InputUrl: storedUrl,
-                    OutputLink: output,
+                    OutputLink: outputLink,
                     MappingTemplateId: mappingTemplateId,
-                    MappingTemplateName: string.Empty
-                ), ct);
+                    MappingTemplateName: string.Empty);
 
-                await fingerprints.SetHash(effectiveUrl, currentHash, mappingTemplateId, ct);
+                await applicationSyncContext.AddUrlConversion(urlConversionHistory, cancellationToken);
 
-                logger.LogInformation("Updated from {Url} (hash changed)", effectiveUrl);
+                await sourceFingerprintStore.SetHash(effectiveUrl, currentContentHash, mappingTemplateId, cancellationToken);
+
+                serviceLogger.LogInformation("Updated from {Url} (hash changed)", effectiveUrl);
             }
-            catch (OperationCanceledException) { }
-            catch (Exception ex)
+            catch (OperationCanceledException)
             {
-                logger.LogError(ex, "Error processing {Url}", storedUrl);
+            }
+            catch (Exception exception)
+            {
+                serviceLogger.LogError(exception, "Error processing {Url}", storedUrl);
             }
             finally
             {
-                gate.Release();
+                effectiveUrlLock.Release();
             }
         }
     }

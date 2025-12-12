@@ -136,7 +136,7 @@ namespace OmniPort.UI.Presentation.ViewModels.Pages
 
             string extension = FileToFormatConverter.ToExtension(selected.OutputFormat);
 
-            string outputUrl = await executor.TransformUploadedFileAsync(
+            string outputUrl = await executor.TransformUploadedFile(
                 templateId: FormModel.SelectedMappingTemplateId,
                 file: uploadObject,
                 outputExtension: extension
@@ -165,7 +165,7 @@ namespace OmniPort.UI.Presentation.ViewModels.Pages
 
             string extension = FileToFormatConverter.ToExtension(selected.OutputFormat);
 
-            string outputUrl = await executor.TransformFromUrlAsync(
+            string outputUrl = await executor.TransformFromUrl(
                 templateId: FormModel.SelectedMappingTemplateId,
                 url: FormModel.FileUrl!,
                 outputExtension: extension
