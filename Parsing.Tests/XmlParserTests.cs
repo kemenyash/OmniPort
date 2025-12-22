@@ -1,19 +1,23 @@
-﻿using OmniPort.Core.Parsers;
+﻿using OmniPort.Core.Interfaces;
+using OmniPort.Core.Parsers;
 
-namespace Parsing.Tests
+namespace Parsing.Tests;
+
+public class XmlParserTests
 {
-    public class XmlParserTests
+    [Fact]
+    public void Should_Parse_Xml_File()
     {
-        [Fact]
-        public void Should_Parse_Xml_File()
-        {
-            XmlImportParser parser = new XmlImportParser("Person");
+        IImportParser parser = new XmlImportParser("Person");
+        string path = Path.Combine(AppContext.BaseDirectory, "TestData", "sample.xml");
+        Assert.True(File.Exists(path), $"Файл не знайдено: {path}");
 
-            using FileStream stream = File.OpenRead("TestData/sample.xml");
-            List<IDictionary<string, object?>> records = parser.Parse(stream).ToList();
+        using FileStream stream = File.OpenRead(path);
 
-            Assert.Equal("Kateryna", records[0]["FirstName"]);
-            Assert.Equal("Gromovych", records[0]["LastName"]);
-        }
+        List<IDictionary<string, object?>> records = parser.Parse(stream).ToList();
+
+        Assert.NotEmpty(records);
+        Assert.Equal("Kateryna", records[0]["FirstName"]);
+        Assert.Equal("Gromovych", records[0]["LastName"]);
     }
 }

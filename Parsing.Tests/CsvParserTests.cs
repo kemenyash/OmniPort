@@ -1,4 +1,5 @@
-﻿using OmniPort.Core.Parsers;
+﻿using OmniPort.Core.Interfaces;
+using OmniPort.Core.Parsers;
 
 namespace Parsing.Tests
 {
@@ -7,11 +8,15 @@ namespace Parsing.Tests
         [Fact]
         public void Should_Parse_Csv_File()
         {
-            CsvImportParser parser = new CsvImportParser();
+            IImportParser parser = new CsvImportParser();
+            string path = Path.Combine(AppContext.BaseDirectory, "TestData", "sample.csv");
+            Assert.True(File.Exists(path), $"Файл не знайдено: {path}");
 
-            using FileStream stream = File.OpenRead("TestData/sample.csv");
+            using FileStream stream = File.OpenRead(path);
+
             List<IDictionary<string, object?>> records = parser.Parse(stream).ToList();
 
+            Assert.NotEmpty(records);
             Assert.Equal("Kateryna", records[0]["FirstName"]);
             Assert.Equal("Gromovych", records[0]["LastName"]);
         }
