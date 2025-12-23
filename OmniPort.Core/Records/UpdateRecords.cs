@@ -19,10 +19,10 @@ namespace OmniPort.Core.Records
     );
 
     public record UpdateMappingTemplateDto(
-    int Id,
-    string Name,
-    int SourceTemplateId,
-    int TargetTemplateId,
-    IReadOnlyList<MappingEntryDto> Mappings
-);
+        int Id,
+        string Name,
+        int SourceTemplateId,
+        int TargetTemplateId,
+        IReadOnlyList<MappingEntryDto> Mappings
+    );
 }

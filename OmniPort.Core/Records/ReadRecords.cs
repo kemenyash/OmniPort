@@ -1,8 +1,16 @@
 ﻿namespace OmniPort.Core.Records
 {
     using OmniPort.Core.Enums;
+    using OmniPort.Core.Models;
     using System;
     using System.Collections.Generic;
+
+
+    public record ImportProfileForJoinResultDto(
+        ImportProfile Profile,
+        SourceType ImportSourceType,
+        SourceType ConvertSourceType
+    );
 
     public record TemplateFieldDto(
         int Id,
