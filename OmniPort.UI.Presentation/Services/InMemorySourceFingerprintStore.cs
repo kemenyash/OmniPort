@@ -19,19 +19,19 @@ namespace OmniPort.UI.Presentation.Services
         }
 
 
-        public Task<string?> GetHash(string url, int? mappingTemplateId = null, CancellationToken ct = default)
+        public Task<string?> GetHash(string url, int? mappingTemplateId = null)
         {
             map.TryGetValue(Key(url, mappingTemplateId), out string? hash);
             return Task.FromResult(hash);
         }
 
-        public Task SetHash(string url, string sha256Hex, int? mappingTemplateId = null, CancellationToken ct = default)
+        public Task SetHash(string url, string sha256Hex, int? mappingTemplateId = null)
         {
             map[Key(url, mappingTemplateId)] = sha256Hex;
             return Task.CompletedTask;
         }
 
-        public Task Remove(string url, int? mappingTemplateId = null, CancellationToken ct = default)
+        public Task Remove(string url, int? mappingTemplateId = null)
         {
             map.TryRemove(Key(url, mappingTemplateId), out _);
             return Task.CompletedTask;

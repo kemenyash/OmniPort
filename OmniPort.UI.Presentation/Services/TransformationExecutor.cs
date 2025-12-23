@@ -31,12 +31,9 @@ public class TransformationExecutor : ITransformationExecutionService
 
     public async Task<string> TransformUploadedFile(int templateId, object file, string outputExtension)
     {
-        var (importProfile, importSourceType, convertSourceType) = await transformationManager.GetImportProfileForJoin(templateId);
-
-        using var inputStream = await ResolveStream(file, importSourceType);
-
-        var mappedRows = ParseAndMap(inputStream, importSourceType, importProfile);
-
+        var join = await transformationManager.GetImportProfileForJoin(templateId);
+        using var inputStream = await ResolveStream(file, join.ImportSourceType);
+        var mappedRows = ParseAndMap(inputStream, join.ImportSourceType, join.Profile);
         var baseFileName = GetBaseNameFromUpload(file) ?? $"template-{templateId}";
 
         return await SaveTransformed(mappedRows, outputExtension, baseFileName);
@@ -44,16 +41,14 @@ public class TransformationExecutor : ITransformationExecutionService
 
     public async Task<string> TransformFromUrl(int templateId, string url, string outputExtension)
     {
-        var (importProfile, importSourceType, convertSourceType) = await transformationManager.GetImportProfileForJoin(templateId);
-
-        using var inputStream = await OpenHttpStreamWithCap(url, importSourceType);
-
-        var mappedRows = ParseAndMap(inputStream, importSourceType, importProfile);
-
+        var join = await transformationManager.GetImportProfileForJoin(templateId);
+        using var inputStream = await OpenHttpStreamWithCap(url, join.ImportSourceType);
+        var mappedRows = ParseAndMap(inputStream, join.ImportSourceType, join.Profile);
         var baseFileName = MakeSafeFileName(new Uri(url).Segments.LastOrDefault() ?? "remote");
 
         return await SaveTransformed(mappedRows, outputExtension, baseFileName);
     }
+
 
     public async Task<string> SaveTransformed(
         IEnumerable<IDictionary<string, object?>> rows,

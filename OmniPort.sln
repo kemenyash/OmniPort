@@ -7,13 +7,13 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OmniPort.Core", "OmniPort.C
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "OmniPort.Tests", "OmniPort.Tests", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Parsing.Tests", "Parsing.Tests\Parsing.Tests.csproj", "{9A58D04A-02ED-491A-88EF-B6D5F78AB4F6}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OmniPort.UI", "OmniPort.UI\OmniPort.UI.csproj", "{92EF09F8-8BF6-4746-999E-BE1F448802ED}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OmniPort.Data", "OmniPort.Data\OmniPort.Data.csproj", "{C764BFA7-B935-437A-9367-7112968FDE40}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OmniPort.UI.Presentation", "OmniPort.UI.Presentation\OmniPort.UI.Presentation.csproj", "{8991BB3D-51F5-4B06-8647-47EE0C6759EE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OmniPort.Core.Tests", "OmniPort.Core.Tests\OmniPort.Core.Tests.csproj", "{DDF80928-F79B-4818-B63F-48B67322AF6B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -25,10 +25,6 @@ Global
 		{A0BDABEC-D586-4F32-8573-8D15CCF021FC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A0BDABEC-D586-4F32-8573-8D15CCF021FC}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A0BDABEC-D586-4F32-8573-8D15CCF021FC}.Release|Any CPU.Build.0 = Release|Any CPU
-		{9A58D04A-02ED-491A-88EF-B6D5F78AB4F6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{9A58D04A-02ED-491A-88EF-B6D5F78AB4F6}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{9A58D04A-02ED-491A-88EF-B6D5F78AB4F6}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{9A58D04A-02ED-491A-88EF-B6D5F78AB4F6}.Release|Any CPU.Build.0 = Release|Any CPU
 		{92EF09F8-8BF6-4746-999E-BE1F448802ED}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{92EF09F8-8BF6-4746-999E-BE1F448802ED}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{92EF09F8-8BF6-4746-999E-BE1F448802ED}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -41,12 +37,16 @@ Global
 		{8991BB3D-51F5-4B06-8647-47EE0C6759EE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8991BB3D-51F5-4B06-8647-47EE0C6759EE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8991BB3D-51F5-4B06-8647-47EE0C6759EE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DDF80928-F79B-4818-B63F-48B67322AF6B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DDF80928-F79B-4818-B63F-48B67322AF6B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DDF80928-F79B-4818-B63F-48B67322AF6B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DDF80928-F79B-4818-B63F-48B67322AF6B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{9A58D04A-02ED-491A-88EF-B6D5F78AB4F6} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
+		{DDF80928-F79B-4818-B63F-48B67322AF6B} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {AF24937E-8271-4888-9B66-5BAD82429E79}

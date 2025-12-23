@@ -144,7 +144,7 @@ namespace OmniPort.UI.Presentation.Services
 
                 var currentContentHash = Sha256HexGenerator.Compute(contentSnapshot.Bytes);
 
-                var previousContentHash = await sourceFingerprintStore.GetHash(effectiveUrl, mappingTemplateId, cancellationToken);
+                var previousContentHash = await sourceFingerprintStore.GetHash(effectiveUrl, mappingTemplateId);
                 if (string.Equals(previousContentHash, currentContentHash, StringComparison.Ordinal))
                 {
                     serviceLogger.LogDebug("No changes by hash for {Url}", effectiveUrl);
@@ -175,7 +175,7 @@ namespace OmniPort.UI.Presentation.Services
 
                 await applicationSyncContext.AddUrlConversion(urlConversionHistory, cancellationToken);
 
-                await sourceFingerprintStore.SetHash(effectiveUrl, currentContentHash, mappingTemplateId, cancellationToken);
+                await sourceFingerprintStore.SetHash(effectiveUrl, currentContentHash, mappingTemplateId);
 
                 serviceLogger.LogInformation("Updated from {Url} (hash changed)", effectiveUrl);
             }

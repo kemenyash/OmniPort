@@ -2,6 +2,7 @@
 using OmniPort.Core.Enums;
 using OmniPort.Core.Interfaces;
 using OmniPort.Core.Models;
+using OmniPort.Core.Records;
 using OmniPort.Data;
 
 public class TransformationManager : ITransformationManager
@@ -13,8 +14,7 @@ public class TransformationManager : ITransformationManager
         this.omniPortDataContext = omniPortDataContext;
     }
 
-    public async Task<(ImportProfile Profile, SourceType ImportSourceType, SourceType ConvertSourceType)>
-        GetImportProfileForJoin(int mappingTemplateId)
+    public async Task<ImportProfileForJoinResultDto> GetImportProfileForJoin(int mappingTemplateId)
     {
         var mappingTemplateData = await omniPortDataContext.MappingTemplates
             .Include(mappingTemplate => mappingTemplate.SourceTemplate)
@@ -96,8 +96,13 @@ public class TransformationManager : ITransformationManager
             Mappings = fieldMappings
         };
 
-        return (importProfile, mappingTemplateData.SourceTemplate.SourceType, mappingTemplateData.TargetTemplate.SourceType);
+        return new ImportProfileForJoinResultDto(
+            importProfile,
+            mappingTemplateData.SourceTemplate.SourceType,
+            mappingTemplateData.TargetTemplate.SourceType
+        );
     }
+
 
     private static bool IsLeafField(FieldData fieldData)
     {
