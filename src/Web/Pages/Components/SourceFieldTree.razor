@@ -2,11 +2,12 @@
 @using BusinessLogic.Enums
 @using Presentation.Inherits.Components
 @inherits SourceFieldTreeBase
+@inject IAppLocalizer L
 
 <li>
     <div class="flex items-center gap-2">
         <span class="font-medium">@ViewModel.Name</span>
-        <span class="text-gray-500 text-sm">(@ViewModel.TypeText)</span>
+        <span class="text-gray-500 text-sm">(@GetTypeText())</span>
     </div>
 
     @if (ViewModel.HasChildren)
@@ -23,3 +24,17 @@
         </ul>
     }
 </li>
+
+@code {
+    private string GetTypeText()
+    {
+        var typeText = L.Enum(Node.Type);
+
+        if (Node.Type == FieldDataType.Array && Node.ItemType.HasValue)
+        {
+            typeText += $"[{L.Enum(Node.ItemType.Value)}]";
+        }
+
+        return typeText;
+    }
+}

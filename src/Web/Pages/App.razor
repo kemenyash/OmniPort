@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="@L.Culture">
 
 <head>
     <meta charset="utf-8" />
@@ -7,12 +7,18 @@
     <base href="/" />
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <HeadOutlet />
+    <script src="omniport-culture.js"></script>
+    <HeadOutlet @rendermode="InteractiveServer" />
 </head>
 
 <body>
-    <Routes />
+    <Routes @rendermode="InteractiveServer" />
     <script src="_framework/blazor.web.js"></script>
 </body>
 
 </html>
+
+@code {
+    [Inject]
+    private IAppLocalizer L { get; set; } = default!;
+}

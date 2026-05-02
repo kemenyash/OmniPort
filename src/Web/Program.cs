@@ -14,6 +14,7 @@ await app.MigrateOmniPortDatabasesAsync();
 app.UseOmniPortPipeline();
 
 app.MapOmniPortAuthEndpoints();
+app.MapOmniPortCultureEndpoints();
 
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 

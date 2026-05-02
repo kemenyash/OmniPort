@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Infrastructure;
 using Infrastructure.Auth;
 using Presentation;
+using Web.Localization;
 
 namespace Web.Bootstrap
 {
@@ -21,6 +22,8 @@ namespace Web.Bootstrap
                     .AddInteractiveServerComponents();
 
             services.AddHttpClient();
+            services.AddHttpContextAccessor();
+            services.AddScoped<IAppLocalizer, AppLocalizer>();
 
             services.AddAuthentication(IdentityConstants.ApplicationScheme)
                     .AddIdentityCookies();

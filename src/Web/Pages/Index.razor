@@ -5,20 +5,20 @@
 @using Presentation.Inherits.Pages
 @using Presentation.ViewModels
 @layout MainLayout
-@rendermode InteractiveServer
 @inherits IndexBase
+@inject IAppLocalizer L
 
-<h1 class="text-2xl font-bold mb-6">OmniPort: All-in-one</h1>
+<h1 class="text-2xl font-bold mb-6">@L["OmniPortTitle"]</h1>
 
 <div class="flex gap-4 flex-wrap">
     <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
             @onclick="OpenTemplates">
-        Basic Templates
+        @L["BasicTemplates"]
     </button>
 
     <button class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
             @onclick="OpenJoinTemplates">
-        Transforming Templates
+        @L["TransformingTemplates"]
     </button>
 </div>
 

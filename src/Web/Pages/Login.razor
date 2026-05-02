@@ -3,26 +3,27 @@
 @using Presentation.Inherits.Pages
 @page "/login"
 @inherits LoginBase
+@inject IAppLocalizer L
 
-<h1 class="text-2xl font-bold mb-4">Sign in</h1>
+<h1 class="text-2xl font-bold mb-4">@L["SignIn"]</h1>
 
 <AntiforgeryToken />
 
 <form action="/auth/login" method="post">
     <div class="mb-3">
-        <label class="block font-medium mb-1" for="email">Email</label>
+        <label class="block font-medium mb-1" for="email">@L["Email"]</label>
         <input id="email" name="Email" class="w-full border rounded px-3 py-2" />
     </div>
 
     <div class="mb-4">
-        <label class="block font-medium mb-1" for="password">Password</label>
+        <label class="block font-medium mb-1" for="password">@L["Password"]</label>
         <input id="password" name="Password" type="password" class="w-full border rounded px-3 py-2" />
     </div>
 
-    <button class="bg-blue-600 text-white px-4 py-2 rounded" type="submit">Sign in</button>
+    <button class="bg-blue-600 text-white px-4 py-2 rounded" type="submit">@L["SignIn"]</button>
 
     @if (ViewModel.ShowInvalidCredentials)
     {
-        <div class="mt-3 text-red-600">Invalid credentials.</div>
+        <div class="mt-3 text-red-600">@L["InvalidCredentials"]</div>
     }
 </form>

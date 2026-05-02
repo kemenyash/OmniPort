@@ -5,25 +5,25 @@
 @using BusinessLogic.Records
 @using Presentation.Inherits.Pages
 @attribute [Authorize]
-@rendermode InteractiveServer
 @inherits JoinTemplatesBase
+@inject IAppLocalizer L
 
-<h1 class="text-2xl font-bold mb-6">Transforming Templates</h1>
+<h1 class="text-2xl font-bold mb-6">@L["TransformingTemplates"]</h1>
 
 @if (ViewModel.Templates.Count == 0)
 {
-    <p>Loading templates...</p>
+    <p>@L["LoadingTemplates"]</p>
 }
 else
 {
     <div class="grid grid-cols-2 gap-6">
         <div class="border rounded p-4 shadow bg-white">
             <div class="flex items-center justify-between mb-2">
-                <h2 class="text-xl font-semibold text-blue-700">Source Template:</h2>
+                <h2 class="text-xl font-semibold text-blue-700">@L["SourceTemplate"]:</h2>
                 <select class="border rounded px-2 py-1"
                         value="@ViewModel.SourceId"
                         @onchange="OnSourceChanged">
-                    <option disabled value="">Select Template</option>
+                    <option disabled value="">@L["SelectTemplate"]</option>
                     @foreach (var template in ViewModel.Templates)
                     {
                         <option value="@template.Id">@template.Name</option>
@@ -31,7 +31,7 @@ else
                 </select>
             </div>
 
-            <p class="text-sm text-gray-500 mb-3 italic">Fields from original data</p>
+            <p class="text-sm text-gray-500 mb-3 italic">@L["FieldsFromOriginalData"]</p>
 
             @if (ViewModel.SourceTemplate?.Fields is { Count: > 0 } roots)
             {
@@ -44,17 +44,17 @@ else
             }
             else
             {
-                <div class="text-gray-500 italic">No fields.</div>
+                <div class="text-gray-500 italic">@L["NoFields"]</div>
             }
         </div>
 
         <div class="border rounded p-4 shadow bg-white">
             <div class="flex items-center justify-between mb-2">
-                <h2 class="text-xl font-semibold text-green-700">Internal CRM Schema:</h2>
+                <h2 class="text-xl font-semibold text-green-700">@L["InternalCrmSchema"]:</h2>
                 <select class="border rounded px-2 py-1"
                         value="@ViewModel.TargetId"
                         @onchange="OnTargetChanged">
-                    <option disabled value="">Select Schema</option>
+                    <option disabled value="">@L["SelectSchema"]</option>
                     @foreach (var template in ViewModel.Templates)
                     {
                         <option value="@template.Id">@template.Name</option>
@@ -63,7 +63,7 @@ else
             </div>
 
             <p class="text-sm text-gray-500 mb-3 italic">
-                Match source fields to target structure (full hierarchy)
+                @L["MatchSourceFields"]
             </p>
 
             @if (ViewModel.TargetFlattened?.Any() == true)
@@ -77,7 +77,7 @@ else
                         {
                             <div class="font-semibold mt-2"
                                  style="@($"margin-left:{indent}px")">
-                                @node.Path (@node.Type)
+                                @node.Path (@L.Enum(node.Type))
                             </div>
                         }
                         else
@@ -89,18 +89,18 @@ else
                                  style="@($"margin-left:{indent}px")">
 
                                 <label class="block text-sm font-medium">
-                                    @node.Path (@node.Type)
+                                    @node.Path (@L.Enum(node.Type))
                                 </label>
 
                                 <select class="w-full mt-1 px-3 py-2 border rounded bg-white"
                                         value="@topValue"
                                         @onchange="eventArgs => OnMapFieldChanged(node.Path, eventArgs)">
-                                    <option value="">-- Not Mapped --</option>
+                                    <option value="">@L["NotMapped"]</option>
                                     @foreach (var flatField in ViewModel.SourceFlattened)
                                     {
                                         if (ViewModel.IsTopOptionCandidate(flatField))
                                         {
-                                            <option value="@flatField.Path">@flatField.Path (@flatField.Type)</option>
+                                            <option value="@flatField.Path">@flatField.Path (@L.Enum(flatField.Type))</option>
                                         }
                                     }
                                 </select>
@@ -109,7 +109,7 @@ else
                                 {
                                     <div class="mt-2">
                                         <label class="block text-xs text-gray-600">
-                                            Inside @topValue
+                                            @L["Inside"] @topValue
                                         </label>
 
                                         <select class="w-full mt-1 px-3 py-2 border rounded bg-white"
@@ -117,7 +117,7 @@ else
                                                 @onchange="eventArgs => OnMapFieldChanged(node.Path, eventArgs)">
 
                                             <option value="@topValue">
-                                                — Map to the whole @topValue —
+                                                @L["MapWhole"] @topValue
                                             </option>
 
                                             @{
@@ -141,7 +141,7 @@ else
             }
             else
             {
-                <div class="text-gray-500 italic">Select target template to map.</div>
+                <div class="text-gray-500 italic">@L["SelectTargetTemplateToMap"]</div>
             }
         </div>
     </div>
@@ -149,21 +149,21 @@ else
     <button @onclick="SaveMapping"
             class="mt-6 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-50"
             disabled="@(!ViewModel.CanSave)">
-        Save Mapping
+        @L["SaveMapping"]
     </button>
 
     <hr class="my-10" />
 
-    <h2 class="text-xl font-semibold mb-4">Saved Join Templates</h2>
+    <h2 class="text-xl font-semibold mb-4">@L["SavedJoinTemplates"]</h2>
 
     @if (ViewModel.JoinedTemplates.Any())
     {
         <table class="min-w-full bg-white border border-gray-300 rounded shadow">
             <thead class="bg-gray-100 text-left">
                 <tr>
-                    <th class="px-4 py-2 border-b">Source Template</th>
-                    <th class="px-4 py-2 border-b">Target Template</th>
-                    <th class="px-4 py-2 border-b text-right">Actions</th>
+                    <th class="px-4 py-2 border-b">@L["SourceTemplate"]</th>
+                    <th class="px-4 py-2 border-b">@L["TargetTemplate"]</th>
+                    <th class="px-4 py-2 border-b text-right">@L["Actions"]</th>
                 </tr>
             </thead>
             <tbody>
@@ -175,7 +175,7 @@ else
                         <td class="px-4 py-2 text-right">
                             <button @onclick="() => DeleteJoinTemplate(join.Id)"
                                     class="text-red-600 hover:underline">
-                                Delete
+                                @L["Delete"]
                             </button>
                         </td>
                     </tr>
@@ -185,6 +185,6 @@ else
     }
     else
     {
-        <p class="text-gray-500">No saved join templates found.</p>
+        <p class="text-gray-500">@L["NoSavedJoinTemplates"]</p>
     }
 }

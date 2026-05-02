@@ -1,7 +1,88 @@
 @inherits LayoutComponentBase
+@implements IDisposable
+@using Microsoft.AspNetCore.Components.Authorization
+@inject IAppLocalizer L
+@inject IJSRuntime JsRuntime
 
 <div class="bg-gray-50 text-gray-900 min-h-screen">
     <div class="container mx-auto p-6">
-        @Body
+        <div class="flex justify-end items-center gap-4 mb-4">
+            <div class="inline-flex items-center gap-2 text-sm">
+                <span class="text-gray-600">@L["Language"]</span>
+                <button type="button"
+                        class="@GetLanguageClass("uk")"
+                        @onclick='() => ChangeCulture("uk")'>
+                    @L["Ukrainian"]
+                </button>
+                <button type="button"
+                        class="@GetLanguageClass("en")"
+                        @onclick='() => ChangeCulture("en")'>
+                    @L["English"]
+                </button>
+            </div>
+
+            @if (IsAuthenticated)
+            {
+                <form action="/auth/logout" method="post">
+                    <AntiforgeryToken />
+                    <button type="submit"
+                            class="px-3 py-1 rounded border border-red-300 text-red-700 hover:bg-red-50 text-sm">
+                        @L["Logout"]
+                    </button>
+                </form>
+            }
+        </div>
+
+        <div @key="L.Culture">
+            @Body
+        </div>
     </div>
 </div>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+
+    private bool IsAuthenticated { get; set; }
+
+    protected override void OnInitialized()
+    {
+        L.CultureChanged += OnCultureChanged;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (AuthenticationStateTask is null)
+        {
+            IsAuthenticated = false;
+            return;
+        }
+
+        var authenticationState = await AuthenticationStateTask;
+        IsAuthenticated = authenticationState.User.Identity?.IsAuthenticated == true;
+    }
+
+    private async Task ChangeCulture(string culture)
+    {
+        L.SetCulture(culture);
+        await JsRuntime.InvokeVoidAsync("omniPortCulture.setCulture", L.Culture);
+    }
+
+    private string GetLanguageClass(string culture)
+    {
+        var active = string.Equals(L.Culture, culture, StringComparison.OrdinalIgnoreCase);
+        return active
+            ? "px-2 py-1 rounded bg-blue-600 text-white"
+            : "px-2 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-100";
+    }
+
+    private void OnCultureChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        L.CultureChanged -= OnCultureChanged;
+    }
+}

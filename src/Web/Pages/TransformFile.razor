@@ -3,6 +3,7 @@
 @using Presentation.Inherits.Pages
 @using Presentation.Models
 @inherits TransformationBase
+@inject IAppLocalizer L
 
 <EditForm Model="@ViewModel.FormModel" OnValidSubmit="RunTransformation">
     <DataAnnotationsValidator />
@@ -11,10 +12,10 @@
     <div class="space-y-6">
 
         <div>
-            <label>Template</label>
+            <label>@L["Template"]</label>
             <InputSelect @bind-Value="@ViewModel.FormModel.SelectedMappingTemplateId"
                          class="w-full border px-3 py-2 rounded">
-                <option value="0" disabled>Select template</option>
+                <option value="0" disabled>@L["SelectTemplate"]</option>
                 @foreach (var joinedTemplate in ViewModel.JoinedTemplates)
                 {
                     <option value="@joinedTemplate.Id">@joinedTemplate.FullName</option>
@@ -24,30 +25,30 @@
         </div>
 
         <div class="flex gap-4 items-center">
-            <label>Import mode:</label>
+            <label>@L["ImportMode"]</label>
             <button type="button"
                     @onclick="() => SetMode(UploadMode.Upload)"
                     class="@ViewModel.GetButtonClass(UploadMode.Upload)">
-                Upload
+                @L["Upload"]
             </button>
             <button type="button"
                     @onclick="() => SetMode(UploadMode.Url)"
                     class="@ViewModel.GetButtonClass(UploadMode.Url)">
-                URL
+                @L["Url"]
             </button>
         </div>
 
         @if (ViewModel.InputMode == UploadMode.Upload)
         {
             <div class="space-y-1">
-                <label>Upload File</label>
+                <label>@L["UploadFile"]</label>
                 <InputFile OnChange="OnFileChange"
                            class="w-full border px-3 py-2 rounded" />
 
                 @if (!string.IsNullOrWhiteSpace(ViewModel.FormModel.UploadedFileName))
                 {
                     <div class="text-sm text-gray-600">
-                        Selected: @ViewModel.FormModel.UploadedFileName
+                        @L["Selected"] @ViewModel.FormModel.UploadedFileName
                     </div>
                 }
             </div>
@@ -56,7 +57,7 @@
         @if (ViewModel.InputMode == UploadMode.Url)
         {
             <div>
-                <label>File URL</label>
+                <label>@L["FileUrl"]</label>
                 <InputText @bind-Value="ViewModel.FormModel.FileUrl"
                            class="w-full border px-3 py-2 rounded"
                            placeholder="https://example.com/file.xlsx" />
@@ -64,7 +65,7 @@
             </div>
 
             <div>
-                <label>Check Interval (min)</label>
+                <label>@L["CheckIntervalMin"]</label>
                 <InputNumber @bind-Value="ViewModel.FormModel.IntervalMinutes"
                              class="w-32 border px-3 py-2 rounded"
                              min="1" max="1440" />
@@ -76,7 +77,7 @@
             <button type="submit"
                     class="bg-green-600 text-white px-4 py-2 rounded disabled:opacity-50"
                     disabled="@(!ViewModel.CanRun)">
-                Run Transformation
+                @L["RunTransformation"]
             </button>
 
             @if (ViewModel.InputMode == UploadMode.Url)
@@ -85,7 +86,7 @@
                         class="bg-indigo-600 text-white px-4 py-2 rounded disabled:opacity-50"
                         disabled="@(!ViewModel.CanAddToWatchlist)"
                         @onclick="AddToWatchlistFromForm">
-                    Add to Watchlist
+                    @L["AddToWatchlist"]
                 </button>
             }
         </div>
@@ -96,13 +97,13 @@
 
 @if (ViewModel.InputMode == UploadMode.Url && ViewModel.WatchedUrls.Any())
 {
-    <h2 class="text-lg font-semibold mb-2">Watched URLs</h2>
+    <h2 class="text-lg font-semibold mb-2">@L["WatchedUrls"]</h2>
     <table class="w-full table-auto border border-gray-300">
         <thead>
             <tr class="bg-gray-100">
-                <th class="px-4 py-2 text-left">URL</th>
-                <th class="px-4 py-2 text-left">Template</th>
-                <th class="px-4 py-2 text-left">Interval (min)</th>
+                <th class="px-4 py-2 text-left">@L["Url"]</th>
+                <th class="px-4 py-2 text-left">@L["Template"]</th>
+                <th class="px-4 py-2 text-left">@L["IntervalMin"]</th>
             </tr>
         </thead>
         <tbody>
@@ -120,14 +121,14 @@
 
 @if (ViewModel.InputMode == UploadMode.Url && ViewModel.UrlConversions.Any())
 {
-    <h2 class="text-lg font-semibold mb-2">URL Conversion History</h2>
+    <h2 class="text-lg font-semibold mb-2">@L["UrlConversionHistory"]</h2>
     <table class="w-full table-auto border border-gray-300">
         <thead>
             <tr class="bg-gray-100">
-                <th class="px-4 py-2 text-left">Input URL</th>
-                <th class="px-4 py-2 text-left">Converted At</th>
-                <th class="px-4 py-2 text-left">Template</th>
-                <th class="px-4 py-2 text-left">Output</th>
+                <th class="px-4 py-2 text-left">@L["InputUrl"]</th>
+                <th class="px-4 py-2 text-left">@L["ConvertedAt"]</th>
+                <th class="px-4 py-2 text-left">@L["Template"]</th>
+                <th class="px-4 py-2 text-left">@L["Output"]</th>
             </tr>
         </thead>
         <tbody>
@@ -138,7 +139,7 @@
                     <td class="border px-4 py-2">@urlConversionHistoryItem.ConvertedAt.ToLocalTime()</td>
                     <td class="border px-4 py-2">@urlConversionHistoryItem.MappingTemplateName</td>
                     <td class="border px-4 py-2">
-                        <a href="@urlConversionHistoryItem.OutputLink" target="_blank" class="text-blue-600 underline">View</a>
+                        <a href="@urlConversionHistoryItem.OutputLink" target="_blank" class="text-blue-600 underline">@L["View"]</a>
                     </td>
                 </tr>
             }
@@ -148,14 +149,14 @@
 
 @if (ViewModel.InputMode == UploadMode.Upload && ViewModel.FileConversions.Any())
 {
-    <h2 class="text-lg font-semibold mb-2">File Conversion History</h2>
+    <h2 class="text-lg font-semibold mb-2">@L["FileConversionHistory"]</h2>
     <table class="w-full table-auto border border-gray-300">
         <thead>
             <tr class="bg-gray-100">
-                <th class="px-4 py-2 text-left">File Name</th>
-                <th class="px-4 py-2 text-left">Converted At</th>
-                <th class="px-4 py-2 text-left">Template</th>
-                <th class="px-4 py-2 text-left">Output</th>
+                <th class="px-4 py-2 text-left">@L["FileName"]</th>
+                <th class="px-4 py-2 text-left">@L["ConvertedAt"]</th>
+                <th class="px-4 py-2 text-left">@L["Template"]</th>
+                <th class="px-4 py-2 text-left">@L["Output"]</th>
             </tr>
         </thead>
         <tbody>
@@ -166,7 +167,7 @@
                     <td class="border px-4 py-2">@fileConversionHistoryItem.ConvertedAt.ToLocalTime()</td>
                     <td class="border px-4 py-2">@fileConversionHistoryItem.MappingTemplateName</td>
                     <td class="border px-4 py-2">
-                        <a href="@fileConversionHistoryItem.OutputLink" target="_blank" class="text-blue-600 underline">View</a>
+                        <a href="@fileConversionHistoryItem.OutputLink" target="_blank" class="text-blue-600 underline">@L["View"]</a>
                     </td>
                 </tr>
             }
