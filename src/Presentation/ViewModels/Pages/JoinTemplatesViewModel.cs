@@ -45,6 +45,7 @@ namespace Presentation.ViewModels.Pages
 
             Templates = syncContext.BasicTemplatesFull.ToList();
             JoinedTemplates = syncContext.JoinedTemplates.ToList();
+            BindSelectedTemplates();
 
             syncContext.Changed += OnChanged;
             Changed?.Invoke();
@@ -195,20 +196,47 @@ namespace Presentation.ViewModels.Pages
         {
             Templates = syncContext.BasicTemplatesFull.ToList();
             JoinedTemplates = syncContext.JoinedTemplates.ToList();
+            BindSelectedTemplates();
 
-            if (SourceId.HasValue)
+            SyncMappingKeys();
+
+            Changed?.Invoke();
+        }
+
+        private void BindSelectedTemplates()
+        {
+            if (!Templates.Any())
             {
-                SourceTemplate = Templates.FirstOrDefault(x => x.Id == SourceId.Value);
+                SourceId = null;
+                TargetId = null;
+                SourceTemplate = null;
+                TargetTemplate = null;
+                SourceFlattened = new List<FlatField>();
+                TargetFlattened = new List<FlatField>();
+                mapByPath.Clear();
+                return;
             }
 
-            if (TargetId.HasValue)
+            if (!SourceId.HasValue || Templates.All(x => x.Id != SourceId.Value))
             {
-                TargetTemplate = Templates.FirstOrDefault(x => x.Id == TargetId.Value);
+                SourceId = Templates.First().Id;
             }
 
+            if (!TargetId.HasValue || Templates.All(x => x.Id != TargetId.Value))
+            {
+                TargetId = Templates.First().Id;
+                mapByPath.Clear();
+            }
+
+            SourceTemplate = Templates.FirstOrDefault(x => x.Id == SourceId.Value);
+            TargetTemplate = Templates.FirstOrDefault(x => x.Id == TargetId.Value);
             SourceFlattened = FlattenTemplate(SourceTemplate);
             TargetFlattened = FlattenTemplate(TargetTemplate);
+            SyncMappingKeys();
+        }
 
+        private void SyncMappingKeys()
+        {
             HashSet<string> targetSet = new HashSet<string>(TargetFlattened.Select(f => f.Path));
             foreach (string key in mapByPath.Keys.ToList())
             {
@@ -219,8 +247,6 @@ namespace Presentation.ViewModels.Pages
             {
                 if (!mapByPath.ContainsKey(target.Path)) mapByPath[target.Path] = null;
             }
-
-            Changed?.Invoke();
         }
 
         private static List<FlatField> FlattenTemplate(BasicTemplateDto? basicTemplate)

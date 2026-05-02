@@ -15,6 +15,7 @@ app.UseOmniPortPipeline();
 
 app.MapOmniPortAuthEndpoints();
 app.MapOmniPortCultureEndpoints();
+app.MapOmniPortWatchEndpoints();
 
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 

@@ -104,6 +104,7 @@
                 <th class="px-4 py-2 text-left">@L["Url"]</th>
                 <th class="px-4 py-2 text-left">@L["Template"]</th>
                 <th class="px-4 py-2 text-left">@L["IntervalMin"]</th>
+                <th class="px-4 py-2 text-left">@L["StableLink"]</th>
             </tr>
         </thead>
         <tbody>
@@ -113,6 +114,11 @@
                     <td class="border px-4 py-2">@watchedUrl.Url</td>
                     <td class="border px-4 py-2">@watchedUrl.MappingTemplateName</td>
                     <td class="border px-4 py-2">@watchedUrl.IntervalMinutes</td>
+                    <td class="border px-4 py-2">
+                        <a href="@($"/watch/{watchedUrl.Id}/latest")" target="_blank" class="text-blue-600 underline">
+                            @L["LatestResult"]
+                        </a>
+                    </td>
                 </tr>
             }
         </tbody>
