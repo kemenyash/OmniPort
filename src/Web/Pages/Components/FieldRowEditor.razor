@@ -1,0 +1,72 @@
+@using System.Linq
+@using BusinessLogic.Enums
+@using Presentation.Inherits.Components
+@using Presentation.Models
+@inherits FieldRowEditorBase
+
+<div class="border rounded p-2 mb-2" style="margin-left:@(ViewModel.Level * 16)px">
+    <div class="grid grid-cols-12 gap-2 items-center">
+
+        <InputText class="col-span-5 border rounded px-2 py-1"
+                   placeholder="Field name"
+                   @bind-Value="ViewModel.Field.Name" />
+
+        <InputSelect class="col-span-3 border rounded px-2 py-1"
+                     @bind-Value="ViewModel.Field.Type"
+                     @bind-Value:after="OnTypeChanged">
+            @foreach (FieldDataType fieldType in Enum.GetValues(typeof(FieldDataType)))
+            {
+                <option value="@fieldType">@fieldType</option>
+            }
+        </InputSelect>
+
+        @if (ViewModel.Field.Type == FieldDataType.Array)
+        {
+            <InputSelect class="col-span-2 border rounded px-2 py-1"
+                         @bind-Value="ViewModel.Field.ItemType"
+                         @bind-Value:after="OnItemTypeChanged">
+                <option value="">-- item type --</option>
+                @foreach (FieldDataType fieldType in Enum.GetValues(typeof(FieldDataType)))
+                {
+                    <option value="@fieldType">@fieldType</option>
+                }
+            </InputSelect>
+        }
+
+        <div class="col-span-2 flex gap-2 justify-end">
+            @if (ViewModel.Field.Type == FieldDataType.Object)
+            {
+                <button type="button" class="text-blue-600 hover:underline" @onclick="AddObjectChild">+ Child</button>
+            }
+            @if (ViewModel.Field.Type == FieldDataType.Array && ViewModel.Field.ItemType == FieldDataType.Object)
+            {
+                <button type="button" class="text-blue-600 hover:underline" @onclick="AddArrayItemChild">+ Item field</button>
+            }
+            <button type="button" class="text-red-600 hover:underline" @onclick="RemoveSelf">Remove</button>
+        </div>
+    </div>
+
+    @if (ViewModel.Field.Type == FieldDataType.Object && ViewModel.Field.Children.Any())
+    {
+        <div class="mt-2">
+            @foreach (var fieldRow in ViewModel.Field.Children)
+            {
+                <FieldRowEditor Field="fieldRow"
+                                Level="@(ViewModel.Level + 1)"
+                                OnRemove="(() => RemoveObjectChild(fieldRow))" />
+            }
+        </div>
+    }
+
+    @if (ViewModel.Field.Type == FieldDataType.Array && ViewModel.Field.ItemType == FieldDataType.Object && ViewModel.Field.ChildrenItems.Any())
+    {
+        <div class="mt-2">
+            @foreach (var fieldRow in ViewModel.Field.ChildrenItems)
+            {
+                <FieldRowEditor Field="fieldRow"
+                                Level="@(ViewModel.Level + 1)"
+                                OnRemove="(() => RemoveArrayItemChild(fieldRow))" />
+            }
+        </div>
+    }
+</div>

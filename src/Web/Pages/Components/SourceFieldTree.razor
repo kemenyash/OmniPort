@@ -1,0 +1,25 @@
+@using BusinessLogic.Records
+@using BusinessLogic.Enums
+@using Presentation.Inherits.Components
+@inherits SourceFieldTreeBase
+
+<li>
+    <div class="flex items-center gap-2">
+        <span class="font-medium">@ViewModel.Name</span>
+        <span class="text-gray-500 text-sm">(@ViewModel.TypeText)</span>
+    </div>
+
+    @if (ViewModel.HasChildren)
+    {
+        <ul class="list-disc pl-5 mt-1">
+            @foreach (var templateField in ViewModel.Children)
+            {
+                <SourceFieldTree Node="templateField" />
+            }
+            @foreach (var templateField in ViewModel.ItemChildren)
+            {
+                <SourceFieldTree Node="templateField" />
+            }
+        </ul>
+    }
+</li>
