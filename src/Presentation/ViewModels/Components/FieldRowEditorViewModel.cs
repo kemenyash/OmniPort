@@ -10,7 +10,7 @@ namespace Presentation.ViewModels.Components
 {
     public class FieldRowEditorViewModel
     {
-        public TemplateFieldRow Field { get; private set; }
+        public TemplateFieldRow Field { get; private set; } = null!;
         public int Level { get; private set; }
 
         public void Bind(TemplateFieldRow field, int level)

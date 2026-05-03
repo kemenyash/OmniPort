@@ -13,12 +13,12 @@ namespace Presentation
 
         public event Action? Changed;
 
-        private List<TemplateSummaryDto> templates;
-        private List<BasicTemplateDto> basicTemplatesFull;
-        private List<JoinedTemplateSummaryDto> joinedTemplates;
-        private List<FileConversionHistoryDto> fileConversionsHistory;
-        private List<UrlConversionHistoryDto> urlConvertsionsHistory;
-        private List<WatchedUrlDto> watchedUrls;
+        private List<TemplateSummaryDto> templates = new();
+        private List<BasicTemplateDto> basicTemplatesFull = new();
+        private List<JoinedTemplateSummaryDto> joinedTemplates = new();
+        private List<FileConversionHistoryDto> fileConversionsHistory = new();
+        private List<UrlConversionHistoryDto> urlConvertsionsHistory = new();
+        private List<WatchedUrlDto> watchedUrls = new();
 
         public IReadOnlyList<TemplateSummaryDto> Templates => templates;
         public IReadOnlyList<BasicTemplateDto> BasicTemplatesFull => basicTemplatesFull;

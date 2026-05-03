@@ -12,7 +12,7 @@ namespace Presentation.Inherits.Components
     public class SourceFieldTreeBase : ComponentBase
     {
         [Parameter]
-        public TemplateFieldDto Node { get; set; } 
+        public TemplateFieldDto Node { get; set; } = null!;
 
         protected SourceFieldTreeViewModel ViewModel { get; } = new();
 

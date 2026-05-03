@@ -14,10 +14,10 @@ namespace Infrastructure
         public DateTime ConvertedAt { get; set; }
 
         [Required, Column("input_url")]
-        public string InputUrl { get; set; }
+        public string InputUrl { get; set; } = null!;
 
         [Required, Column("output_url")]
-        public string OutputUrl { get; set; }
+        public string OutputUrl { get; set; } = null!;
 
         [Required, Column("mapping_template_id")]
         public int MappingTemplateId { get; set; }

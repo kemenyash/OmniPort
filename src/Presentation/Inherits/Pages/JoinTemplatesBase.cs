@@ -11,7 +11,7 @@ namespace Presentation.Inherits.Pages
     public class JoinTemplatesBase : ComponentBase, IDisposable
     {
         [Inject]
-        protected JoinTemplatesViewModel ViewModel { get; set; }
+        protected JoinTemplatesViewModel ViewModel { get; set; } = null!;
 
         protected override async Task OnInitializedAsync()
         {

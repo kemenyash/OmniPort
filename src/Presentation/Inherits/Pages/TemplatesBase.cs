@@ -13,7 +13,7 @@ namespace Presentation.Inherits.Pages
     public class TemplatesBase : ComponentBase, IDisposable
     {
         [Inject]
-        protected TemplateEditorViewModel ViewModel { get; set; }
+        protected TemplateEditorViewModel ViewModel { get; set; } = null!;
 
         protected override async Task OnInitializedAsync()
         {

@@ -1,11 +1,8 @@
-using AutoMapper;
-using AutoMapper.QueryableExtensions;
 using Microsoft.EntityFrameworkCore;
 using BusinessLogic.Interfaces;
 using BusinessLogic.Records;
 using Infrastructure;
 using Presentation.Helpers;
-using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 
 namespace Presentation.Services
@@ -13,17 +10,14 @@ namespace Presentation.Services
     public class TemplateManager : ITemplateManager
     {
         private readonly OmniPortDataContext omniPortDataContext;
-        private readonly IMapper objectMapper;
         private readonly TemplateManagerHelpers templateManagerHelpers;
         private readonly ILogger<TemplateManager> logger;
 
         public TemplateManager(
             OmniPortDataContext omniPortDataContext,
-            IMapper objectMapper,
             ILogger<TemplateManager> logger)
         {
             this.omniPortDataContext = omniPortDataContext;
-            this.objectMapper = objectMapper;
             this.logger = logger;
             templateManagerHelpers = new TemplateManagerHelpers(omniPortDataContext);
         }
@@ -32,7 +26,13 @@ namespace Presentation.Services
         {
             var basicTemplates = await omniPortDataContext.BasicTemplates
                 .AsNoTracking()
-                .ProjectTo<TemplateSummaryDto>(objectMapper.ConfigurationProvider)
+                .Select(template => new TemplateSummaryDto(
+                    template.Id,
+                    template.Name,
+                    template.SourceType,
+                    template.Fields.Count(field =>
+                        field.ParentFieldId == null &&
+                        !field.IsArrayItem)))
                 .ToListAsync();
 
             logger.LogDebug("Loaded {TemplateCount} basic template summaries", basicTemplates.Count);
@@ -157,9 +157,11 @@ namespace Presentation.Services
         {
             var joinedTemplates = await omniPortDataContext.MappingTemplates
                 .AsNoTracking()
-                .Include(mapping => mapping.SourceTemplate)
-                .Include(mapping => mapping.TargetTemplate)
-                .ProjectTo<JoinedTemplateSummaryDto>(objectMapper.ConfigurationProvider)
+                .Select(mapping => new JoinedTemplateSummaryDto(
+                    mapping.Id,
+                    mapping.SourceTemplate.Name,
+                    mapping.TargetTemplate.Name,
+                    mapping.TargetTemplate.SourceType))
                 .ToListAsync();
 
             logger.LogDebug("Loaded {JoinedTemplateCount} transformation templates", joinedTemplates.Count);
@@ -182,7 +184,7 @@ namespace Presentation.Services
                 return null;
             }
 
-            return objectMapper.Map<MappingTemplateDto>(mappingTemplateEntity);
+            return ConvertMappingTemplateToDto(mappingTemplateEntity);
         }
 
         public async Task<int> CreateMappingTemplate(CreateMappingTemplateDto createMappingTemplateDto)
@@ -261,8 +263,13 @@ namespace Presentation.Services
         {
             var urlConversionHistoryItems = await omniPortDataContext.UrlConversionHistory
                 .AsNoTracking()
-                .Include(history => history.MappingTemplate)
-                .ProjectTo<UrlConversionHistoryDto>(objectMapper.ConfigurationProvider)
+                .Select(history => new UrlConversionHistoryDto(
+                    history.Id,
+                    history.ConvertedAt,
+                    history.InputUrl,
+                    history.OutputUrl,
+                    history.MappingTemplateId,
+                    history.MappingTemplate.Name))
                 .ToListAsync();
 
             return urlConversionHistoryItems;
@@ -309,8 +316,13 @@ namespace Presentation.Services
         {
             var fileConversionHistoryItems = await omniPortDataContext.FileConversionHistory
                 .AsNoTracking()
-                .Include(history => history.MappingTemplate)
-                .ProjectTo<FileConversionHistoryDto>(objectMapper.ConfigurationProvider)
+                .Select(history => new FileConversionHistoryDto(
+                    history.Id,
+                    history.ConvertedAt,
+                    history.FileName,
+                    history.OutputUrl,
+                    history.MappingTemplateId,
+                    history.MappingTemplate.Name))
                 .ToListAsync();
 
             return fileConversionHistoryItems;
@@ -320,7 +332,12 @@ namespace Presentation.Services
         {
             var watchedUrls = await omniPortDataContext.UrlFileGetting
                 .AsNoTracking()
-                .ProjectTo<WatchedUrlDto>(objectMapper.ConfigurationProvider)
+                .Select(watchedUrl => new WatchedUrlDto(
+                    watchedUrl.Id,
+                    watchedUrl.Url,
+                    watchedUrl.CheckIntervalMinutes,
+                    watchedUrl.MappingTemplateId,
+                    watchedUrl.MappingTemplate.Name))
                 .ToListAsync();
 
             return watchedUrls;
@@ -405,6 +422,29 @@ namespace Presentation.Services
                     .Select(childEntity => ConvertFieldToDto(childEntity, childrenByParentFieldId))
                     .ToList()
             );
+        }
+
+        private static MappingTemplateDto ConvertMappingTemplateToDto(MappingTemplateData mappingTemplateEntity)
+        {
+            var mappingFieldDtos = mappingTemplateEntity.MappingFields
+                .Select(mappingField => new MappingFieldDto(
+                    mappingField.Id,
+                    mappingField.SourceFieldId,
+                    mappingField.SourceField.Name,
+                    mappingField.SourceField.Type,
+                    mappingField.TargetFieldId,
+                    mappingField.TargetField.Name,
+                    mappingField.TargetField.Type))
+                .ToList();
+
+            return new MappingTemplateDto(
+                mappingTemplateEntity.Id,
+                mappingTemplateEntity.Name,
+                mappingTemplateEntity.SourceTemplateId,
+                mappingTemplateEntity.SourceTemplate.Name,
+                mappingTemplateEntity.TargetTemplateId,
+                mappingTemplateEntity.TargetTemplate.Name,
+                mappingFieldDtos);
         }
     }
 }

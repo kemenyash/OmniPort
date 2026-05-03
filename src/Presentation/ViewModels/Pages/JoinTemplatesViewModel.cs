@@ -189,7 +189,7 @@ namespace Presentation.ViewModels.Pages
         {
             return string.IsNullOrWhiteSpace(sourcePath)
                 ? null
-                : SourceFlattened.FirstOrDefault(x => x.Path == sourcePath).Type;
+                : SourceFlattened.FirstOrDefault(x => x.Path == sourcePath)?.Type;
         }
 
         private void OnChanged()

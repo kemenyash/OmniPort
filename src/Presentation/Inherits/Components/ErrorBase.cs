@@ -12,7 +12,7 @@ namespace Presentation.Inherits.Components
     public class ErrorBase : ComponentBase
     {
         [Inject]
-        protected ErrorViewModel ViewModel { get; set; }
+        protected ErrorViewModel ViewModel { get; set; } = null!;
 
         [CascadingParameter]
         protected HttpContext? HttpContext { get; set; }

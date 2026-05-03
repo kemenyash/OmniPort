@@ -13,7 +13,7 @@ namespace Presentation.Inherits.Pages
     public class TransformationBase : ComponentBase, IDisposable
     {
         [Inject]
-        protected TransformationViewModel ViewModel { get; set; }
+        protected TransformationViewModel ViewModel { get; set; } = null!;
 
         protected override async Task OnInitializedAsync()
         {

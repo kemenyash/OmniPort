@@ -11,7 +11,7 @@ namespace Presentation.Inherits.Components
 {
     public class FieldRowEditorBase : ComponentBase
     {
-        [Parameter] public TemplateFieldRow Field { get; set; }
+        [Parameter] public TemplateFieldRow Field { get; set; } = null!;
         [Parameter] public int Level { get; set; }
         [Parameter] public Action? OnRemove { get; set; }
 

@@ -10,7 +10,7 @@ namespace Presentation.Inherits.Components
     public class RequireLoginBase : ComponentBase
     {
         [Inject]
-        protected NavigationManager Nav { get; set; }
+        protected NavigationManager Nav { get; set; } = null!;
 
         protected override void OnInitialized()
         {

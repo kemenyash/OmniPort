@@ -1,7 +1,6 @@
 using BusinessLogic.Interfaces;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Presentation.Mapping;
 using Presentation.Models;
 using Presentation.Services;
 using Presentation.ViewModels.Components;
@@ -15,9 +14,6 @@ namespace Presentation
             this IServiceCollection services,
             IConfiguration configuration)
         {
-            services.AddAutoMapper(cfg =>
-                cfg.AddProfile<OmniPortMappingProfile>());
-
             services.Configure<UploadLimits>(
                 configuration.GetSection("UploadLimits"));
 

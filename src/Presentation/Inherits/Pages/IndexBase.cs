@@ -11,7 +11,7 @@ namespace Presentation.Inherits.Pages
     public class IndexBase : ComponentBase
     {
         [Inject]
-        protected IndexViewModel ViewModel { get; set; }
+        protected IndexViewModel ViewModel { get; set; } = null!;
 
         protected void OpenTemplates()
         {

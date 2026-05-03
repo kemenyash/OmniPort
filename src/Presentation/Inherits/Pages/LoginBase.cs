@@ -15,7 +15,7 @@ namespace Presentation.Inherits.Pages
         protected HttpContext? Context { get; set; }
 
         [Inject]
-        protected LoginViewModel ViewModel { get; set; }
+        protected LoginViewModel ViewModel { get; set; } = null!;
 
         protected override void OnParametersSet()
         {
