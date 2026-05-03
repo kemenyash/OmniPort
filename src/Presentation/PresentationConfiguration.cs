@@ -24,6 +24,7 @@ namespace Presentation
             services.AddScoped<ITemplateManager, TemplateManager>();
             services.AddScoped<ITransformationManager, TransformationManager>();
             services.AddScoped<ITransformationExecutionService, TransformationExecutor>();
+            services.AddScoped<TemplateSchemaInferenceService>();
 
             services.AddScoped<LoginViewModel>();
             services.AddScoped<IndexViewModel>();

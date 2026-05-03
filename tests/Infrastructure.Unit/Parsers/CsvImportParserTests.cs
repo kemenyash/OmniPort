@@ -21,12 +21,12 @@ namespace Infrastructure.Unit.Parsers
         }
 
         [Fact]
-        public void Parse_ShouldExposeHeaders_AsKeys()
+        public async Task Parse_ShouldExposeHeaders_AsKeys()
         {
             IImportParser sut = CreateSut();
             using Stream stream = CreateValidStream();
 
-            List<IDictionary<string, object?>> rows = sut.Parse(stream).ToList();
+            IReadOnlyList<IDictionary<string, object?>> rows = await sut.ParseAsync(stream);
 
             rows.Should().HaveCount(2);
             rows[0].Should().ContainKey("Name");

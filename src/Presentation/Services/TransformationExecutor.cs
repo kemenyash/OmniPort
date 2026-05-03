@@ -35,7 +35,7 @@ public class TransformationExecutor : ITransformationExecutionService
     {
         var join = await transformationManager.GetImportProfileForJoin(templateId);
         using var inputStream = await ResolveStream(file, join.ImportSourceType);
-        var mappedRows = ParseAndMap(inputStream, join.ImportSourceType, join.Profile);
+        var mappedRows = await ParseAndMap(inputStream, join.ImportSourceType, join.Profile);
         var baseFileName = GetBaseNameFromUpload(file) ?? $"template-{templateId}";
 
         return await SaveTransformed(mappedRows, outputExtension, baseFileName);
@@ -45,7 +45,7 @@ public class TransformationExecutor : ITransformationExecutionService
     {
         var join = await transformationManager.GetImportProfileForJoin(templateId);
         using var inputStream = await OpenHttpStreamWithCap(url, join.ImportSourceType);
-        var mappedRows = ParseAndMap(inputStream, join.ImportSourceType, join.Profile);
+        var mappedRows = await ParseAndMap(inputStream, join.ImportSourceType, join.Profile);
         var baseFileName = MakeSafeFileName(new Uri(url).Segments.LastOrDefault() ?? "remote");
 
         return await SaveTransformed(mappedRows, outputExtension, baseFileName);
@@ -99,21 +99,24 @@ public class TransformationExecutor : ITransformationExecutionService
         return safeExtension;
     }
 
-    private IEnumerable<IDictionary<string, object?>> ParseAndMap(
+    private async Task<List<IDictionary<string, object?>>> ParseAndMap(
         Stream stream,
         SourceType sourceType,
         ImportProfile importProfile)
     {
         var importParser = importParserFactory.Create(sourceType);
 
-        var parsedRows = importParser.Parse(stream);
+        var parsedRows = await importParser.ParseAsync(stream);
 
         var importMapper = new ImportMapper(importProfile);
+        List<IDictionary<string, object?>> mappedRows = new List<IDictionary<string, object?>>();
 
         foreach (var parsedRow in parsedRows)
         {
-            yield return importMapper.MapRow(parsedRow);
+            mappedRows.Add(importMapper.MapRow(parsedRow));
         }
+
+        return mappedRows;
     }
 
     private async Task<Stream> ResolveStream(object file, SourceType importSourceType)

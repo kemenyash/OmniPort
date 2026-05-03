@@ -26,11 +26,11 @@ namespace Infrastructure.Unit.Parsers
         }
 
         [Fact]
-        public void Parse_ShouldReturnEmpty_ForEmptyStream()
+        public async Task Parse_ShouldReturnEmpty_ForEmptyStream()
         {
             IImportParser sut = CreateSut();
             using Stream stream = new MemoryStream(Array.Empty<byte>());
-            List<IDictionary<string, object?>> rows = sut.Parse(stream).ToList();
+            IReadOnlyList<IDictionary<string, object?>> rows = await sut.ParseAsync(stream);
             rows.Should().BeEmpty();
         }
     }

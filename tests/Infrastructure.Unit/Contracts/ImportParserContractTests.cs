@@ -14,22 +14,22 @@ namespace Infrastructure.Unit.Contracts
         protected abstract Stream CreateValidStream();
 
         [Fact]
-        public void Parse_ShouldNotThrow_ForValidInput()
+        public async Task Parse_ShouldNotThrow_ForValidInput()
         {
             IImportParser sut = CreateSut();
             using Stream stream = CreateValidStream();
             
-            Action act = () => sut.Parse(stream).ToList();
-            act.Should().NotThrow();
+            Func<Task> act = async () => await sut.ParseAsync(stream);
+            await act.Should().NotThrowAsync();
         }
 
         [Fact]
-        public void Parse_ShouldReturnCollection_OfDictionaries()
+        public async Task Parse_ShouldReturnCollection_OfDictionaries()
         {
             IImportParser sut = CreateSut();
             using Stream stream = CreateValidStream();
             
-            List<IDictionary<string, object?>> rows = sut.Parse(stream).ToList();
+            IReadOnlyList<IDictionary<string, object?>> rows = await sut.ParseAsync(stream);
             
             rows.Should().NotBeNull();
             rows.Should().NotBeEmpty();
@@ -37,11 +37,11 @@ namespace Infrastructure.Unit.Contracts
         }
 
         [Fact]
-        public void Parse_ShouldReturnDictionaries_WithAtLeastOneKey()
+        public async Task Parse_ShouldReturnDictionaries_WithAtLeastOneKey()
         {
             IImportParser sut = CreateSut();
-            using Stream stream = CreateValidStream();   
-            List<IDictionary<string, object?>> rows = sut.Parse(stream).ToList();
+            using Stream stream = CreateValidStream();
+            IReadOnlyList<IDictionary<string, object?>> rows = await sut.ParseAsync(stream);
 
             rows.Should().OnlyContain(r => r.Keys.Count > 0);
         }

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Forms;
 using Presentation.Models;
 using Presentation.ViewModels.Pages;
 using System;
@@ -57,6 +58,18 @@ namespace Presentation.Inherits.Pages
         protected void RemoveField(TemplateFieldRow row)
         {
             ViewModel.RemoveField(row);
+            StateHasChanged();
+        }
+
+        protected async Task GenerateFieldsFromUpload(InputFileChangeEventArgs e)
+        {
+            await ViewModel.GenerateFieldsFromUpload(e.File);
+            StateHasChanged();
+        }
+
+        protected async Task GenerateFieldsFromUrl()
+        {
+            await ViewModel.GenerateFieldsFromUrl();
             StateHasChanged();
         }
 

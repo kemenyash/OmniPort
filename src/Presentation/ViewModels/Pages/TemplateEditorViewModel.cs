@@ -1,18 +1,24 @@
 using BusinessLogic.Enums;
 using BusinessLogic.Interfaces;
 using BusinessLogic.Records;
+using Microsoft.AspNetCore.Components.Forms;
 using Presentation.Models;
+using Presentation.Services;
 
 namespace Presentation.ViewModels.Pages
 {
     public class TemplateEditorViewModel
     {
         private readonly IAppSyncContext sync;
+        private readonly TemplateSchemaInferenceService schemaInferenceService;
 
         public event Action? Changed;
 
         public bool IsModalOpen { get; private set; }
         public int? EditingTemplateId { get; private set; }
+        public string SampleUrl { get; set; } = string.Empty;
+        public string? SchemaInferenceError { get; private set; }
+        public bool IsInferringSchema { get; private set; }
 
         public SourceType SelectedSourceType
         {
@@ -28,9 +34,12 @@ namespace Presentation.ViewModels.Pages
         public List<TemplateSummaryDto> Templates { get; private set; }
         public List<TemplateFieldRow> CurrentFields => CurrentTemplate.Fields;
 
-        public TemplateEditorViewModel(IAppSyncContext sync)
+        public TemplateEditorViewModel(
+            IAppSyncContext sync,
+            TemplateSchemaInferenceService schemaInferenceService)
         {
             this.sync = sync;
+            this.schemaInferenceService = schemaInferenceService;
 
             CurrentTemplate = new TemplateEditForm();
             Templates = new List<TemplateSummaryDto>();
@@ -60,6 +69,9 @@ namespace Presentation.ViewModels.Pages
                     new() { Name = "Name", Type = FieldDataType.String }
                 }
             };
+            SampleUrl = string.Empty;
+            SchemaInferenceError = null;
+            IsInferringSchema = false;
 
             IsModalOpen = true;
             Changed?.Invoke();
@@ -117,6 +129,16 @@ namespace Presentation.ViewModels.Pages
             Changed?.Invoke();
         }
 
+        public async Task GenerateFieldsFromUpload(IBrowserFile file)
+        {
+            await InferFields(() => schemaInferenceService.InferFromUpload(file, SelectedSourceType));
+        }
+
+        public async Task GenerateFieldsFromUrl()
+        {
+            await InferFields(() => schemaInferenceService.InferFromUrl(SampleUrl, SelectedSourceType));
+        }
+
         public async Task Save()
         {
             if (EditingTemplateId is null)
@@ -153,6 +175,35 @@ namespace Presentation.ViewModels.Pages
         {
             Templates = sync.Templates.ToList();
             Changed?.Invoke();
+        }
+
+        private async Task InferFields(Func<Task<List<TemplateFieldRow>>> infer)
+        {
+            SchemaInferenceError = null;
+            IsInferringSchema = true;
+            Changed?.Invoke();
+
+            try
+            {
+                var inferredFields = await infer();
+                if (inferredFields.Any())
+                {
+                    CurrentTemplate.Fields = inferredFields;
+                }
+                else
+                {
+                    SchemaInferenceError = "NoFieldsDetected";
+                }
+            }
+            catch
+            {
+                SchemaInferenceError = "SchemaInferenceFailed";
+            }
+            finally
+            {
+                IsInferringSchema = false;
+                Changed?.Invoke();
+            }
         }
 
         private static CreateTemplateFieldDto ToCreate(TemplateFieldRow row)

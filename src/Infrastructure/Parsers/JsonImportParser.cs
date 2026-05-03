@@ -7,14 +7,14 @@ namespace Infrastructure.Parsers
 {
     public class JsonImportParser : IImportParser
     {
-        public IEnumerable<IDictionary<string, object?>> Parse(Stream stream)
+        public async Task<IReadOnlyList<IDictionary<string, object?>>> ParseAsync(Stream stream, CancellationToken cancellationToken = default)
         {
             using StreamReader streamReader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
-            string text = streamReader.ReadToEnd();
+            string text = await streamReader.ReadToEndAsync(cancellationToken);
 
             if (string.IsNullOrWhiteSpace(text))
             {
-                return Enumerable.Empty<IDictionary<string, object?>>();
+                return Array.Empty<IDictionary<string, object?>>();
             }
 
             text = text.Trim();

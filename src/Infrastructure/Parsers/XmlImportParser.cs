@@ -1,5 +1,6 @@
 using BusinessLogic.Interfaces;
 using System.Xml;
+using System.Text;
 
 namespace Infrastructure.Parsers
 {
@@ -12,11 +13,15 @@ namespace Infrastructure.Parsers
             this.recordNodeName = recordNodeName;
         }
 
-        public IEnumerable<IDictionary<string, object?>> Parse(Stream stream)
+        public async Task<IReadOnlyList<IDictionary<string, object?>>> ParseAsync(Stream stream, CancellationToken cancellationToken = default)
         {
-            XmlDocument xmlDocument = new XmlDocument();
-            xmlDocument.Load(stream);
+            using StreamReader reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+            string xmlText = await reader.ReadToEndAsync(cancellationToken);
 
+            XmlDocument xmlDocument = new XmlDocument();
+            xmlDocument.LoadXml(xmlText);
+
+            List<IDictionary<string, object?>> rows = new List<IDictionary<string, object?>>();
             XmlNodeList nodes = xmlDocument.GetElementsByTagName(recordNodeName);
             foreach (XmlNode node in nodes)
             {
@@ -25,8 +30,10 @@ namespace Infrastructure.Parsers
                 {
                     dict[child.Name] = child.InnerText;
                 }
-                yield return dict;
+                rows.Add(dict);
             }
+
+            return rows;
         }
     }
 }

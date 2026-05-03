@@ -5,14 +5,14 @@ namespace Infrastructure.Parsers
 {
     public class ExcelImportParser : IImportParser
     {
-        public IEnumerable<IDictionary<string, object?>> Parse(Stream stream)
+        public async Task<IReadOnlyList<IDictionary<string, object?>>> ParseAsync(Stream stream, CancellationToken cancellationToken = default)
         {
             try
             {
                 if (!stream.CanSeek)
                 {
                     MemoryStream memoryStream = new MemoryStream();
-                    stream.CopyTo(memoryStream);
+                    await stream.CopyToAsync(memoryStream, cancellationToken);
                     memoryStream.Position = 0;
                     stream = memoryStream;
                 }
@@ -21,15 +21,15 @@ namespace Infrastructure.Parsers
                     stream.Position = 0;
                 }
 
-                Span<byte> spanByte = stackalloc byte[4];
-                int read = stream.Read(spanByte);
+                byte[] magicHeaderBytes = new byte[4];
+                int read = await stream.ReadAsync(magicHeaderBytes.AsMemory(0, 4), cancellationToken);
                 stream.Position = 0;
 
                 bool looksZip = read == 4 &&
-                                spanByte[0] == (byte)'P' &&
-                                spanByte[1] == (byte)'K' &&
-                                spanByte[2] == 3 &&
-                                spanByte[3] == 4;
+                                magicHeaderBytes[0] == (byte)'P' &&
+                                magicHeaderBytes[1] == (byte)'K' &&
+                                magicHeaderBytes[2] == 3 &&
+                                magicHeaderBytes[3] == 4;
 
                 if (!looksZip)
                 {
@@ -43,13 +43,13 @@ namespace Infrastructure.Parsers
                 IXLRange? range = worksheet.RangeUsed();
                 if (range is null)
                 {
-                    return Enumerable.Empty<IDictionary<string, object?>>();
+                    return Array.Empty<IDictionary<string, object?>>();
                 }
 
                 List<IXLRangeRow> rows = range.RowsUsed().ToList();
                 if (rows.Count < 2)
                 {
-                    return Enumerable.Empty<IDictionary<string, object?>>();
+                    return Array.Empty<IDictionary<string, object?>>();
                 }
 
                 IXLRangeRow headerRow = rows[0];

@@ -32,14 +32,14 @@ namespace Infrastructure.Unit.Parsers
         }
 
         [Fact]
-        public void Parse_ShouldThrow_InvalidOperationException_ForNonXlsx()
+        public async Task Parse_ShouldThrow_InvalidOperationException_ForNonXlsx()
         {
             IImportParser sut = CreateSut();
             using Stream stream = new MemoryStream(new byte[] { 1, 2, 3, 4, 5 });
 
-            Action act = () => sut.Parse(stream).ToList();
+            Func<Task> act = async () => await sut.ParseAsync(stream);
 
-            act.Should().Throw<InvalidOperationException>();
+            await act.Should().ThrowAsync<InvalidOperationException>();
         }
     }
 }

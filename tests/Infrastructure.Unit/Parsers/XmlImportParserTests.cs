@@ -26,12 +26,12 @@ namespace Infrastructure.Unit.Parsers
         }
 
         [Fact]
-        public void Parse_ShouldMapChildNodes_ToKeys()
+        public async Task Parse_ShouldMapChildNodes_ToKeys()
         {
             IImportParser sut = CreateSut();
             using Stream stream = CreateValidStream();
 
-            List<IDictionary<string, object?>> rows = sut.Parse(stream).ToList();
+            IReadOnlyList<IDictionary<string, object?>> rows = await sut.ParseAsync(stream);
 
             rows.Should().HaveCount(2);
             rows[1]["Name"]?.ToString().Should().Be("Bob");

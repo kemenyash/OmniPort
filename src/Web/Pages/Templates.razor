@@ -86,6 +86,44 @@
                     </InputSelect>
                 </div>
 
+                <div class="mb-4 border rounded p-4 bg-gray-50">
+                    <div class="font-medium mb-3">@L["GenerateTemplateFromFile"]</div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-medium mb-1">@L["UploadFile"]</label>
+                            <InputFile OnChange="GenerateFieldsFromUpload"
+                                       class="w-full border rounded px-3 py-2 bg-white"
+                                       disabled="@ViewModel.IsInferringSchema" />
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium mb-1">@L["FileUrl"]</label>
+                            <div class="flex gap-2">
+                                <InputText class="w-full border rounded px-3 py-2"
+                                           @bind-Value="ViewModel.SampleUrl"
+                                           placeholder="https://example.com/file.csv" />
+                                <button type="button"
+                                        class="px-3 py-2 bg-blue-600 text-white rounded disabled:opacity-50"
+                                        disabled="@ViewModel.IsInferringSchema"
+                                        @onclick="GenerateFieldsFromUrl">
+                                    @L["Generate"]
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    @if (ViewModel.IsInferringSchema)
+                    {
+                        <div class="text-sm text-gray-600 mt-2">@L["GeneratingFields"]</div>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(ViewModel.SchemaInferenceError))
+                    {
+                        <div class="text-sm text-red-600 mt-2">@L[ViewModel.SchemaInferenceError]</div>
+                    }
+                </div>
+
                 <div class="mb-4">
                     <div class="flex items-center justify-between">
                         <label class="block font-medium mb-1">@L["Fields"]</label>
