@@ -3,7 +3,6 @@ using OpenTelemetry;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Instrumentation.AspNetCore;
 using OpenTelemetry.Instrumentation.Http;
-using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
@@ -41,41 +40,9 @@ namespace Web.Telemetry
                     {
                         builder.AddOtlpExporter(ConfigureOtlpExporter);
                     }
-                })
-                .WithMetrics(builder =>
-                {
-                    builder.AddAspNetCoreInstrumentation();
-                    builder.AddHttpClientInstrumentation();
-                    builder.AddRuntimeInstrumentation();
-                    builder.AddMeter(OmniPortTelemetry.MeterName);
-
-                    if (isConsoleExporterEnabled)
-                    {
-                        builder.AddConsoleExporter();
-                    }
-
-                    builder.AddPrometheusExporter(options =>
-                    {
-                        options.ScrapeResponseCacheDurationMilliseconds = 0;
-                        options.ScrapeEndpointPath = "/metrics";
-                    });
                 });
 
             return services;
-        }
-
-        public static IApplicationBuilder PassTraceIdToResponse(this IApplicationBuilder app)
-        {
-            app.Use((httpContext, next) =>
-            {
-                httpContext.Response.Headers.TryAdd(
-                    "x-trace-id",
-                    Activity.Current?.TraceId.ToString() ?? string.Empty);
-
-                return next();
-            });
-
-            return app;
         }
 
         private static void ConfigureAspNetCoreInstrumentation(AspNetCoreTraceInstrumentationOptions options)
@@ -84,7 +51,6 @@ namespace Web.Telemetry
             options.Filter = httpContext =>
             {
                 var path = httpContext.Request.Path.Value;
-                if (string.Equals(path, "/metrics", StringComparison.OrdinalIgnoreCase)) return false;
                 if (string.Equals(path, "/health", StringComparison.OrdinalIgnoreCase)) return false;
                 if (string.Equals(path, "/favicon.ico", StringComparison.OrdinalIgnoreCase)) return false;
                 if (path?.Contains("_framework", StringComparison.OrdinalIgnoreCase) == true) return false;

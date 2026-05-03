@@ -5,7 +5,6 @@ using BusinessLogic.Interfaces;
 using BusinessLogic.Records;
 using BusinessLogic.Utilities;
 using System.Collections.Concurrent;
-using Presentation.Telemetry;
 
 namespace Presentation.Services
 {
@@ -138,7 +137,6 @@ namespace Presentation.Services
         private async Task ProcessUrl(string storedUrl, int mappingTemplateId, CancellationToken cancellationToken)
         {
             var effectiveUrl = UrlWatchTagger.StripTag(storedUrl);
-            OmniPortTelemetry.WatchedUrlChecks.Add(1);
 
             var effectiveUrlLock = urlLocksByEffectiveUrl.GetOrAdd(
                 effectiveUrl,

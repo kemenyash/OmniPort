@@ -1,4 +1,3 @@
-using OpenTelemetry.Metrics;
 using Web.Telemetry;
 
 namespace Web.Bootstrap
@@ -28,8 +27,6 @@ namespace Web.Bootstrap
             app.UseAuthentication();
             app.UseAuthorization();
             app.UseHealthChecks("/health");
-            app.PassTraceIdToResponse();
-            app.UseOpenTelemetryPrometheusScrapingEndpoint();
 
             logger.LogInformation("OmniPort middleware pipeline configured");
 

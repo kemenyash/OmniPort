@@ -9,7 +9,6 @@ using BusinessLogic.Models;
 using Presentation.Services;
 using Presentation.Telemetry;
 using System.Net;
-using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using System.Xml;
@@ -42,8 +41,6 @@ public class TransformationExecutor : ITransformationExecutionService
         using var activity = OmniPortTelemetry.ActivitySource.StartActivity("TransformUploadedFile");
         activity?.SetTag("template.id", templateId);
         activity?.SetTag("output.extension", outputExtension);
-        OmniPortTelemetry.TransformationsStarted.Add(1, KeyValuePair.Create<string, object?>("source", "upload"));
-        var stopwatch = Stopwatch.StartNew();
 
         try
         {
@@ -63,16 +60,8 @@ public class TransformationExecutor : ITransformationExecutionService
         }
         catch (Exception exception)
         {
-            OmniPortTelemetry.TransformationsFailed.Add(1, KeyValuePair.Create<string, object?>("source", "upload"));
             logger.LogError(exception, "Uploaded file transformation failed for template {TemplateId}", templateId);
             throw;
-        }
-        finally
-        {
-            stopwatch.Stop();
-            OmniPortTelemetry.TransformationDuration.Record(
-                stopwatch.Elapsed.TotalMilliseconds,
-                KeyValuePair.Create<string, object?>("source", "upload"));
         }
     }
 
@@ -82,8 +71,6 @@ public class TransformationExecutor : ITransformationExecutionService
         activity?.SetTag("template.id", templateId);
         activity?.SetTag("url", url);
         activity?.SetTag("output.extension", outputExtension);
-        OmniPortTelemetry.TransformationsStarted.Add(1, KeyValuePair.Create<string, object?>("source", "url"));
-        var stopwatch = Stopwatch.StartNew();
 
         try
         {
@@ -103,16 +90,8 @@ public class TransformationExecutor : ITransformationExecutionService
         }
         catch (Exception exception)
         {
-            OmniPortTelemetry.TransformationsFailed.Add(1, KeyValuePair.Create<string, object?>("source", "url"));
             logger.LogError(exception, "URL transformation failed for template {TemplateId} from {Url}", templateId, url);
             throw;
-        }
-        finally
-        {
-            stopwatch.Stop();
-            OmniPortTelemetry.TransformationDuration.Record(
-                stopwatch.Elapsed.TotalMilliseconds,
-                KeyValuePair.Create<string, object?>("source", "url"));
         }
     }
 
