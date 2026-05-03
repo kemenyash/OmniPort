@@ -6,60 +6,63 @@
 @inherits TemplatesBase
 @inject IAppLocalizer L
 
-<h1 class="text-2xl font-bold mb-6">@L["BasicTemplates"]</h1>
-
-<table class="min-w-full bg-white shadow rounded mb-6">
-    <thead>
-        <tr class="bg-gray-100 text-left">
-            <th class="p-3">@L["Name"]</th>
-            <th class="p-3">@L["Fields"]</th>
-            <th class="p-3">@L["SourceType"]</th>
-            <th class="p-3"></th>
-        </tr>
-    </thead>
-    <tbody>
-        @if (ViewModel.Templates.Any())
-        {
-            @foreach (var templateSummary in ViewModel.Templates)
-            {
-                <tr>
-                    <td class="p-3">@templateSummary.Name</td>
-                    <td class="p-3">@templateSummary.FieldsCount</td>
-                    <td class="p-3">@L.Enum(templateSummary.SourceType)</td>
-                    <td class="p-3 flex gap-2">
-                        <button class="text-blue-600 hover:underline"
-                                @onclick="() => StartEdit(templateSummary.Id)">
-                            @L["Edit"]
-                        </button>
-                        <button class="text-red-600 hover:underline"
-                                @onclick="() => Delete(templateSummary.Id)">
-                            @L["Delete"]
-                        </button>
-                    </td>
-                </tr>
-            }
-        }
-        else
-        {
-            <tr>
-                <td colspan="4" class="p-3 text-gray-500 italic">@L["NoTemplatesFound"]</td>
-            </tr>
-        }
-    </tbody>
-</table>
-
-<div class="flex gap-4 mb-8">
-    <button class="bg-blue-600 text-white px-4 py-2 rounded"
+<div class="mb-5 flex flex-col gap-3 pr-14 sm:flex-row sm:items-center sm:justify-between sm:pr-16">
+    <h1 class="text-2xl font-semibold tracking-tight text-gray-950">@L["BasicTemplates"]</h1>
+    <button class="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
             @onclick="StartCreate">
         @L["CreateTemplate"]
     </button>
 </div>
 
+<div class="mb-6 overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+    <table class="min-w-full text-sm">
+        <thead class="bg-gray-50 text-gray-600">
+            <tr class="text-left">
+                <th class="px-4 py-3 font-medium">@L["Name"]</th>
+                <th class="px-4 py-3 font-medium">@L["Fields"]</th>
+                <th class="px-4 py-3 font-medium">@L["SourceType"]</th>
+                <th class="px-4 py-3 text-right font-medium">@L["Actions"]</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            @if (ViewModel.Templates.Any())
+            {
+                @foreach (var templateSummary in ViewModel.Templates)
+                {
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3 font-medium text-gray-900">@templateSummary.Name</td>
+                        <td class="px-4 py-3 text-gray-700">@templateSummary.FieldsCount</td>
+                        <td class="px-4 py-3 text-gray-700">@L.Enum(templateSummary.SourceType)</td>
+                        <td class="px-4 py-3">
+                            <div class="flex justify-end gap-2">
+                                <button class="rounded border border-blue-200 px-3 py-1.5 text-blue-700 hover:bg-blue-50"
+                                        @onclick="() => StartEdit(templateSummary.Id)">
+                                    @L["Edit"]
+                                </button>
+                                <button class="rounded border border-red-200 px-3 py-1.5 text-red-700 hover:bg-red-50"
+                                        @onclick="() => Delete(templateSummary.Id)">
+                                    @L["Delete"]
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            }
+            else
+            {
+                <tr>
+                    <td colspan="4" class="px-4 py-6 text-center text-gray-500">@L["NoTemplatesFound"]</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
 @if (ViewModel.IsModalOpen)
 {
-    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-3xl" @onclick:stopPropagation>
-            <h2 class="text-xl font-semibold mb-4">
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50 p-4">
+        <div class="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-lg bg-white p-5 shadow-xl sm:p-6" @onclick:stopPropagation>
+            <h2 class="mb-4 text-xl font-semibold text-gray-950">
                 @((ViewModel.EditingTemplateId == null) ? L["CreateTemplate"] : L["EditTemplate"])
             </h2>
 
@@ -70,14 +73,14 @@
 
                 <div class="mb-4">
                     <label class="block font-medium mb-1">@L["TemplateName"]</label>
-                    <InputText class="w-full border rounded px-3 py-2"
+                    <InputText class="w-full rounded border border-gray-300 px-3 py-2"
                                @bind-Value="ViewModel.CurrentTemplate.Name" />
                     <ValidationMessage For="@(() => ViewModel.CurrentTemplate.Name)" />
                 </div>
 
                 <div class="mb-4">
                     <label class="block font-medium mb-1">@L["SourceType"]</label>
-                    <InputSelect class="w-full border rounded px-3 py-2"
+                    <InputSelect class="w-full rounded border border-gray-300 px-3 py-2"
                                  @bind-Value="ViewModel.SelectedSourceType">
                         @foreach (SourceType sourceType in Enum.GetValues(typeof(SourceType)))
                         {
@@ -86,25 +89,25 @@
                     </InputSelect>
                 </div>
 
-                <div class="mb-4 border rounded p-4 bg-gray-50">
+                <div class="mb-4 rounded border border-gray-200 bg-gray-50 p-4">
                     <div class="font-medium mb-3">@L["GenerateTemplateFromFile"]</div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-sm font-medium mb-1">@L["UploadFile"]</label>
                             <InputFile OnChange="GenerateFieldsFromUpload"
-                                       class="w-full border rounded px-3 py-2 bg-white"
+                                       class="w-full rounded border border-gray-300 bg-white px-3 py-2"
                                        disabled="@ViewModel.IsInferringSchema" />
                         </div>
 
                         <div>
                             <label class="block text-sm font-medium mb-1">@L["FileUrl"]</label>
                             <div class="flex gap-2">
-                                <InputText class="w-full border rounded px-3 py-2"
+                                <InputText class="w-full rounded border border-gray-300 px-3 py-2"
                                            @bind-Value="ViewModel.SampleUrl"
                                            placeholder="https://example.com/file.csv" />
                                 <button type="button"
-                                        class="px-3 py-2 bg-blue-600 text-white rounded disabled:opacity-50"
+                                        class="rounded bg-blue-600 px-3 py-2 text-white disabled:opacity-50"
                                         disabled="@ViewModel.IsInferringSchema"
                                         @onclick="GenerateFieldsFromUrl">
                                     @L["Generate"]
@@ -151,12 +154,12 @@
 
                 <div class="flex justify-end gap-3 mt-4">
                     <button type="button"
-                            class="px-4 py-2 bg-gray-300 rounded"
+                            class="rounded border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-100"
                             @onclick="CancelEdit">
                         @L["Cancel"]
                     </button>
                     <button type="submit"
-                            class="px-4 py-2 bg-green-600 text-white rounded">
+                            class="rounded bg-emerald-600 px-4 py-2 text-white hover:bg-emerald-700">
                         @L["SaveTemplate"]
                     </button>
                 </div>

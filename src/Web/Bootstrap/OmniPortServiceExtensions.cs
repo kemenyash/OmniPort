@@ -54,6 +54,7 @@ namespace Web.Bootstrap
                 options.Password.RequireDigit = false;
                 options.Password.RequiredLength = 6;
             })
+            .AddRoles<IdentityRole>()
             .AddEntityFrameworkStores<AppIdentityDbContext>()
             .AddSignInManager()
             .AddDefaultTokenProviders();

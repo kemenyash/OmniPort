@@ -1,0 +1,208 @@
+@page "/users"
+@attribute [Authorize(Roles = "Admin")]
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@using Infrastructure.Auth
+@inject UserManager<AppUser> UserManager
+@inject IAppLocalizer L
+
+<h1 class="mb-5 text-2xl font-semibold tracking-tight text-gray-950">@L["Users"]</h1>
+
+<div class="grid gap-8 lg:grid-cols-[minmax(280px,420px)_1fr]">
+    <section class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+        <h2 class="mb-4 text-lg font-semibold text-gray-950">@L["CreateUser"]</h2>
+
+        <EditForm Model="createUserForm" OnValidSubmit="CreateUser">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="space-y-4">
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700" for="new-user-email">@L["Email"]</label>
+                    <InputText id="new-user-email"
+                               class="w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                               @bind-Value="createUserForm.Email" />
+                    <ValidationMessage For="@(() => createUserForm.Email)" />
+                </div>
+
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700" for="new-user-password">@L["Password"]</label>
+                    <InputText id="new-user-password"
+                               type="password"
+                               class="w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                               @bind-Value="createUserForm.Password" />
+                    <ValidationMessage For="@(() => createUserForm.Password)" />
+                </div>
+
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700" for="new-user-confirm-password">@L["ConfirmPassword"]</label>
+                    <InputText id="new-user-confirm-password"
+                               type="password"
+                               class="w-full rounded border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                               @bind-Value="createUserForm.ConfirmPassword" />
+                    <ValidationMessage For="@(() => createUserForm.ConfirmPassword)" />
+                </div>
+
+                <label class="inline-flex items-center gap-2">
+                    <InputCheckbox class="h-4 w-4 rounded border-gray-300"
+                                   @bind-Value="createUserForm.IsAdmin" />
+                    <span>@L["GrantAdministrator"]</span>
+                </label>
+
+                <button type="submit"
+                        class="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-50"
+                        disabled="@isBusy">
+                    @L["CreateUser"]
+                </button>
+
+                @if (!string.IsNullOrWhiteSpace(successMessage))
+                {
+                    <div class="rounded border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">@successMessage</div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(errorMessage))
+                {
+                    <div class="rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">@errorMessage</div>
+                }
+            </div>
+        </EditForm>
+    </section>
+
+    <section>
+        <h2 class="mb-4 text-lg font-semibold text-gray-950">@L["ExistingUsers"]</h2>
+
+        <div class="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+            <table class="min-w-full text-sm">
+                <thead class="bg-gray-50 text-gray-600">
+                    <tr>
+                        <th class="px-4 py-3 text-left font-medium">@L["Email"]</th>
+                        <th class="px-4 py-3 text-left font-medium">@L["UserName"]</th>
+                        <th class="px-4 py-3 text-left font-medium">@L["Role"]</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    @if (users.Count == 0)
+                    {
+                        <tr>
+                            <td class="px-4 py-6 text-center text-gray-500" colspan="3">@L["NoUsersFound"]</td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var user in users)
+                        {
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-4 py-3">@user.Email</td>
+                                <td class="px-4 py-3">@user.UserName</td>
+                                <td class="px-4 py-3">
+                                    <span class="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700">
+                                        @(user.IsAdmin ? L["Administrator"] : L["StandardUser"])
+                                    </span>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+@code {
+    private readonly CreateUserForm createUserForm = new();
+    private List<UserListItem> users = new();
+    private bool isBusy;
+    private string? successMessage;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUsers();
+    }
+
+    private async Task CreateUser()
+    {
+        isBusy = true;
+        successMessage = null;
+        errorMessage = null;
+
+        try
+        {
+            var normalizedEmail = createUserForm.Email.Trim();
+            var user = new AppUser
+            {
+                UserName = normalizedEmail,
+                Email = normalizedEmail,
+                EmailConfirmed = true
+            };
+
+            var result = await UserManager.CreateAsync(user, createUserForm.Password);
+            if (!result.Succeeded)
+            {
+                errorMessage = string.Join(" ", result.Errors.Select(error => error.Description));
+                return;
+            }
+
+            if (createUserForm.IsAdmin)
+            {
+                var roleResult = await UserManager.AddToRoleAsync(user, "Admin");
+                if (!roleResult.Succeeded)
+                {
+                    await UserManager.DeleteAsync(user);
+                    errorMessage = string.Join(" ", roleResult.Errors.Select(error => error.Description));
+                    return;
+                }
+            }
+
+            createUserForm.Email = string.Empty;
+            createUserForm.Password = string.Empty;
+            createUserForm.ConfirmPassword = string.Empty;
+            createUserForm.IsAdmin = false;
+            successMessage = L["UserCreated"];
+            await LoadUsers();
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private async Task LoadUsers()
+    {
+        var appUsers = await UserManager.Users
+            .OrderBy(user => user.Email)
+            .ToListAsync();
+
+        var loadedUsers = new List<UserListItem>(appUsers.Count);
+        foreach (var user in appUsers)
+        {
+            loadedUsers.Add(new UserListItem(
+                user.Email ?? string.Empty,
+                user.UserName ?? string.Empty,
+                await UserManager.IsInRoleAsync(user, "Admin")));
+        }
+
+        users = loadedUsers;
+    }
+
+    private sealed class CreateUserForm
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [Required]
+        [MinLength(6)]
+        public string Password { get; set; } = string.Empty;
+
+        [Required]
+        [Compare(nameof(Password))]
+        public string ConfirmPassword { get; set; } = string.Empty;
+
+        public bool IsAdmin { get; set; }
+    }
+
+    private sealed record UserListItem(string Email, string UserName, bool IsAdmin);
+}

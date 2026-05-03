@@ -9,14 +9,14 @@
 
 <EditForm Model="@ViewModel.FormModel" OnValidSubmit="RunTransformation">
     <DataAnnotationsValidator />
-    <ValidationSummary />
+    <ValidationSummary class="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" />
 
-    <div class="space-y-6">
-
-        <div>
-            <label>@L["Template"]</label>
+    <section class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+        <div class="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-end">
+            <div>
+                <label class="mb-1 block text-sm font-medium text-gray-700">@L["Template"]</label>
             <InputSelect @bind-Value="@ViewModel.FormModel.SelectedMappingTemplateId"
-                         class="w-full border px-3 py-2 rounded">
+                             class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100">
                 <option value="0" disabled>@L["SelectTemplate"]</option>
                 @foreach (var joinedTemplate in ViewModel.JoinedTemplates)
                 {
@@ -24,60 +24,65 @@
                 }
             </InputSelect>
             <ValidationMessage For="@(() => ViewModel.FormModel.SelectedMappingTemplateId)" />
-        </div>
-
-        <div class="flex gap-4 items-center">
-            <label>@L["ImportMode"]</label>
-            <button type="button"
-                    @onclick="() => SetMode(UploadMode.Upload)"
-                    class="@ViewModel.GetButtonClass(UploadMode.Upload)">
-                @L["Upload"]
-            </button>
-            <button type="button"
-                    @onclick="() => SetMode(UploadMode.Url)"
-                    class="@ViewModel.GetButtonClass(UploadMode.Url)">
-                @L["Url"]
-            </button>
-        </div>
-
-        @if (ViewModel.InputMode == UploadMode.Upload)
-        {
-            <div class="space-y-1">
-                <label>@L["UploadFile"]</label>
-                <InputFile OnChange="OnFileChange"
-                           class="w-full border px-3 py-2 rounded" />
-
-                @if (!string.IsNullOrWhiteSpace(ViewModel.FormModel.UploadedFileName))
-                {
-                    <div class="text-sm text-gray-600">
-                        @L["Selected"] @ViewModel.FormModel.UploadedFileName
-                    </div>
-                }
-            </div>
-        }
-
-        @if (ViewModel.InputMode == UploadMode.Url)
-        {
-            <div>
-                <label>@L["FileUrl"]</label>
-                <InputText @bind-Value="ViewModel.FormModel.FileUrl"
-                           class="w-full border px-3 py-2 rounded"
-                           placeholder="https://example.com/file.xlsx" />
-                <ValidationMessage For="@(() => ViewModel.FormModel.FileUrl)" />
             </div>
 
             <div>
-                <label>@L["CheckIntervalMin"]</label>
-                <InputNumber @bind-Value="ViewModel.FormModel.IntervalMinutes"
-                             class="w-32 border px-3 py-2 rounded"
-                             min="1" max="1440" />
-                <ValidationMessage For="@(() => ViewModel.FormModel.IntervalMinutes)" />
+                <div class="mb-1 text-sm font-medium text-gray-700">@L["ImportMode"]</div>
+                <div class="inline-flex rounded border border-gray-200 bg-gray-50 p-0.5">
+                    <button type="button"
+                            @onclick="() => SetMode(UploadMode.Upload)"
+                            class="@GetModeButtonClass(UploadMode.Upload)">
+                        @L["Upload"]
+                    </button>
+                    <button type="button"
+                            @onclick="() => SetMode(UploadMode.Url)"
+                            class="@GetModeButtonClass(UploadMode.Url)">
+                        @L["Url"]
+                    </button>
+                </div>
             </div>
-        }
+        </div>
 
-        <div class="flex items-center gap-3">
+        <div class="mt-5 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
+            @if (ViewModel.InputMode == UploadMode.Upload)
+            {
+                <div class="space-y-1">
+                    <label class="block text-sm font-medium text-gray-700">@L["UploadFile"]</label>
+                    <InputFile OnChange="OnFileChange"
+                               class="w-full rounded border border-dashed border-gray-300 bg-gray-50 px-3 py-2 text-sm" />
+
+                    @if (!string.IsNullOrWhiteSpace(ViewModel.FormModel.UploadedFileName))
+                    {
+                        <div class="text-sm text-gray-600">
+                            @L["Selected"] @ViewModel.FormModel.UploadedFileName
+                        </div>
+                    }
+                </div>
+            }
+
+            @if (ViewModel.InputMode == UploadMode.Url)
+            {
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">@L["FileUrl"]</label>
+                    <InputText @bind-Value="ViewModel.FormModel.FileUrl"
+                               class="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                               placeholder="https://example.com/file.xlsx" />
+                    <ValidationMessage For="@(() => ViewModel.FormModel.FileUrl)" />
+                </div>
+
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">@L["CheckIntervalMin"]</label>
+                    <InputNumber @bind-Value="ViewModel.FormModel.IntervalMinutes"
+                                 class="w-36 rounded border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                                 min="1" max="1440" />
+                    <ValidationMessage For="@(() => ViewModel.FormModel.IntervalMinutes)" />
+                </div>
+            }
+        </div>
+
+        <div class="mt-5 flex flex-wrap items-center gap-3">
             <button type="submit"
-                    class="bg-green-600 text-white px-4 py-2 rounded disabled:opacity-50"
+                    class="rounded bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
                     disabled="@(!ViewModel.CanRun || ViewModel.IsBusy)">
                 @(ViewModel.IsBusy ? L["Processing"] : L["RunTransformation"])
             </button>
@@ -85,7 +90,7 @@
             @if (ViewModel.InputMode == UploadMode.Url)
             {
                 <button type="button"
-                        class="bg-indigo-600 text-white px-4 py-2 rounded disabled:opacity-50"
+                        class="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
                         disabled="@(!ViewModel.CanAddToWatchlist || ViewModel.IsBusy)"
                         @onclick="AddToWatchlistFromForm">
                     @L["AddToWatchlist"]
@@ -95,12 +100,12 @@
 
         @if (!string.IsNullOrWhiteSpace(ViewModel.ErrorMessage))
         {
-            <div class="text-red-600">@ViewModel.ErrorMessage</div>
+            <div class="mt-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">@ViewModel.ErrorMessage</div>
         }
 
         @if (!string.IsNullOrWhiteSpace(ViewModel.SuccessMessage))
         {
-            <div class="rounded border border-green-200 bg-green-50 px-4 py-3 text-green-800">
+            <div class="mt-4 rounded border border-green-200 bg-green-50 px-4 py-3 text-green-800">
                 <div>@L["TransformationCompleted"]</div>
                 @if (!string.IsNullOrWhiteSpace(ViewModel.LastOutputLink))
                 {
@@ -119,125 +124,147 @@
                 }
             </div>
         }
-    </div>
+    </section>
 </EditForm>
 
-<hr class="my-10" />
+<div class="my-6 h-px bg-gray-200"></div>
 
 @if (ViewModel.InputMode == UploadMode.Url && ViewModel.WatchedUrls.Any())
 {
-    <h2 class="text-lg font-semibold mb-2">@L["WatchedUrls"]</h2>
-    <table class="w-full table-auto border border-gray-300">
-        <thead>
-            <tr class="bg-gray-100">
-                <th class="px-4 py-2 text-left">@L["Url"]</th>
-                <th class="px-4 py-2 text-left">@L["Template"]</th>
-                <th class="px-4 py-2 text-left">@L["IntervalMin"]</th>
-                <th class="px-4 py-2 text-left">@L["StableLink"]</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var watchedUrl in ViewModel.WatchedUrls)
-            {
-                <tr>
-                    <td class="border px-4 py-2">@watchedUrl.Url</td>
-                    <td class="border px-4 py-2">@watchedUrl.MappingTemplateName</td>
-                    <td class="border px-4 py-2">@watchedUrl.IntervalMinutes</td>
-                    <td class="border px-4 py-2">
-                        @{
-                            var stableLink = $"/watch/{watchedUrl.Id}/latest";
-                        }
-                        <div class="flex items-center gap-2">
-                            <a href="@stableLink" target="_blank" class="text-blue-600 underline">
-                                @L["LatestResult"]
-                            </a>
-                            <button type="button"
-                                    class="inline-flex h-8 w-8 items-center justify-center rounded border border-gray-300 text-gray-700 hover:bg-gray-100"
-                                    title="@L["CopyStableLink"]"
-                                    aria-label="@L["CopyStableLink"]"
-                                    @onclick="() => CopyLink(stableLink)">
-                                @CopyIcon
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
+    <section class="mb-6 rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div class="border-b border-gray-100 px-4 py-3">
+            <h2 class="text-lg font-semibold text-gray-950">@L["WatchedUrls"]</h2>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead class="bg-gray-50 text-gray-600">
+                    <tr>
+                        <th class="px-4 py-3 text-left font-medium">@L["Url"]</th>
+                        <th class="px-4 py-3 text-left font-medium">@L["Template"]</th>
+                        <th class="px-4 py-3 text-left font-medium">@L["IntervalMin"]</th>
+                        <th class="px-4 py-3 text-left font-medium">@L["StableLink"]</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    @foreach (var watchedUrl in ViewModel.WatchedUrls)
+                    {
+                        <tr class="align-top hover:bg-gray-50">
+                            <td class="max-w-[360px] px-4 py-3 text-gray-700">
+                                <div class="truncate" title="@watchedUrl.Url">@watchedUrl.Url</div>
+                            </td>
+                            <td class="px-4 py-3 text-gray-700">@watchedUrl.MappingTemplateName</td>
+                            <td class="px-4 py-3 text-gray-700">@watchedUrl.IntervalMinutes</td>
+                            <td class="px-4 py-3">
+                                @{
+                                    var stableLink = $"/watch/{watchedUrl.Id}/latest";
+                                }
+                                <div class="flex items-center gap-2">
+                                    <a href="@stableLink" target="_blank" class="font-medium text-blue-600 hover:underline">
+                                        @L["LatestResult"]
+                                    </a>
+                                    <button type="button"
+                                            class="inline-flex h-8 w-8 items-center justify-center rounded border border-gray-300 text-gray-700 hover:bg-gray-100"
+                                            title="@L["CopyStableLink"]"
+                                            aria-label="@L["CopyStableLink"]"
+                                            @onclick="() => CopyLink(stableLink)">
+                                        @CopyIcon
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
 }
 
 @if (ViewModel.InputMode == UploadMode.Url && ViewModel.UrlConversions.Any())
 {
-    <h2 class="text-lg font-semibold mb-2">@L["UrlConversionHistory"]</h2>
-    <table class="w-full table-auto border border-gray-300">
-        <thead>
-            <tr class="bg-gray-100">
-                <th class="px-4 py-2 text-left">@L["InputUrl"]</th>
-                <th class="px-4 py-2 text-left">@L["ConvertedAt"]</th>
-                <th class="px-4 py-2 text-left">@L["Template"]</th>
-                <th class="px-4 py-2 text-left">@L["Output"]</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var urlConversionHistoryItem in ViewModel.UrlConversions)
-            {
-                <tr>
-                    <td class="border px-4 py-2">@urlConversionHistoryItem.InputUrl</td>
-                    <td class="border px-4 py-2">@urlConversionHistoryItem.ConvertedAt.ToLocalTime()</td>
-                    <td class="border px-4 py-2">@urlConversionHistoryItem.MappingTemplateName</td>
-                    <td class="border px-4 py-2">
-                        <div class="flex items-center gap-2">
-                            <a href="@urlConversionHistoryItem.OutputLink" target="_blank" class="text-blue-600 underline">@L["View"]</a>
-                            <button type="button"
-                                    class="inline-flex h-8 w-8 items-center justify-center rounded border border-gray-300 text-gray-700 hover:bg-gray-100"
-                                    title="@L["CopyLink"]"
-                                    aria-label="@L["CopyLink"]"
-                                    @onclick="() => CopyLink(urlConversionHistoryItem.OutputLink)">
-                                @CopyIcon
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
+    <section class="mb-6 rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div class="border-b border-gray-100 px-4 py-3">
+            <h2 class="text-lg font-semibold text-gray-950">@L["UrlConversionHistory"]</h2>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead class="bg-gray-50 text-gray-600">
+                    <tr>
+                        <th class="px-4 py-3 text-left font-medium">@L["InputUrl"]</th>
+                        <th class="px-4 py-3 text-left font-medium">@L["ConvertedAt"]</th>
+                        <th class="px-4 py-3 text-left font-medium">@L["Template"]</th>
+                        <th class="px-4 py-3 text-left font-medium">@L["Output"]</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    @foreach (var urlConversionHistoryItem in ViewModel.UrlConversions)
+                    {
+                        <tr class="align-top hover:bg-gray-50">
+                            <td class="max-w-[360px] px-4 py-3 text-gray-700">
+                                <div class="truncate" title="@urlConversionHistoryItem.InputUrl">@urlConversionHistoryItem.InputUrl</div>
+                            </td>
+                            <td class="whitespace-nowrap px-4 py-3 text-gray-700">@urlConversionHistoryItem.ConvertedAt.ToLocalTime()</td>
+                            <td class="px-4 py-3 text-gray-700">@urlConversionHistoryItem.MappingTemplateName</td>
+                            <td class="px-4 py-3">
+                                <div class="flex items-center gap-2">
+                                    <a href="@urlConversionHistoryItem.OutputLink" target="_blank" class="font-medium text-blue-600 hover:underline">@L["View"]</a>
+                                    <button type="button"
+                                            class="inline-flex h-8 w-8 items-center justify-center rounded border border-gray-300 text-gray-700 hover:bg-gray-100"
+                                            title="@L["CopyLink"]"
+                                            aria-label="@L["CopyLink"]"
+                                            @onclick="() => CopyLink(urlConversionHistoryItem.OutputLink)">
+                                        @CopyIcon
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
 }
 
 @if (ViewModel.InputMode == UploadMode.Upload && ViewModel.FileConversions.Any())
 {
-    <h2 class="text-lg font-semibold mb-2">@L["FileConversionHistory"]</h2>
-    <table class="w-full table-auto border border-gray-300">
-        <thead>
-            <tr class="bg-gray-100">
-                <th class="px-4 py-2 text-left">@L["FileName"]</th>
-                <th class="px-4 py-2 text-left">@L["ConvertedAt"]</th>
-                <th class="px-4 py-2 text-left">@L["Template"]</th>
-                <th class="px-4 py-2 text-left">@L["Output"]</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var fileConversionHistoryItem in ViewModel.FileConversions)
-            {
-                <tr>
-                    <td class="border px-4 py-2">@fileConversionHistoryItem.FileName</td>
-                    <td class="border px-4 py-2">@fileConversionHistoryItem.ConvertedAt.ToLocalTime()</td>
-                    <td class="border px-4 py-2">@fileConversionHistoryItem.MappingTemplateName</td>
-                    <td class="border px-4 py-2">
-                        <div class="flex items-center gap-2">
-                            <a href="@fileConversionHistoryItem.OutputLink" target="_blank" class="text-blue-600 underline">@L["View"]</a>
-                            <button type="button"
-                                    class="inline-flex h-8 w-8 items-center justify-center rounded border border-gray-300 text-gray-700 hover:bg-gray-100"
-                                    title="@L["CopyLink"]"
-                                    aria-label="@L["CopyLink"]"
-                                    @onclick="() => CopyLink(fileConversionHistoryItem.OutputLink)">
-                                @CopyIcon
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
+    <section class="mb-6 rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div class="border-b border-gray-100 px-4 py-3">
+            <h2 class="text-lg font-semibold text-gray-950">@L["FileConversionHistory"]</h2>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead class="bg-gray-50 text-gray-600">
+                    <tr>
+                        <th class="px-4 py-3 text-left font-medium">@L["FileName"]</th>
+                        <th class="px-4 py-3 text-left font-medium">@L["ConvertedAt"]</th>
+                        <th class="px-4 py-3 text-left font-medium">@L["Template"]</th>
+                        <th class="px-4 py-3 text-left font-medium">@L["Output"]</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    @foreach (var fileConversionHistoryItem in ViewModel.FileConversions)
+                    {
+                        <tr class="align-top hover:bg-gray-50">
+                            <td class="px-4 py-3 text-gray-700">@fileConversionHistoryItem.FileName</td>
+                            <td class="whitespace-nowrap px-4 py-3 text-gray-700">@fileConversionHistoryItem.ConvertedAt.ToLocalTime()</td>
+                            <td class="px-4 py-3 text-gray-700">@fileConversionHistoryItem.MappingTemplateName</td>
+                            <td class="px-4 py-3">
+                                <div class="flex items-center gap-2">
+                                    <a href="@fileConversionHistoryItem.OutputLink" target="_blank" class="font-medium text-blue-600 hover:underline">@L["View"]</a>
+                                    <button type="button"
+                                            class="inline-flex h-8 w-8 items-center justify-center rounded border border-gray-300 text-gray-700 hover:bg-gray-100"
+                                            title="@L["CopyLink"]"
+                                            aria-label="@L["CopyLink"]"
+                                            @onclick="() => CopyLink(fileConversionHistoryItem.OutputLink)">
+                                        @CopyIcon
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
 }
 
 @if (!string.IsNullOrWhiteSpace(copiedLinkMessage))
@@ -249,6 +276,13 @@
 
 @code {
     private string? copiedLinkMessage;
+
+    private string GetModeButtonClass(UploadMode mode)
+    {
+        return ViewModel.InputMode == mode
+            ? "rounded px-3 py-1.5 text-sm font-medium bg-blue-600 text-white shadow-sm"
+            : "rounded px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-white";
+    }
 
     private static RenderFragment CopyIcon => builder =>
     {

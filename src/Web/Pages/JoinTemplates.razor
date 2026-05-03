@@ -8,19 +8,19 @@
 @inherits JoinTemplatesBase
 @inject IAppLocalizer L
 
-<h1 class="text-2xl font-bold mb-6">@L["TransformingTemplates"]</h1>
+<h1 class="mb-5 text-2xl font-semibold tracking-tight text-gray-950">@L["TransformingTemplates"]</h1>
 
 @if (ViewModel.Templates.Count == 0)
 {
-    <p>@L["LoadingTemplates"]</p>
+    <div class="rounded-lg border border-gray-200 bg-white px-4 py-5 text-gray-600 shadow-sm">@L["LoadingTemplates"]</div>
 }
 else
 {
-    <div class="grid grid-cols-2 gap-6">
-        <div class="border rounded p-4 shadow bg-white">
-            <div class="flex items-center justify-between mb-2">
-                <h2 class="text-xl font-semibold text-blue-700">@L["SourceTemplate"]:</h2>
-                <select class="border rounded px-2 py-1"
+    <div class="grid gap-5 xl:grid-cols-2">
+        <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <h2 class="text-lg font-semibold text-blue-700">@L["SourceTemplate"]</h2>
+                <select class="rounded border border-gray-300 bg-white px-3 py-2 text-sm"
                         value="@ViewModel.SourceId"
                         @onchange="OnSourceChanged">
                     <option disabled value="">@L["SelectTemplate"]</option>
@@ -31,7 +31,7 @@ else
                 </select>
             </div>
 
-            <p class="text-sm text-gray-500 mb-3 italic">@L["FieldsFromOriginalData"]</p>
+            <p class="mb-3 text-sm text-gray-500">@L["FieldsFromOriginalData"]</p>
 
             @if (ViewModel.SourceTemplate?.Fields is { Count: > 0 } roots)
             {
@@ -48,10 +48,10 @@ else
             }
         </div>
 
-        <div class="border rounded p-4 shadow bg-white">
-            <div class="flex items-center justify-between mb-2">
-                <h2 class="text-xl font-semibold text-green-700">@L["InternalCrmSchema"]:</h2>
-                <select class="border rounded px-2 py-1"
+        <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <h2 class="text-lg font-semibold text-emerald-700">@L["InternalCrmSchema"]</h2>
+                <select class="rounded border border-gray-300 bg-white px-3 py-2 text-sm"
                         value="@ViewModel.TargetId"
                         @onchange="OnTargetChanged">
                     <option disabled value="">@L["SelectSchema"]</option>
@@ -62,7 +62,7 @@ else
                 </select>
             </div>
 
-            <p class="text-sm text-gray-500 mb-3 italic">
+            <p class="mb-3 text-sm text-gray-500">
                 @L["MatchSourceFields"]
             </p>
 
@@ -92,7 +92,7 @@ else
                                     @node.Path (@L.Enum(node.Type))
                                 </label>
 
-                                <select class="w-full mt-1 px-3 py-2 border rounded bg-white"
+                                <select class="mt-1 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm"
                                         value="@topValue"
                                         @onchange="eventArgs => OnMapFieldChanged(node.Path, eventArgs)">
                                     <option value="">@L["NotMapped"]</option>
@@ -112,7 +112,7 @@ else
                                             @L["Inside"] @topValue
                                         </label>
 
-                                        <select class="w-full mt-1 px-3 py-2 border rounded bg-white"
+                                        <select class="mt-1 w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm"
                                                 value="@(current ?? topValue)"
                                                 @onchange="eventArgs => OnMapFieldChanged(node.Path, eventArgs)">
 
@@ -147,41 +147,43 @@ else
     </div>
 
     <button @onclick="SaveMapping"
-            class="mt-6 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-50"
+            class="mt-5 rounded bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
             disabled="@(!ViewModel.CanSave)">
         @L["SaveMapping"]
     </button>
 
-    <hr class="my-10" />
+    <div class="my-6 h-px bg-gray-200"></div>
 
-    <h2 class="text-xl font-semibold mb-4">@L["SavedJoinTemplates"]</h2>
+    <h2 class="mb-4 text-xl font-semibold text-gray-950">@L["SavedJoinTemplates"]</h2>
 
     @if (ViewModel.JoinedTemplates.Any())
     {
-        <table class="min-w-full bg-white border border-gray-300 rounded shadow">
-            <thead class="bg-gray-100 text-left">
-                <tr>
-                    <th class="px-4 py-2 border-b">@L["SourceTemplate"]</th>
-                    <th class="px-4 py-2 border-b">@L["TargetTemplate"]</th>
-                    <th class="px-4 py-2 border-b text-right">@L["Actions"]</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var join in ViewModel.JoinedTemplates)
-                {
-                    <tr class="border-b hover:bg-gray-50">
-                        <td class="px-4 py-2">@join.SourceTemplate</td>
-                        <td class="px-4 py-2">@join.TargetTemplate</td>
-                        <td class="px-4 py-2 text-right">
-                            <button @onclick="() => DeleteJoinTemplate(join.Id)"
-                                    class="text-red-600 hover:underline">
-                                @L["Delete"]
-                            </button>
-                        </td>
+        <div class="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+            <table class="min-w-full text-sm">
+                <thead class="bg-gray-50 text-left text-gray-600">
+                    <tr>
+                        <th class="px-4 py-3 font-medium">@L["SourceTemplate"]</th>
+                        <th class="px-4 py-3 font-medium">@L["TargetTemplate"]</th>
+                        <th class="px-4 py-3 text-right font-medium">@L["Actions"]</th>
                     </tr>
-                }
-            </tbody>
-        </table>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    @foreach (var join in ViewModel.JoinedTemplates)
+                    {
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3">@join.SourceTemplate</td>
+                            <td class="px-4 py-3">@join.TargetTemplate</td>
+                            <td class="px-4 py-3 text-right">
+                                <button @onclick="() => DeleteJoinTemplate(join.Id)"
+                                        class="rounded border border-red-200 px-3 py-1.5 text-red-700 hover:bg-red-50">
+                                    @L["Delete"]
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
     }
     else
     {

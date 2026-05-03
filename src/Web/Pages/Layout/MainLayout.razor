@@ -5,46 +5,88 @@
 @inject IJSRuntime JsRuntime
 
 <div class="bg-gray-50 text-gray-900 min-h-screen">
-    <div class="container mx-auto p-6">
-        <div class="flex justify-end items-center gap-4 mb-4">
-            @if (IsAuthenticated)
-            {
-                <a href="/logs"
-                   class="px-3 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-100 text-sm">
-                    @L["Logs"]
-                </a>
-            }
+    <header class="bg-white border-b border-gray-200">
+        <div class="container mx-auto px-4 sm:px-6 py-3">
+            <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div class="flex items-center justify-between gap-3">
+                    <a href="/"
+                       class="text-lg font-semibold text-gray-950 hover:text-blue-700">
+                        OmniPort
+                    </a>
 
-            <div class="inline-flex items-center gap-2 text-sm">
-                <span class="text-gray-600">@L["Language"]</span>
-                <button type="button"
-                        class="@GetLanguageClass("uk")"
-                        @onclick='() => ChangeCulture("uk")'>
-                    @L["Ukrainian"]
-                </button>
-                <button type="button"
-                        class="@GetLanguageClass("en")"
-                        @onclick='() => ChangeCulture("en")'>
-                    @L["English"]
-                </button>
+                    @if (IsAuthenticated)
+                    {
+                        <form action="/auth/logout" method="post" class="lg:hidden">
+                            <AntiforgeryToken />
+                            <button type="submit"
+                                    class="px-3 py-1.5 rounded border border-red-300 text-red-700 hover:bg-red-50 text-sm">
+                                @L["Logout"]
+                            </button>
+                        </form>
+                    }
+                </div>
+
+                @if (IsAuthenticated)
+                {
+                    <nav class="flex flex-wrap items-center gap-2">
+                        <NavLink href="/account"
+                                 class="px-3 py-1.5 rounded border border-gray-200 text-gray-700 hover:bg-gray-100 text-sm"
+                                 ActiveClass="bg-blue-50 border-blue-200 text-blue-700">
+                            @L["Account"]
+                        </NavLink>
+                        @if (IsAdmin)
+                        {
+                            <NavLink href="/users"
+                                     class="px-3 py-1.5 rounded border border-gray-200 text-gray-700 hover:bg-gray-100 text-sm"
+                                     ActiveClass="bg-blue-50 border-blue-200 text-blue-700">
+                                @L["Users"]
+                            </NavLink>
+                        }
+                        <NavLink href="/logs"
+                                 class="px-3 py-1.5 rounded border border-gray-200 text-gray-700 hover:bg-gray-100 text-sm"
+                                 ActiveClass="bg-blue-50 border-blue-200 text-blue-700">
+                            @L["Logs"]
+                        </NavLink>
+                    </nav>
+                }
+
+                <div class="flex flex-wrap items-center gap-3">
+                    <div class="inline-flex items-center gap-2 text-sm">
+                        <span class="text-gray-500">@L["Language"]</span>
+                        <div class="inline-flex rounded border border-gray-200 bg-gray-50 p-0.5">
+                            <button type="button"
+                                    class="@GetLanguageClass("uk")"
+                                    @onclick='() => ChangeCulture("uk")'>
+                                @L["Ukrainian"]
+                            </button>
+                            <button type="button"
+                                    class="@GetLanguageClass("en")"
+                                    @onclick='() => ChangeCulture("en")'>
+                                @L["English"]
+                            </button>
+                        </div>
+                    </div>
+
+                    @if (IsAuthenticated)
+                    {
+                        <form action="/auth/logout" method="post" class="hidden lg:block">
+                            <AntiforgeryToken />
+                            <button type="submit"
+                                    class="px-3 py-1.5 rounded border border-red-300 text-red-700 hover:bg-red-50 text-sm">
+                                @L["Logout"]
+                            </button>
+                        </form>
+                    }
+                </div>
             </div>
-
-            @if (IsAuthenticated)
-            {
-                <form action="/auth/logout" method="post">
-                    <AntiforgeryToken />
-                    <button type="submit"
-                            class="px-3 py-1 rounded border border-red-300 text-red-700 hover:bg-red-50 text-sm">
-                        @L["Logout"]
-                    </button>
-                </form>
-            }
         </div>
+    </header>
 
+    <main class="container mx-auto px-4 sm:px-6 py-6">
         <div @key="L.Culture">
             @Body
         </div>
-    </div>
+    </main>
 </div>
 
 @code {
@@ -52,6 +94,7 @@
     private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
 
     private bool IsAuthenticated { get; set; }
+    private bool IsAdmin { get; set; }
 
     protected override void OnInitialized()
     {
@@ -63,11 +106,13 @@
         if (AuthenticationStateTask is null)
         {
             IsAuthenticated = false;
+            IsAdmin = false;
             return;
         }
 
         var authenticationState = await AuthenticationStateTask;
         IsAuthenticated = authenticationState.User.Identity?.IsAuthenticated == true;
+        IsAdmin = authenticationState.User.IsInRole("Admin");
     }
 
     private async Task ChangeCulture(string culture)
@@ -80,8 +125,8 @@
     {
         var active = string.Equals(L.Culture, culture, StringComparison.OrdinalIgnoreCase);
         return active
-            ? "px-2 py-1 rounded bg-blue-600 text-white"
-            : "px-2 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-100";
+            ? "px-3 py-1 rounded bg-blue-600 text-white"
+            : "px-3 py-1 rounded text-gray-700 hover:bg-white";
     }
 
     private void OnCultureChanged()

@@ -10,6 +10,7 @@ namespace Web.Bootstrap
         {
             app.MapPost("/auth/login", Login).AllowAnonymous();
             app.MapPost("/auth/logout", Logout).AllowAnonymous();
+            app.MapPost("/auth/change-password", ChangePassword).RequireAuthorization();
             return app;
         }
 
@@ -58,6 +59,46 @@ namespace Web.Bootstrap
             await signInManager.SignOutAsync();
             loggerFactory.CreateLogger("OmniPort.Auth").LogInformation("User logged out");
             return Results.Redirect("/login");
+        }
+
+        private static async Task<IResult> ChangePassword(
+            HttpContext http,
+            UserManager<AppUser> userManager,
+            SignInManager<AppUser> signInManager,
+            ILoggerFactory loggerFactory)
+        {
+            var logger = loggerFactory.CreateLogger("OmniPort.Auth");
+            IFormCollection form = await http.Request.ReadFormAsync();
+            string currentPassword = form["CurrentPassword"].ToString();
+            string newPassword = form["NewPassword"].ToString();
+            string confirmPassword = form["ConfirmPassword"].ToString();
+
+            if (!string.Equals(newPassword, confirmPassword, StringComparison.Ordinal))
+            {
+                logger.LogWarning("Password change failed because confirmation did not match");
+                return Results.Redirect("/account?passwordStatus=mismatch");
+            }
+
+            AppUser? user = await userManager.GetUserAsync(http.User);
+            if (user is null)
+            {
+                logger.LogWarning("Password change failed because user was not found");
+                return Results.Redirect("/account?passwordStatus=error");
+            }
+
+            IdentityResult result = await userManager.ChangePasswordAsync(user, currentPassword, newPassword);
+            if (!result.Succeeded)
+            {
+                logger.LogWarning(
+                    "Password change failed for user {UserId}: {Errors}",
+                    user.Id,
+                    string.Join(", ", result.Errors.Select(error => error.Code)));
+                return Results.Redirect("/account?passwordStatus=error");
+            }
+
+            await signInManager.RefreshSignInAsync(user);
+            logger.LogInformation("Password changed for user {UserId}", user.Id);
+            return Results.Redirect("/account?passwordStatus=changed");
         }
     }
 }
