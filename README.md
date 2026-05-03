@@ -1,28 +1,69 @@
-# OmniPort – data transformation and mapping service
+# OmniPort
 
-**OmniPort** is a system for uploading, transforming, and converting data between various formats (**CSV, Excel, JSON, XML**) using flexible mapping templates.  
+OmniPort is a .NET 10 app for converting CSV, Excel, JSON, and XML data with reusable transformation templates.
 
-The application allows you to configure field mappings between the source and target formats, store conversion history, and automatically process data from URLs.  
-OmniPort is an excellent alternative to paid mapping services: simply create a template for your input and output data, map their fields, run the transformation - and you can obtain a permanent link for data synchronization, for example, with marketplaces like **Amazon**, **eBay**, or other services, without writing additional automation scripts.
+It can process uploaded files, convert data from URLs, keep conversion history, and watch remote URLs on a schedule. Watched URLs expose a stable latest-result link that can be used by external services.
 
----
+## Features
 
-## Key Features
-- **Mapping Templates** - create and edit templates for data conversion.
-- **File Transformation** - upload files in CSV, XLSX, JSON, XML formats and export them to the desired format.
-- **URL Conversion** - retrieve and process data from remote sources via URL.
-- **Conversion History** - automatically store a history of processed conversions.
-- **URL Monitoring** - save a list of URLs with a defined check interval.
-- **Permanent Links to Results** - integrate with other systems without extra code.
-
----
+- Create source and target templates.
+- Map fields between templates.
+- Convert uploaded files or remote URLs.
+- Keep file and URL conversion history.
+- Watch URLs and automatically refresh converted output.
+- Copy result links and stable watched links from the UI.
+- View application logs in the `/logs` page.
+- Check app health at `/health`.
 
 ## Supported Formats
-| Format | Extensions |
-|--------|------------|
-| CSV    | `.csv`     |
-| Excel  | `.xls`, `.xlsx` |
-| JSON   | `.json`    |
-| XML    | `.xml`     |
 
----
+| Format | Extensions |
+| --- | --- |
+| CSV | `.csv` |
+| Excel | `.xls`, `.xlsx` |
+| JSON | `.json` |
+| XML | `.xml` |
+
+## Stable Links
+
+Watched URLs expose a permanent endpoint:
+
+```text
+/watch/{watchedUrlId}/latest
+```
+
+This URL redirects to the latest successful conversion result for that watched URL.
+
+## Logs
+
+Application logs are written to:
+
+```text
+src/Web/logs/omniport-app.jsonl
+```
+
+Use `/logs` in the app to view recent and older log entries or change the runtime log level.
+
+## Run Locally
+
+Requirements:
+
+- .NET 10 SDK
+
+Build:
+
+```powershell
+dotnet build OmniPort.sln
+```
+
+Run:
+
+```powershell
+dotnet run --project src\Web\Web.csproj
+```
+
+## Test
+
+```powershell
+dotnet test OmniPort.sln
+```

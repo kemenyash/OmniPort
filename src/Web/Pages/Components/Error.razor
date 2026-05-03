@@ -1,0 +1,26 @@
+@page "/Error"
+@using Presentation.Inherits.Components
+@using Presentation.ViewModels
+@inherits ErrorBase
+@inject IAppLocalizer L
+
+<PageTitle>@L["Error"]</PageTitle>
+
+<h1 class="text-danger">@L["Error"]</h1>
+<h2 class="text-danger">@L["UnexpectedError"]</h2>
+
+@if (ViewModel.ShowRequestId)
+{
+    <p>
+        <strong>@L["RequestId"]:</strong>
+        <code>@ViewModel.RequestId</code>
+    </p>
+}
+
+<h3>@L["DevelopmentMode"]</h3>
+<p>
+    @L["DevelopmentModeDetails"]
+</p>
+<p>
+    <strong>@L["DevelopmentModeWarning"]</strong>
+</p>

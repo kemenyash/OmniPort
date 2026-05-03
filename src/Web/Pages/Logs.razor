@@ -1,0 +1,245 @@
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.Extensions.Logging
+@using Web.Telemetry
+@page "/logs"
+@attribute [Authorize]
+@implements IDisposable
+@inject IApplicationLogStore LogStore
+@inject IAppLocalizer L
+
+<div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+    <h1 class="text-2xl font-semibold tracking-tight text-gray-950">@L["TelemetryLogs"]</h1>
+    <a href="/"
+       class="rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm hover:bg-gray-100">
+        @L["Back"]
+    </a>
+</div>
+
+<section class="mb-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+<div class="flex flex-wrap items-center gap-3">
+    <label class="text-sm text-gray-600" for="minimum-log-level">@L["MinimumLogLevel"]</label>
+    <select id="minimum-log-level"
+            class="rounded border border-gray-300 bg-white px-3 py-2 text-sm"
+            value="@selectedLevel"
+            @onchange="OnLevelChanged">
+        @foreach (var level in Levels)
+        {
+            <option value="@level">@level</option>
+        }
+    </select>
+
+    <button type="button"
+            class="rounded border border-gray-300 px-3 py-2 text-sm hover:bg-gray-100"
+            @onclick="Refresh">
+        @L["Refresh"]
+    </button>
+
+    <button type="button"
+            class="rounded border border-red-300 px-3 py-2 text-sm text-red-700 hover:bg-red-50"
+            @onclick="Clear">
+        @L["Clear"]
+    </button>
+</div>
+
+<div class="mt-3 flex flex-wrap items-center gap-3 text-sm">
+    <button type="button"
+            class="rounded border border-gray-300 px-3 py-2 hover:bg-gray-100 disabled:opacity-50"
+            disabled="@(!logPage.HasNewer)"
+            @onclick="ShowNewest">
+        @L["NewestLogs"]
+    </button>
+
+    <button type="button"
+            class="rounded border border-gray-300 px-3 py-2 hover:bg-gray-100 disabled:opacity-50"
+            disabled="@(!logPage.HasNewer)"
+            @onclick="ShowNewer">
+        @L["NewerLogs"]
+    </button>
+
+    <span class="text-gray-600">
+        @L["Page"] @(logPage.TotalPages == 0 ? 0 : logPage.PageIndex + 1) / @logPage.TotalPages
+        · @logPage.TotalCount @L["Entries"]
+    </span>
+
+    <button type="button"
+            class="rounded border border-gray-300 px-3 py-2 hover:bg-gray-100 disabled:opacity-50"
+            disabled="@(!logPage.HasOlder)"
+            @onclick="ShowOlder">
+        @L["OlderLogs"]
+    </button>
+</div>
+</section>
+
+<div class="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+    <table class="min-w-full text-sm">
+        <thead class="bg-gray-50 text-gray-600">
+            <tr>
+                <th class="px-4 py-3 text-left font-medium">@L["Time"]</th>
+                <th class="px-4 py-3 text-left font-medium">@L["Level"]</th>
+                <th class="px-4 py-3 text-left font-medium">@L["Category"]</th>
+                <th class="px-4 py-3 text-left font-medium">@L["Message"]</th>
+                <th class="px-4 py-3 text-left font-medium">@L["Trace"]</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            @if (entries.Count == 0)
+            {
+                <tr>
+                    <td class="px-4 py-6 text-center text-gray-500" colspan="5">@L["NoLogsCaptured"]</td>
+                </tr>
+            }
+            else
+            {
+                @foreach (var entry in entries)
+                {
+                    <tr class="align-top hover:bg-gray-50">
+                        <td class="whitespace-nowrap px-4 py-3 text-gray-600">@entry.Timestamp.ToLocalTime().ToString("HH:mm:ss")</td>
+                        <td class="px-4 py-3">
+                            <span class="@GetLevelClass(entry.Level)">@entry.Level</span>
+                        </td>
+                        <td class="px-4 py-3 text-gray-700">@ShortenCategory(entry.Category)</td>
+                        <td class="px-4 py-3">
+                            <div>@entry.Message</div>
+                            @if (!string.IsNullOrWhiteSpace(entry.Exception))
+                            {
+                                <details class="mt-1 text-red-700">
+                                    <summary>@L["Exception"]</summary>
+                                    <pre class="whitespace-pre-wrap text-xs mt-1">@entry.Exception</pre>
+                                </details>
+                            }
+                            @if (entry.Scopes.Count > 0)
+                            {
+                                <div class="mt-1 text-xs text-gray-500">
+                                    @string.Join(", ", entry.Scopes.Select(scope => $"{scope.Key}: {scope.Value}"))
+                                </div>
+                            }
+                        </td>
+                        <td class="px-4 py-3 font-mono text-xs text-gray-500">
+                            @if (!string.IsNullOrWhiteSpace(entry.TraceId))
+                            {
+                                <div>@entry.TraceId</div>
+                                <div>@entry.SpanId</div>
+                            }
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    private static readonly LogLevel[] Levels =
+    [
+        LogLevel.Trace,
+        LogLevel.Debug,
+        LogLevel.Information,
+        LogLevel.Warning,
+        LogLevel.Error,
+        LogLevel.Critical
+    ];
+
+    private const int PageSize = 100;
+
+    private ApplicationLogPage logPage = new(
+        new List<ApplicationLogEntry>(),
+        PageIndex: 0,
+        PageSize,
+        TotalCount: 0,
+        TotalPages: 0);
+
+    private IReadOnlyList<ApplicationLogEntry> entries = [];
+    private string selectedLevel = LogLevel.Information.ToString();
+
+    protected override void OnInitialized()
+    {
+        selectedLevel = LogStore.MinimumLevel.ToString();
+        LoadPage(0);
+        LogStore.Changed += OnLogsChanged;
+        L.CultureChanged += OnCultureChanged;
+    }
+
+    private void OnLevelChanged(ChangeEventArgs args)
+    {
+        if (Enum.TryParse<LogLevel>(args.Value?.ToString(), out var level))
+        {
+            LogStore.SetMinimumLevel(level);
+            selectedLevel = level.ToString();
+            LoadPage(logPage.PageIndex);
+        }
+    }
+
+    private void Refresh()
+    {
+        LoadPage(logPage.PageIndex);
+    }
+
+    private void Clear()
+    {
+        LogStore.Clear();
+        LoadPage(0);
+    }
+
+    private void ShowNewest()
+    {
+        LoadPage(0);
+    }
+
+    private void ShowNewer()
+    {
+        LoadPage(logPage.PageIndex - 1);
+    }
+
+    private void ShowOlder()
+    {
+        LoadPage(logPage.PageIndex + 1);
+    }
+
+    private void LoadPage(int pageIndex)
+    {
+        logPage = LogStore.GetPage(pageIndex, PageSize);
+        entries = logPage.Entries;
+    }
+
+    private void OnLogsChanged()
+    {
+        LoadPage(logPage.PageIndex);
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnCultureChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private static string ShortenCategory(string category)
+    {
+        const int maxLength = 52;
+        if (category.Length <= maxLength)
+        {
+            return category;
+        }
+
+        return "..." + category[^maxLength..];
+    }
+
+    private static string GetLevelClass(LogLevel level)
+    {
+        return level switch
+        {
+            LogLevel.Trace => "px-2 py-1 rounded bg-gray-100 text-gray-700",
+            LogLevel.Debug => "px-2 py-1 rounded bg-sky-100 text-sky-700",
+            LogLevel.Information => "px-2 py-1 rounded bg-green-100 text-green-700",
+            LogLevel.Warning => "px-2 py-1 rounded bg-yellow-100 text-yellow-800",
+            LogLevel.Error => "px-2 py-1 rounded bg-red-100 text-red-700",
+            LogLevel.Critical => "px-2 py-1 rounded bg-red-700 text-white",
+            _ => "px-2 py-1 rounded bg-gray-100 text-gray-700"
+        };
+    }
+
+    public void Dispose()
+    {
+        LogStore.Changed -= OnLogsChanged;
+        L.CultureChanged -= OnCultureChanged;
+    }
+}

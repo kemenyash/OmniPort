@@ -1,0 +1,55 @@
+@using Microsoft.AspNetCore.Authorization
+@page "/"
+@attribute [Authorize]
+@using Web.Pages.Layout
+@using Presentation.Inherits.Pages
+@using Presentation.ViewModels
+@layout MainLayout
+@inherits IndexBase
+@inject IAppLocalizer L
+
+<section class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div>
+        <h1 class="text-2xl font-semibold tracking-tight text-gray-950 sm:text-3xl">@L["OmniPortTitle"]</h1>
+    </div>
+
+    <div class="flex flex-wrap gap-3">
+        <button class="rounded border border-blue-200 bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
+                @onclick="OpenTemplates">
+            @L["BasicTemplates"]
+        </button>
+
+        <button class="rounded border border-emerald-200 bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700"
+                @onclick="OpenJoinTemplates">
+            @L["TransformingTemplates"]
+        </button>
+    </div>
+</section>
+
+@if (ViewModel.ShowTemplates)
+{
+    <div class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+        <div class="relative h-[90vh] w-full max-w-6xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
+            <button class="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded border border-gray-200 text-xl text-gray-600 hover:bg-gray-100 hover:text-black"
+                    @onclick="CloseTemplates">
+                &times;
+            </button>
+            <Templates />
+        </div>
+    </div>
+}
+
+@if (ViewModel.ShowJoinTemplates)
+{
+    <div class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+        <div class="relative h-[90vh] w-full max-w-6xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
+            <button class="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded border border-gray-200 text-xl text-gray-600 hover:bg-gray-100 hover:text-black"
+                    @onclick="CloseJoinTemplates">
+                &times;
+            </button>
+            <JoinTemplates />
+        </div>
+    </div>
+}
+
+<TransformFile />
