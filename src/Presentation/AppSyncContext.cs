@@ -1,12 +1,14 @@
 using Microsoft.Extensions.DependencyInjection;
 using BusinessLogic.Interfaces;
 using BusinessLogic.Records;
+using Microsoft.Extensions.Logging;
 
 namespace Presentation
 {
     public class AppSyncContext : IAppSyncContext
     {
         private readonly IServiceProvider serviceProvider;
+        private readonly ILogger<AppSyncContext> logger;
         private readonly SemaphoreSlim gate;
 
         public event Action? Changed;
@@ -25,10 +27,13 @@ namespace Presentation
         public IReadOnlyList<UrlConversionHistoryDto> UrlConversions => urlConvertsionsHistory;
         public IReadOnlyList<WatchedUrlDto> WatchedUrls => watchedUrls;
 
-        public AppSyncContext(IServiceProvider serviceProvider)
+        public AppSyncContext(
+            IServiceProvider serviceProvider,
+            ILogger<AppSyncContext> logger)
         {
             gate = new(1, 1);
             this.serviceProvider = serviceProvider;
+            this.logger = logger;
         }
 
         public async Task Initialize(CancellationToken ct = default)
@@ -36,6 +41,7 @@ namespace Presentation
             await gate.WaitAsync(ct);
             try
             {
+                logger.LogInformation("Refreshing application sync context");
                 using IServiceScope scope = serviceProvider.CreateScope();
                 ITemplateManager templateManager = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
 
@@ -55,6 +61,16 @@ namespace Presentation
                 fileConversionsHistory = (await templateManager.GetFileConversionHistory()).OrderByDescending(x => x.ConvertedAt).ToList() ?? new List<FileConversionHistoryDto>();
                 urlConvertsionsHistory = (await templateManager.GetUrlConversionHistory()).OrderByDescending(x => x.ConvertedAt).ToList() ?? new List<UrlConversionHistoryDto>();
                 watchedUrls = (await templateManager.GetWatchedUrls()).ToList();
+                logger.LogInformation(
+                    "Application sync context refreshed: {TemplateCount} templates, {MappingCount} mappings, {WatchedUrlCount} watched URLs",
+                    templates.Count,
+                    joinedTemplates.Count,
+                    watchedUrls.Count);
+            }
+            catch (Exception exception)
+            {
+                logger.LogError(exception, "Application sync context refresh failed");
+                throw;
             }
             finally
             {
@@ -85,6 +101,7 @@ namespace Presentation
                 }
                 templates = summaries;
                 basicTemplatesFull = newFull;
+                logger.LogInformation("Application sync context created basic template {TemplateName}", basicTemplateCreation.Name);
             }
             finally
             {
@@ -118,6 +135,7 @@ namespace Presentation
 
                 List<TemplateSummaryDto> summaries = (await templateManager.GetBasicTemplatesSummary()).ToList();
                 templates = summaries;
+                logger.LogInformation("Application sync context updated basic template {TemplateId}", basicTemplateUpdating.Id);
             }
             finally
             {
@@ -141,6 +159,7 @@ namespace Presentation
                 joinedTemplates = (await templateManager.GetJoinedTemplates()).ToList();
                 fileConversionsHistory = (await templateManager.GetFileConversionHistory()).OrderByDescending(x => x.ConvertedAt).ToList();
                 urlConvertsionsHistory = (await templateManager.GetUrlConversionHistory()).OrderByDescending(x => x.ConvertedAt).ToList();
+                logger.LogInformation("Application sync context deleted basic template {TemplateId}", id);
             }
             finally
             {
@@ -161,6 +180,7 @@ namespace Presentation
                 await templateManager.CreateMappingTemplate(mapingTemplateCreating);
 
                 joinedTemplates = (await templateManager.GetJoinedTemplates()).ToList();
+                logger.LogInformation("Application sync context created mapping template {TemplateName}", mapingTemplateCreating.Name);
             }
             finally
             {
@@ -180,6 +200,7 @@ namespace Presentation
                 await templateManager.DeleteMappingTemplate(mappingId);
 
                 joinedTemplates = (await templateManager.GetJoinedTemplates()).ToList();
+                logger.LogInformation("Application sync context deleted mapping template {MappingTemplateId}", mappingId);
             }
             finally
             {
@@ -198,6 +219,7 @@ namespace Presentation
                 ITemplateManager templateManager = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
                 await templateManager.AddFileConversion(fileConversionHistory);
                 fileConversionsHistory = (await templateManager.GetFileConversionHistory()).OrderByDescending(x => x.ConvertedAt).ToList();
+                logger.LogInformation("Application sync context added file conversion for {FileName}", fileConversionHistory.FileName);
             }
             finally
             {
@@ -216,6 +238,7 @@ namespace Presentation
                 ITemplateManager tm = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
                 await tm.AddUrlConversion(urlConversionHistory);
                 urlConvertsionsHistory = (await tm.GetUrlConversionHistory()).OrderByDescending(x => x.ConvertedAt).ToList();
+                logger.LogInformation("Application sync context added URL conversion for {InputUrl}", urlConversionHistory.InputUrl);
             }
             finally
             {
@@ -234,6 +257,7 @@ namespace Presentation
                 ITemplateManager templateManager = scope.ServiceProvider.GetRequiredService<ITemplateManager>();
                 await templateManager.AddWatchedUrl(watchedUrlAdding.Url, watchedUrlAdding.IntervalMinutes, watchedUrlAdding.MappingTemplateId);
                 watchedUrls = (await templateManager.GetWatchedUrls()).ToList();
+                logger.LogInformation("Application sync context added watched URL {Url}", watchedUrlAdding.Url);
             }
             finally
             {

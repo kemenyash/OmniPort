@@ -7,6 +7,14 @@
 <div class="bg-gray-50 text-gray-900 min-h-screen">
     <div class="container mx-auto p-6">
         <div class="flex justify-end items-center gap-4 mb-4">
+            @if (IsAuthenticated)
+            {
+                <a href="/logs"
+                   class="px-3 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-100 text-sm">
+                    @L["Logs"]
+                </a>
+            }
+
             <div class="inline-flex items-center gap-2 text-sm">
                 <span class="text-gray-600">@L["Language"]</span>
                 <button type="button"

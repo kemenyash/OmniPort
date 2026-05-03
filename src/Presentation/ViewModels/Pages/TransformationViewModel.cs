@@ -18,6 +18,10 @@ namespace Presentation.ViewModels.Pages
         public event Action? Changed;
 
         public UploadMode InputMode { get; private set; }
+        public bool IsBusy { get; private set; }
+        public string? ErrorMessage { get; private set; }
+        public string? SuccessMessage { get; private set; }
+        public string? LastOutputLink { get; private set; }
         public bool CanRun => CanRunTransformation();
         public bool CanAddToWatchlist => CanAddToWatchListFromForm();
 
@@ -61,6 +65,8 @@ namespace Presentation.ViewModels.Pages
         public void SetMode(UploadMode mode)
         {
             InputMode = mode;
+            ErrorMessage = null;
+            SuccessMessage = null;
             Changed?.Invoke();
         }
 
@@ -76,6 +82,8 @@ namespace Presentation.ViewModels.Pages
             uploadFileName = fileName;
             uploadObject = new LazyStream(openStream);
             FormModel.UploadedFileName = fileName;
+            ErrorMessage = null;
+            SuccessMessage = null;
             Changed?.Invoke();
         }
 
@@ -84,25 +92,50 @@ namespace Presentation.ViewModels.Pages
             uploadFileName = file.Name;
             uploadObject = file;
             FormModel.UploadedFileName = file.Name;
+            ErrorMessage = null;
+            SuccessMessage = null;
             Changed?.Invoke();
         }
 
         public async Task RunTransformation()
         {
-            if (FormModel.SelectedMappingTemplateId == 0) return;
-
-            if (InputMode == UploadMode.Upload)
-            {
-                await RunUpload();
-            }
-            else
-            {
-                await RunUrl();
-            }
-
-            await ReloadWatched();
-            BindFromSyncContext();
+            IsBusy = true;
+            ErrorMessage = null;
+            SuccessMessage = null;
+            LastOutputLink = null;
             Changed?.Invoke();
+
+            try
+            {
+                if (FormModel.SelectedMappingTemplateId == 0)
+                {
+                    throw new InvalidOperationException("Select a transformation template first.");
+                }
+
+                string outputUrl;
+                if (InputMode == UploadMode.Upload)
+                {
+                    outputUrl = await RunUpload();
+                }
+                else
+                {
+                    outputUrl = await RunUrl();
+                }
+
+                await ReloadWatched();
+                BindFromSyncContext();
+                LastOutputLink = outputUrl;
+                SuccessMessage = "Transformation completed.";
+            }
+            catch (Exception exception)
+            {
+                ErrorMessage = exception.Message;
+            }
+            finally
+            {
+                IsBusy = false;
+                Changed?.Invoke();
+            }
         }
 
         public async Task AddToWatchlistFromForm()
@@ -116,23 +149,44 @@ namespace Presentation.ViewModels.Pages
                 return;
             }
 
-            await AddToWatchlist(url, interval, templateId);
-            await ReloadWatched();
-            BindFromSyncContext();
+            IsBusy = true;
+            ErrorMessage = null;
             Changed?.Invoke();
+
+            try
+            {
+                await AddToWatchlist(url, interval, templateId);
+                await ReloadWatched();
+                BindFromSyncContext();
+            }
+            catch (Exception exception)
+            {
+                ErrorMessage = exception.Message;
+            }
+            finally
+            {
+                IsBusy = false;
+                Changed?.Invoke();
+            }
         }
 
-        private async Task RunUpload()
+        private async Task<string> RunUpload()
         {
-            if (FormModel.SelectedMappingTemplateId == 0 ||
-                uploadObject is null ||
-                string.IsNullOrWhiteSpace(uploadFileName))
+            if (FormModel.SelectedMappingTemplateId == 0)
             {
-                return;
+                throw new InvalidOperationException("Select a transformation template first.");
+            }
+
+            if (uploadObject is null || string.IsNullOrWhiteSpace(uploadFileName))
+            {
+                throw new InvalidOperationException("Please select the file again before running the transformation.");
             }
 
             JoinedTemplateSummaryDto? selected = JoinedTemplates.FirstOrDefault(x => x.Id == FormModel.SelectedMappingTemplateId);
-            if (selected is null) return;
+            if (selected is null)
+            {
+                throw new InvalidOperationException("The selected transformation template was not found.");
+            }
 
             string extension = FileToFormatConverter.ToExtension(selected.OutputFormat);
 
@@ -150,18 +204,23 @@ namespace Presentation.ViewModels.Pages
                 MappingTemplateId: FormModel.SelectedMappingTemplateId,
                 MappingTemplateName: string.Empty
             ));
+
+            return outputUrl;
         }
 
-        private async Task RunUrl()
+        private async Task<string> RunUrl()
         {
             if (FormModel.SelectedMappingTemplateId == 0 ||
                 string.IsNullOrWhiteSpace(FormModel.FileUrl))
             {
-                return;
+                throw new InvalidOperationException("Enter a valid file URL before running the transformation.");
             }
 
             JoinedTemplateSummaryDto? selected = JoinedTemplates.FirstOrDefault(x => x.Id == FormModel.SelectedMappingTemplateId);
-            if (selected is null) return;
+            if (selected is null)
+            {
+                throw new InvalidOperationException("The selected transformation template was not found.");
+            }
 
             string extension = FileToFormatConverter.ToExtension(selected.OutputFormat);
 
@@ -179,6 +238,8 @@ namespace Presentation.ViewModels.Pages
                 MappingTemplateId: FormModel.SelectedMappingTemplateId,
                 MappingTemplateName: string.Empty
             ));
+
+            return outputUrl;
         }
 
         private Task AddToWatchlist(string url, int intervalMinutes, int mappingTemplateId)
@@ -222,7 +283,7 @@ namespace Presentation.ViewModels.Pages
         {
             return FormModel.SelectedMappingTemplateId != 0
                 && (InputMode == UploadMode.Upload
-                    ? !string.IsNullOrWhiteSpace(FormModel.UploadedFileName)
+                    ? uploadObject is not null && !string.IsNullOrWhiteSpace(FormModel.UploadedFileName)
                     : !string.IsNullOrWhiteSpace(FormModel.FileUrl));
         }
     }

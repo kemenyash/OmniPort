@@ -6,6 +6,7 @@ using BusinessLogic.Records;
 using Infrastructure;
 using Presentation.Helpers;
 using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
 
 namespace Presentation.Services
 {
@@ -14,11 +15,16 @@ namespace Presentation.Services
         private readonly OmniPortDataContext omniPortDataContext;
         private readonly IMapper objectMapper;
         private readonly TemplateManagerHelpers templateManagerHelpers;
+        private readonly ILogger<TemplateManager> logger;
 
-        public TemplateManager(OmniPortDataContext omniPortDataContext, IMapper objectMapper)
+        public TemplateManager(
+            OmniPortDataContext omniPortDataContext,
+            IMapper objectMapper,
+            ILogger<TemplateManager> logger)
         {
             this.omniPortDataContext = omniPortDataContext;
             this.objectMapper = objectMapper;
+            this.logger = logger;
             templateManagerHelpers = new TemplateManagerHelpers(omniPortDataContext);
         }
 
@@ -29,6 +35,7 @@ namespace Presentation.Services
                 .ProjectTo<TemplateSummaryDto>(objectMapper.ConfigurationProvider)
                 .ToListAsync();
 
+            logger.LogDebug("Loaded {TemplateCount} basic template summaries", basicTemplates.Count);
             return basicTemplates;
         }
 
@@ -40,6 +47,7 @@ namespace Presentation.Services
 
             if (basicTemplateEntity is null)
             {
+                logger.LogWarning("Basic template {TemplateId} was not found", templateId);
                 return null;
             }
 
@@ -79,6 +87,10 @@ namespace Presentation.Services
 
             omniPortDataContext.BasicTemplates.Add(basicTemplateEntity);
             await omniPortDataContext.SaveChangesAsync();
+            logger.LogInformation(
+                "Created basic template {TemplateId} named {TemplateName}",
+                basicTemplateEntity.Id,
+                basicTemplateEntity.Name);
 
             foreach (var createTemplateFieldDto in createBasicTemplateDto.Fields)
             {
@@ -101,6 +113,7 @@ namespace Presentation.Services
 
             if (existingTemplateEntity is null)
             {
+                logger.LogWarning("Cannot update missing basic template {TemplateId}", updateBasicTemplateDto.Id);
                 return false;
             }
 
@@ -120,6 +133,7 @@ namespace Presentation.Services
             );
 
             await omniPortDataContext.SaveChangesAsync();
+            logger.LogInformation("Updated basic template {TemplateId}", updateBasicTemplateDto.Id);
             return true;
         }
 
@@ -129,11 +143,13 @@ namespace Presentation.Services
 
             if (templateEntity is null)
             {
+                logger.LogWarning("Cannot delete missing basic template {TemplateId}", templateId);
                 return false;
             }
 
             omniPortDataContext.BasicTemplates.Remove(templateEntity);
             await omniPortDataContext.SaveChangesAsync();
+            logger.LogInformation("Deleted basic template {TemplateId}", templateId);
             return true;
         }
 
@@ -146,6 +162,7 @@ namespace Presentation.Services
                 .ProjectTo<JoinedTemplateSummaryDto>(objectMapper.ConfigurationProvider)
                 .ToListAsync();
 
+            logger.LogDebug("Loaded {JoinedTemplateCount} transformation templates", joinedTemplates.Count);
             return joinedTemplates;
         }
 
@@ -161,6 +178,7 @@ namespace Presentation.Services
 
             if (mappingTemplateEntity is null)
             {
+                logger.LogWarning("Mapping template {MappingTemplateId} was not found", mappingTemplateId);
                 return null;
             }
 
@@ -186,6 +204,10 @@ namespace Presentation.Services
                 createMappingTemplateDto.Mappings
             );
 
+            logger.LogInformation(
+                "Created mapping template {MappingTemplateId} named {MappingTemplateName}",
+                mappingTemplateEntity.Id,
+                mappingTemplateEntity.Name);
             return mappingTemplateEntity.Id;
         }
 
@@ -197,6 +219,7 @@ namespace Presentation.Services
 
             if (existingMappingTemplateEntity is null)
             {
+                logger.LogWarning("Cannot update missing mapping template {MappingTemplateId}", updateMappingTemplateDto.Id);
                 return false;
             }
 
@@ -214,6 +237,7 @@ namespace Presentation.Services
                 updateMappingTemplateDto.Mappings
             );
 
+            logger.LogInformation("Updated mapping template {MappingTemplateId}", updateMappingTemplateDto.Id);
             return true;
         }
 
@@ -223,11 +247,13 @@ namespace Presentation.Services
 
             if (mappingTemplateEntity is null)
             {
+                logger.LogWarning("Cannot delete missing mapping template {MappingTemplateId}", mappingTemplateId);
                 return false;
             }
 
             omniPortDataContext.MappingTemplates.Remove(mappingTemplateEntity);
             await omniPortDataContext.SaveChangesAsync();
+            logger.LogInformation("Deleted mapping template {MappingTemplateId}", mappingTemplateId);
             return true;
         }
 
@@ -254,6 +280,10 @@ namespace Presentation.Services
 
             omniPortDataContext.UrlConversionHistory.Add(urlConversionHistoryEntity);
             await omniPortDataContext.SaveChangesAsync();
+            logger.LogInformation(
+                "Recorded URL conversion for mapping {MappingTemplateId}; output {OutputLink}",
+                urlConversionHistoryDto.MappingTemplateId,
+                urlConversionHistoryDto.OutputLink);
         }
 
         public async Task AddFileConversion(FileConversionHistoryDto fileConversionHistoryDto)
@@ -268,6 +298,11 @@ namespace Presentation.Services
 
             omniPortDataContext.FileConversionHistory.Add(fileConversionHistoryEntity);
             await omniPortDataContext.SaveChangesAsync();
+            logger.LogInformation(
+                "Recorded file conversion for mapping {MappingTemplateId}; file {FileName}; output {OutputLink}",
+                fileConversionHistoryDto.MappingTemplateId,
+                fileConversionHistoryDto.FileName,
+                fileConversionHistoryDto.OutputLink);
         }
 
         public async Task<IReadOnlyList<FileConversionHistoryDto>> GetFileConversionHistory()
@@ -302,6 +337,10 @@ namespace Presentation.Services
             {
                 existingWatchedUrlEntity.CheckIntervalMinutes = intervalMinutes;
                 await omniPortDataContext.SaveChangesAsync();
+                logger.LogInformation(
+                    "Updated watched URL {WatchedUrlId} interval to {IntervalMinutes} minutes",
+                    existingWatchedUrlEntity.Id,
+                    intervalMinutes);
                 return existingWatchedUrlEntity.Id;
             }
 
@@ -314,6 +353,10 @@ namespace Presentation.Services
 
             omniPortDataContext.UrlFileGetting.Add(watchedUrlEntityToCreate);
             await omniPortDataContext.SaveChangesAsync();
+            logger.LogInformation(
+                "Added watched URL {WatchedUrlId} for mapping {MappingTemplateId}",
+                watchedUrlEntityToCreate.Id,
+                mappingTemplateId);
             return watchedUrlEntityToCreate.Id;
         }
 
@@ -323,11 +366,13 @@ namespace Presentation.Services
 
             if (watchedUrlEntity is null)
             {
+                logger.LogWarning("Cannot delete missing watched URL {WatchedUrlId}", watchedUrlId);
                 return false;
             }
 
             omniPortDataContext.UrlFileGetting.Remove(watchedUrlEntity);
             await omniPortDataContext.SaveChangesAsync();
+            logger.LogInformation("Deleted watched URL {WatchedUrlId}", watchedUrlId);
             return true;
         }
 

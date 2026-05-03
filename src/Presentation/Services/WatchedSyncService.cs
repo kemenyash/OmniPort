@@ -5,6 +5,7 @@ using BusinessLogic.Interfaces;
 using BusinessLogic.Records;
 using BusinessLogic.Utilities;
 using System.Collections.Concurrent;
+using Presentation.Telemetry;
 
 namespace Presentation.Services
 {
@@ -42,9 +43,11 @@ namespace Presentation.Services
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            serviceLogger.LogInformation("Watched URL sync service is starting");
             try
             {
                 await applicationSyncContext.Initialize(stoppingToken);
+                serviceLogger.LogInformation("Watched URL sync service initialized app sync context");
             }
             catch (Exception exception)
             {
@@ -73,6 +76,8 @@ namespace Presentation.Services
                 {
                 }
             }
+
+            serviceLogger.LogInformation("Watched URL sync service stopped");
         }
 
         private async Task Tick(CancellationToken cancellationToken)
@@ -80,9 +85,11 @@ namespace Presentation.Services
             var watchedUrls = applicationSyncContext.WatchedUrls;
             if (watchedUrls.Count == 0)
             {
+                serviceLogger.LogDebug("No watched URLs configured");
                 return;
             }
 
+            serviceLogger.LogDebug("Scanning {WatchedUrlCount} watched URLs", watchedUrls.Count);
             var utcNow = DateTime.UtcNow;
 
             foreach (var watchedUrl in watchedUrls)
@@ -90,6 +97,7 @@ namespace Presentation.Services
                 var storedUrl = (watchedUrl.Url ?? string.Empty).Trim();
                 if (string.IsNullOrWhiteSpace(storedUrl))
                 {
+                    serviceLogger.LogWarning("Watched URL {WatchedUrlId} has an empty URL", watchedUrl.Id);
                     continue;
                 }
 
@@ -105,6 +113,10 @@ namespace Presentation.Services
 
                 if (lastConversion == null || utcNow - lastConversion.ConvertedAt >= watchInterval)
                 {
+                    serviceLogger.LogInformation(
+                        "Scheduling watched URL {Url} for mapping {MappingTemplateId}",
+                        storedUrl,
+                        mappingTemplateId);
                     _ = ProcessScheduledUrl(storedUrl, mappingTemplateId, cancellationToken);
                 }
             }
@@ -126,6 +138,7 @@ namespace Presentation.Services
         private async Task ProcessUrl(string storedUrl, int mappingTemplateId, CancellationToken cancellationToken)
         {
             var effectiveUrl = UrlWatchTagger.StripTag(storedUrl);
+            OmniPortTelemetry.WatchedUrlChecks.Add(1);
 
             var effectiveUrlLock = urlLocksByEffectiveUrl.GetOrAdd(
                 effectiveUrl,
@@ -135,6 +148,10 @@ namespace Presentation.Services
 
             try
             {
+                serviceLogger.LogDebug(
+                    "Checking watched URL {EffectiveUrl} for mapping {MappingTemplateId}",
+                    effectiveUrl,
+                    mappingTemplateId);
                 var contentSnapshot = urlContentFetcher.DownloadEffectiveContent(effectiveUrl, cancellationToken);
                 if (contentSnapshot.IsEmpty)
                 {
@@ -177,7 +194,11 @@ namespace Presentation.Services
 
                 await sourceFingerprintStore.SetHash(effectiveUrl, currentContentHash, mappingTemplateId);
 
-                serviceLogger.LogInformation("Updated from {Url} (hash changed)", effectiveUrl);
+                serviceLogger.LogInformation(
+                    "Updated watched URL {Url} for mapping {MappingTemplateId}; output {OutputLink}",
+                    effectiveUrl,
+                    mappingTemplateId,
+                    outputLink);
             }
             catch (OperationCanceledException)
             {

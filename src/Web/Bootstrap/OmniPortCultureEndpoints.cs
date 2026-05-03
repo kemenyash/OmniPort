@@ -10,9 +10,15 @@ namespace Web.Bootstrap
             return app;
         }
 
-        private static IResult SetCulture(HttpContext httpContext, string culture, string? returnUrl)
+        private static IResult SetCulture(
+            HttpContext httpContext,
+            string culture,
+            string? returnUrl,
+            ILoggerFactory loggerFactory)
         {
             var normalizedCulture = AppLocalizer.NormalizeCulture(culture);
+            loggerFactory.CreateLogger("OmniPort.Culture")
+                .LogInformation("Culture changed to {Culture}", normalizedCulture);
 
             httpContext.Response.Cookies.Append(
                 AppLocalizer.CookieName,

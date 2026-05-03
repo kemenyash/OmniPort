@@ -7,10 +7,13 @@ using BusinessLogic.Interfaces;
 using BusinessLogic.Mappers;
 using BusinessLogic.Models;
 using Presentation.Services;
+using Presentation.Telemetry;
 using System.Net;
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using System.Xml;
+using Microsoft.Extensions.Logging;
 
 public class TransformationExecutor : ITransformationExecutionService
 {
@@ -18,37 +21,99 @@ public class TransformationExecutor : ITransformationExecutionService
     private readonly IImportParserFactory importParserFactory;
     private readonly ITransformationManager transformationManager;
     private readonly IWebHostEnvironment webHostEnvironment;
+    private readonly ILogger<TransformationExecutor> logger;
 
     public TransformationExecutor(
         IOptionsMonitor<UploadLimits> uploadLimitsMonitor,
         IImportParserFactory importParserFactory,
         ITransformationManager transformationManager,
-        IWebHostEnvironment webHostEnvironment)
+        IWebHostEnvironment webHostEnvironment,
+        ILogger<TransformationExecutor> logger)
     {
         this.uploadLimitsMonitor = uploadLimitsMonitor;
         this.importParserFactory = importParserFactory;
         this.transformationManager = transformationManager;
         this.webHostEnvironment = webHostEnvironment;
+        this.logger = logger;
     }
 
     public async Task<string> TransformUploadedFile(int templateId, object file, string outputExtension)
     {
-        var join = await transformationManager.GetImportProfileForJoin(templateId);
-        using var inputStream = await ResolveStream(file, join.ImportSourceType);
-        var mappedRows = await ParseAndMap(inputStream, join.ImportSourceType, join.Profile);
-        var baseFileName = GetBaseNameFromUpload(file) ?? $"template-{templateId}";
+        using var activity = OmniPortTelemetry.ActivitySource.StartActivity("TransformUploadedFile");
+        activity?.SetTag("template.id", templateId);
+        activity?.SetTag("output.extension", outputExtension);
+        OmniPortTelemetry.TransformationsStarted.Add(1, KeyValuePair.Create<string, object?>("source", "upload"));
+        var stopwatch = Stopwatch.StartNew();
 
-        return await SaveTransformed(mappedRows, outputExtension, baseFileName);
+        try
+        {
+            logger.LogInformation("Starting uploaded file transformation for template {TemplateId}", templateId);
+            var join = await transformationManager.GetImportProfileForJoin(templateId);
+            using var inputStream = await ResolveStream(file, join.ImportSourceType);
+            var mappedRows = await ParseAndMap(inputStream, join.ImportSourceType, join.Profile);
+            var baseFileName = GetBaseNameFromUpload(file) ?? $"template-{templateId}";
+
+            var outputUrl = await SaveTransformed(mappedRows, outputExtension, baseFileName);
+            logger.LogInformation(
+                "Uploaded file transformation completed for template {TemplateId}; output {OutputUrl}",
+                templateId,
+                outputUrl);
+
+            return outputUrl;
+        }
+        catch (Exception exception)
+        {
+            OmniPortTelemetry.TransformationsFailed.Add(1, KeyValuePair.Create<string, object?>("source", "upload"));
+            logger.LogError(exception, "Uploaded file transformation failed for template {TemplateId}", templateId);
+            throw;
+        }
+        finally
+        {
+            stopwatch.Stop();
+            OmniPortTelemetry.TransformationDuration.Record(
+                stopwatch.Elapsed.TotalMilliseconds,
+                KeyValuePair.Create<string, object?>("source", "upload"));
+        }
     }
 
     public async Task<string> TransformFromUrl(int templateId, string url, string outputExtension)
     {
-        var join = await transformationManager.GetImportProfileForJoin(templateId);
-        using var inputStream = await OpenHttpStreamWithCap(url, join.ImportSourceType);
-        var mappedRows = await ParseAndMap(inputStream, join.ImportSourceType, join.Profile);
-        var baseFileName = MakeSafeFileName(new Uri(url).Segments.LastOrDefault() ?? "remote");
+        using var activity = OmniPortTelemetry.ActivitySource.StartActivity("TransformFromUrl");
+        activity?.SetTag("template.id", templateId);
+        activity?.SetTag("url", url);
+        activity?.SetTag("output.extension", outputExtension);
+        OmniPortTelemetry.TransformationsStarted.Add(1, KeyValuePair.Create<string, object?>("source", "url"));
+        var stopwatch = Stopwatch.StartNew();
 
-        return await SaveTransformed(mappedRows, outputExtension, baseFileName);
+        try
+        {
+            logger.LogInformation("Starting URL transformation for template {TemplateId} from {Url}", templateId, url);
+            var join = await transformationManager.GetImportProfileForJoin(templateId);
+            using var inputStream = await OpenHttpStreamWithCap(url, join.ImportSourceType);
+            var mappedRows = await ParseAndMap(inputStream, join.ImportSourceType, join.Profile);
+            var baseFileName = MakeSafeFileName(new Uri(url).Segments.LastOrDefault() ?? "remote");
+
+            var outputUrl = await SaveTransformed(mappedRows, outputExtension, baseFileName);
+            logger.LogInformation(
+                "URL transformation completed for template {TemplateId}; output {OutputUrl}",
+                templateId,
+                outputUrl);
+
+            return outputUrl;
+        }
+        catch (Exception exception)
+        {
+            OmniPortTelemetry.TransformationsFailed.Add(1, KeyValuePair.Create<string, object?>("source", "url"));
+            logger.LogError(exception, "URL transformation failed for template {TemplateId} from {Url}", templateId, url);
+            throw;
+        }
+        finally
+        {
+            stopwatch.Stop();
+            OmniPortTelemetry.TransformationDuration.Record(
+                stopwatch.Elapsed.TotalMilliseconds,
+                KeyValuePair.Create<string, object?>("source", "url"));
+        }
     }
 
 
@@ -84,6 +149,7 @@ public class TransformationExecutor : ITransformationExecutionService
                 }
         }
 
+        logger.LogDebug("Saved transformed export {OutputFilePath}", outputFilePath);
         return $"/exports/{outputFileName}";
     }
 
@@ -105,6 +171,7 @@ public class TransformationExecutor : ITransformationExecutionService
         ImportProfile importProfile)
     {
         var importParser = importParserFactory.Create(sourceType);
+        logger.LogDebug("Parsing input as {SourceType}", sourceType);
 
         var parsedRows = await importParser.ParseAsync(stream);
 
@@ -116,6 +183,7 @@ public class TransformationExecutor : ITransformationExecutionService
             mappedRows.Add(importMapper.MapRow(parsedRow));
         }
 
+        logger.LogInformation("Parsed and mapped {RowCount} rows for profile {ProfileName}", mappedRows.Count, importProfile.ProfileName);
         return mappedRows;
     }
 
@@ -131,6 +199,11 @@ public class TransformationExecutor : ITransformationExecutionService
                 {
                     if (browserFile.Size > maxAllowedBytes)
                     {
+                        logger.LogWarning(
+                            "Upload {FileName} rejected: {FileSize} bytes exceeds {MaxAllowedBytes}",
+                            browserFile.Name,
+                            browserFile.Size,
+                            maxAllowedBytes);
                         throw new InvalidOperationException(
                             $"File {browserFile.Name} exceeds the maximum size of {maxAllowedBytes} bytes.");
                     }
@@ -143,6 +216,11 @@ public class TransformationExecutor : ITransformationExecutionService
                 {
                     if (formFile.Length > maxAllowedBytes)
                     {
+                        logger.LogWarning(
+                            "Form upload {FileName} rejected: {FileSize} bytes exceeds {MaxAllowedBytes}",
+                            formFile.FileName,
+                            formFile.Length,
+                            maxAllowedBytes);
                         throw new InvalidOperationException(
                             $"File {formFile.FileName} exceeds the maximum size of {maxAllowedBytes} bytes.");
                     }
@@ -162,6 +240,11 @@ public class TransformationExecutor : ITransformationExecutionService
 
                     if (fileInfo.Length > maxAllowedBytes)
                     {
+                        logger.LogWarning(
+                            "File {FileName} rejected: {FileSize} bytes exceeds {MaxAllowedBytes}",
+                            fileInfo.Name,
+                            fileInfo.Length,
+                            maxAllowedBytes);
                         throw new InvalidOperationException(
                             $"File {fileInfo.Name} exceeds the maximum size of {maxAllowedBytes} bytes.");
                     }
@@ -179,6 +262,7 @@ public class TransformationExecutor : ITransformationExecutionService
 
             default:
                 {
+                    logger.LogWarning("Unsupported upload object type {UploadType}", file?.GetType().FullName);
                     throw new NotSupportedException($"Unsupported upload type: {file?.GetType().FullName}");
                 }
         }
@@ -214,6 +298,11 @@ public class TransformationExecutor : ITransformationExecutionService
             cancellationToken);
 
         initialResponse.EnsureSuccessStatusCode();
+        logger.LogDebug(
+            "Downloaded URL headers for {Url}; status {StatusCode}; content type {ContentType}",
+            url,
+            (int)initialResponse.StatusCode,
+            initialResponse.Content.Headers.ContentType?.MediaType);
 
         var responseContentType = initialResponse.Content.Headers.ContentType?.MediaType ?? string.Empty;
 
@@ -232,6 +321,7 @@ public class TransformationExecutor : ITransformationExecutionService
 
                 if (TryExtractXlsxHref(htmlHead, baseUri, out var directUri))
                 {
+                    logger.LogInformation("Resolved XLSX link {DirectUri} from HTML page {Url}", directUri, url);
                     using var fileRequest = new HttpRequestMessage(HttpMethod.Get, directUri);
                     fileRequest.Headers.UserAgent.ParseAdd("OmniPort/1.0");
                     fileRequest.Headers.Referrer = baseUri;
@@ -253,6 +343,7 @@ public class TransformationExecutor : ITransformationExecutionService
                     if (!LooksLikeZip(seekableFileStream))
                     {
                         var responseHeadPreview = await PeekText(seekableFileStream, 1024);
+                        logger.LogWarning("Direct XLSX link {DirectUri} did not return a valid XLSX/ZIP", directUri);
 
                         throw new InvalidOperationException(
                             $"Direct link did not return XLSX/ZIP. Content-Type: '{fileResponse.Content.Headers.ContentType?.MediaType}'. Head: {responseHeadPreview}");
@@ -262,6 +353,7 @@ public class TransformationExecutor : ITransformationExecutionService
                 }
             }
 
+            logger.LogWarning("Remote content from {Url} is not a valid XLSX/ZIP", url);
             throw new InvalidOperationException(
                 $"Remote content is not a valid XLSX/ZIP. Content-Type: '{responseContentType}'. " +
                 $"Head: {TrimPreview(htmlHead)}");

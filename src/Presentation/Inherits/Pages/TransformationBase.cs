@@ -44,7 +44,7 @@ namespace Presentation.Inherits.Pages
             return Task.CompletedTask;
         }
 
-        protected async Task RunTransformation(EditContext editContext)
+        protected async Task RunTransformation()
         {
             await ViewModel.RunTransformation();
             StateHasChanged();

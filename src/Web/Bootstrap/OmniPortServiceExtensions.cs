@@ -4,6 +4,7 @@ using Infrastructure;
 using Infrastructure.Auth;
 using Presentation;
 using Web.Localization;
+using Web.Telemetry;
 
 namespace Web.Bootstrap
 {
@@ -24,6 +25,14 @@ namespace Web.Bootstrap
             services.AddHttpClient();
             services.AddHttpContextAccessor();
             services.AddScoped<IAppLocalizer, AppLocalizer>();
+            services.Configure<ApplicationLogStoreOptions>(
+                configuration.GetSection("RuntimeLogging"));
+            services.AddSingleton<ApplicationLogStore>();
+            services.AddSingleton<IApplicationLogStore>(sp =>
+                sp.GetRequiredService<ApplicationLogStore>());
+            services.AddSingleton<ILoggerProvider, FileBackedLoggerProvider>();
+            services.AddHealthChecks();
+            services.AddOmniPortOpenTelemetry(serviceName: "omniport-web");
 
             services.AddAuthentication(IdentityConstants.ApplicationScheme)
                     .AddIdentityCookies();

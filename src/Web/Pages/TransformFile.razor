@@ -4,6 +4,8 @@
 @using Presentation.Models
 @inherits TransformationBase
 @inject IAppLocalizer L
+@inject IJSRuntime JsRuntime
+@inject NavigationManager NavigationManager
 
 <EditForm Model="@ViewModel.FormModel" OnValidSubmit="RunTransformation">
     <DataAnnotationsValidator />
@@ -76,20 +78,47 @@
         <div class="flex items-center gap-3">
             <button type="submit"
                     class="bg-green-600 text-white px-4 py-2 rounded disabled:opacity-50"
-                    disabled="@(!ViewModel.CanRun)">
-                @L["RunTransformation"]
+                    disabled="@(!ViewModel.CanRun || ViewModel.IsBusy)">
+                @(ViewModel.IsBusy ? L["Processing"] : L["RunTransformation"])
             </button>
 
             @if (ViewModel.InputMode == UploadMode.Url)
             {
                 <button type="button"
                         class="bg-indigo-600 text-white px-4 py-2 rounded disabled:opacity-50"
-                        disabled="@(!ViewModel.CanAddToWatchlist)"
+                        disabled="@(!ViewModel.CanAddToWatchlist || ViewModel.IsBusy)"
                         @onclick="AddToWatchlistFromForm">
                     @L["AddToWatchlist"]
                 </button>
             }
         </div>
+
+        @if (!string.IsNullOrWhiteSpace(ViewModel.ErrorMessage))
+        {
+            <div class="text-red-600">@ViewModel.ErrorMessage</div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(ViewModel.SuccessMessage))
+        {
+            <div class="rounded border border-green-200 bg-green-50 px-4 py-3 text-green-800">
+                <div>@L["TransformationCompleted"]</div>
+                @if (!string.IsNullOrWhiteSpace(ViewModel.LastOutputLink))
+                {
+                    <div class="mt-2 flex items-center gap-2">
+                        <a href="@ViewModel.LastOutputLink" target="_blank" class="text-green-700 underline">
+                            @L["OpenLatestResult"]
+                        </a>
+                        <button type="button"
+                                class="inline-flex h-8 w-8 items-center justify-center rounded border border-green-300 text-green-700 hover:bg-green-100"
+                                title="@L["CopyLink"]"
+                                aria-label="@L["CopyLink"]"
+                                @onclick="() => CopyLink(ViewModel.LastOutputLink)">
+                            @CopyIcon
+                        </button>
+                    </div>
+                }
+            </div>
+        }
     </div>
 </EditForm>
 
@@ -115,9 +144,21 @@
                     <td class="border px-4 py-2">@watchedUrl.MappingTemplateName</td>
                     <td class="border px-4 py-2">@watchedUrl.IntervalMinutes</td>
                     <td class="border px-4 py-2">
-                        <a href="@($"/watch/{watchedUrl.Id}/latest")" target="_blank" class="text-blue-600 underline">
-                            @L["LatestResult"]
-                        </a>
+                        @{
+                            var stableLink = $"/watch/{watchedUrl.Id}/latest";
+                        }
+                        <div class="flex items-center gap-2">
+                            <a href="@stableLink" target="_blank" class="text-blue-600 underline">
+                                @L["LatestResult"]
+                            </a>
+                            <button type="button"
+                                    class="inline-flex h-8 w-8 items-center justify-center rounded border border-gray-300 text-gray-700 hover:bg-gray-100"
+                                    title="@L["CopyStableLink"]"
+                                    aria-label="@L["CopyStableLink"]"
+                                    @onclick="() => CopyLink(stableLink)">
+                                @CopyIcon
+                            </button>
+                        </div>
                     </td>
                 </tr>
             }
@@ -145,7 +186,16 @@
                     <td class="border px-4 py-2">@urlConversionHistoryItem.ConvertedAt.ToLocalTime()</td>
                     <td class="border px-4 py-2">@urlConversionHistoryItem.MappingTemplateName</td>
                     <td class="border px-4 py-2">
-                        <a href="@urlConversionHistoryItem.OutputLink" target="_blank" class="text-blue-600 underline">@L["View"]</a>
+                        <div class="flex items-center gap-2">
+                            <a href="@urlConversionHistoryItem.OutputLink" target="_blank" class="text-blue-600 underline">@L["View"]</a>
+                            <button type="button"
+                                    class="inline-flex h-8 w-8 items-center justify-center rounded border border-gray-300 text-gray-700 hover:bg-gray-100"
+                                    title="@L["CopyLink"]"
+                                    aria-label="@L["CopyLink"]"
+                                    @onclick="() => CopyLink(urlConversionHistoryItem.OutputLink)">
+                                @CopyIcon
+                            </button>
+                        </div>
                     </td>
                 </tr>
             }
@@ -173,10 +223,80 @@
                     <td class="border px-4 py-2">@fileConversionHistoryItem.ConvertedAt.ToLocalTime()</td>
                     <td class="border px-4 py-2">@fileConversionHistoryItem.MappingTemplateName</td>
                     <td class="border px-4 py-2">
-                        <a href="@fileConversionHistoryItem.OutputLink" target="_blank" class="text-blue-600 underline">@L["View"]</a>
+                        <div class="flex items-center gap-2">
+                            <a href="@fileConversionHistoryItem.OutputLink" target="_blank" class="text-blue-600 underline">@L["View"]</a>
+                            <button type="button"
+                                    class="inline-flex h-8 w-8 items-center justify-center rounded border border-gray-300 text-gray-700 hover:bg-gray-100"
+                                    title="@L["CopyLink"]"
+                                    aria-label="@L["CopyLink"]"
+                                    @onclick="() => CopyLink(fileConversionHistoryItem.OutputLink)">
+                                @CopyIcon
+                            </button>
+                        </div>
                     </td>
                 </tr>
             }
         </tbody>
     </table>
+}
+
+@if (!string.IsNullOrWhiteSpace(copiedLinkMessage))
+{
+    <div class="fixed bottom-4 right-4 rounded bg-gray-900 px-4 py-2 text-sm text-white shadow-lg">
+        @copiedLinkMessage
+    </div>
+}
+
+@code {
+    private string? copiedLinkMessage;
+
+    private static RenderFragment CopyIcon => builder =>
+    {
+        builder.OpenElement(0, "svg");
+        builder.AddAttribute(1, "xmlns", "http://www.w3.org/2000/svg");
+        builder.AddAttribute(2, "viewBox", "0 0 24 24");
+        builder.AddAttribute(3, "fill", "none");
+        builder.AddAttribute(4, "stroke", "currentColor");
+        builder.AddAttribute(5, "stroke-width", "2");
+        builder.AddAttribute(6, "stroke-linecap", "round");
+        builder.AddAttribute(7, "stroke-linejoin", "round");
+        builder.AddAttribute(8, "class", "h-4 w-4");
+        builder.OpenElement(9, "rect");
+        builder.AddAttribute(10, "width", "14");
+        builder.AddAttribute(11, "height", "14");
+        builder.AddAttribute(12, "x", "8");
+        builder.AddAttribute(13, "y", "8");
+        builder.AddAttribute(14, "rx", "2");
+        builder.AddAttribute(15, "ry", "2");
+        builder.CloseElement();
+        builder.OpenElement(16, "path");
+        builder.AddAttribute(17, "d", "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2");
+        builder.CloseElement();
+        builder.CloseElement();
+    };
+
+    private async Task CopyLink(string? link)
+    {
+        if (string.IsNullOrWhiteSpace(link))
+        {
+            return;
+        }
+
+        var absoluteLink = NavigationManager.ToAbsoluteUri(link).ToString();
+
+        try
+        {
+            var copied = await JsRuntime.InvokeAsync<bool>("omniPortClipboard.copyText", absoluteLink);
+            copiedLinkMessage = copied ? L["LinkCopied"] : L["LinkCopyFailed"];
+        }
+        catch
+        {
+            copiedLinkMessage = L["LinkCopyFailed"];
+        }
+
+        StateHasChanged();
+        await Task.Delay(1600);
+        copiedLinkMessage = null;
+        StateHasChanged();
+    }
 }

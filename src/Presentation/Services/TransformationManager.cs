@@ -4,14 +4,19 @@ using BusinessLogic.Interfaces;
 using BusinessLogic.Models;
 using BusinessLogic.Records;
 using Infrastructure;
+using Microsoft.Extensions.Logging;
 
 public class TransformationManager : ITransformationManager
 {
     private readonly OmniPortDataContext omniPortDataContext;
+    private readonly ILogger<TransformationManager> logger;
 
-    public TransformationManager(OmniPortDataContext omniPortDataContext)
+    public TransformationManager(
+        OmniPortDataContext omniPortDataContext,
+        ILogger<TransformationManager> logger)
     {
         this.omniPortDataContext = omniPortDataContext;
+        this.logger = logger;
     }
 
     public async Task<ImportProfileForJoinResultDto> GetImportProfileForJoin(int mappingTemplateId)
@@ -23,6 +28,7 @@ public class TransformationManager : ITransformationManager
 
         if (mappingTemplateData is null)
         {
+            logger.LogWarning("Join mapping {MappingTemplateId} not found while building import profile", mappingTemplateId);
             throw new InvalidOperationException($"Join mapping {mappingTemplateId} not found.");
         }
 
@@ -72,11 +78,19 @@ public class TransformationManager : ITransformationManager
         {
             if (!sourceFieldsById.TryGetValue(mappingField.SourceFieldId, out var sourceField))
             {
+                logger.LogWarning(
+                    "Mapping field {MappingFieldId} references missing source field {SourceFieldId}",
+                    mappingField.Id,
+                    mappingField.SourceFieldId);
                 continue;
             }
 
             if (!targetFieldsById.TryGetValue(mappingField.TargetFieldId, out var targetField))
             {
+                logger.LogWarning(
+                    "Mapping field {MappingFieldId} references missing target field {TargetFieldId}",
+                    mappingField.Id,
+                    mappingField.TargetFieldId);
                 continue;
             }
 
@@ -95,6 +109,11 @@ public class TransformationManager : ITransformationManager
             Template = importTemplate,
             Mappings = fieldMappings
         };
+
+        logger.LogInformation(
+            "Built import profile for mapping {MappingTemplateId} with {MappingCount} field mappings",
+            mappingTemplateData.Id,
+            fieldMappings.Count);
 
         return new ImportProfileForJoinResultDto(
             importProfile,

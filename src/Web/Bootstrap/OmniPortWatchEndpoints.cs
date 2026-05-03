@@ -10,11 +10,16 @@ namespace Web.Bootstrap
             return app;
         }
 
-        private static IResult Latest(int watchedUrlId, IAppSyncContext syncContext)
+        private static IResult Latest(
+            int watchedUrlId,
+            IAppSyncContext syncContext,
+            ILoggerFactory loggerFactory)
         {
+            var logger = loggerFactory.CreateLogger("OmniPort.WatchEndpoint");
             var watchedUrl = syncContext.WatchedUrls.FirstOrDefault(x => x.Id == watchedUrlId);
             if (watchedUrl is null)
             {
+                logger.LogWarning("Latest watched URL request missed unknown id {WatchedUrlId}", watchedUrlId);
                 return Results.NotFound();
             }
 
@@ -27,9 +32,14 @@ namespace Web.Bootstrap
 
             if (latestConversion is null || string.IsNullOrWhiteSpace(latestConversion.OutputLink))
             {
+                logger.LogInformation("Latest conversion is not available for watched URL {WatchedUrlId}", watchedUrlId);
                 return Results.NotFound();
             }
 
+            logger.LogInformation(
+                "Redirecting watched URL {WatchedUrlId} to latest output {OutputLink}",
+                watchedUrlId,
+                latestConversion.OutputLink);
             return Results.Redirect(latestConversion.OutputLink);
         }
     }
