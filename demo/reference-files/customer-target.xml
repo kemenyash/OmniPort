@@ -1,0 +1,38 @@
+<root>
+  <record>
+    <ClientCode>1001</ClientCode>
+    <DisplayName>Anna Melnyk</DisplayName>
+    <EmailAddress>anna.melnyk@example.com</EmailAddress>
+    <Enabled>true</Enabled>
+    <RegisteredAt>2025-01-15</RegisteredAt>
+    <CreditLimit>1200.50</CreditLimit>
+    <RegionCode>UA</RegionCode>
+  </record>
+  <record>
+    <ClientCode>1002</ClientCode>
+    <DisplayName>Mark Johnson</DisplayName>
+    <EmailAddress>mark.johnson@example.com</EmailAddress>
+    <Enabled>false</Enabled>
+    <RegisteredAt>2024-11-03</RegisteredAt>
+    <CreditLimit>0.00</CreditLimit>
+    <RegionCode>US</RegionCode>
+  </record>
+  <record>
+    <ClientCode>1003</ClientCode>
+    <DisplayName>Sofia Chen</DisplayName>
+    <EmailAddress>sofia.chen@example.com</EmailAddress>
+    <Enabled>true</Enabled>
+    <RegisteredAt>2025-03-22</RegisteredAt>
+    <CreditLimit>845.75</CreditLimit>
+    <RegionCode>CA</RegionCode>
+  </record>
+  <record>
+    <ClientCode>1004</ClientCode>
+    <DisplayName>Lucas Meyer</DisplayName>
+    <EmailAddress>lucas.meyer@example.com</EmailAddress>
+    <Enabled>true</Enabled>
+    <RegisteredAt>2023-08-09</RegisteredAt>
+    <CreditLimit>420.10</CreditLimit>
+    <RegionCode>DE</RegionCode>
+  </record>
+</root>
